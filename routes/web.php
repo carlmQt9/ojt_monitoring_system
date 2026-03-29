@@ -1,0 +1,1129 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use App\Rules\ReCaptcha;
+use App\Helpers\MailHelper;
+
+Route::get('/', function () {
+    return view('landing');
+});
+
+// Authentication Routes
+Route::get('/login', function () {
+    return view('auth.login');
+})->name('login')->middleware('guest');
+
+Route::post('/login', function () {
+    $validated = request()->validate([
+        'email' => 'required|email',
+        'password' => 'required|min:6',
+    ]);
+
+    $user = User::where('email', $validated['email'])->first();
+
+    if (!$user || !Hash::check($validated['password'], $user->password)) {
+        return back()->withErrors(['email' => 'Invalid credentials.'])->withInput();
+    }
+
+    if (!$user->is_approved) {
+        return back()->withErrors(['email' => 'Your account is pending approval by the CCIT Head. Please wait for confirmation.'])->withInput();
+    }
+
+    // Store user in session
+    session([
+        'user_id' => $user->id,
+        'user' => $user,
+    ]);
+
+    return redirect()->route('dashboard');
+})->name('login.post');
+
+// Registration Routes
+Route::get('/register', function () {
+    return view('auth.register');
+})->name('register')->middleware('guest');
+
+Route::post('/register', function () {
+    $validated = request()->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|max:255|unique:users',
+        'password' => ['required','min:8','max:128','confirmed','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/'],
+        'password_confirmation' => 'required|min:8|max:128',
+        'role' => 'required|in:student,supervisor,coordinator,ccit_head',
+        'company_id' => 'nullable|exists:companies,id',
+        'school_year' => 'nullable|string|max:20',
+        'terms' => 'required',
+        'school_id_number' => 'nullable|string|max:20',
+    ]);
+
+    // Company is required for students and supervisors
+    if (in_array($validated['role'], ['student', 'supervisor'])) {
+        if (!$validated['company_id']) {
+            return back()->withErrors(['company_id' => 'Please select a company/organization.'])->withInput();
+        }
+    }
+
+    // School ID is required for students and must exist in the approved list
+    if ($validated['role'] === 'student') {
+        if (empty($validated['school_id_number'])) {
+            return back()->withErrors(['school_id_number' => 'School ID number is required for students.'])->withInput();
+        }
+        $schoolId = \App\Models\StudentSchoolId::where('school_id_number', $validated['school_id_number'])
+            ->where('is_used', false)->first();
+        if (!$schoolId) {
+            return back()->withErrors(['school_id_number' => 'This School ID is not on the approved list or has already been used.'])->withInput();
+        }
+    }
+
+    $user = User::create([
+        'name' => $validated['name'],
+        'email' => $validated['email'],
+        'password' => Hash::make($validated['password']),
+        'role' => $validated['role'],
+        'company_id' => $validated['company_id'],
+        'school_year' => $validated['school_year'] ?? null,
+        'school_id_number' => $validated['school_id_number'] ?? null,
+        'is_approved' => $validated['role'] === 'student' ? true : false,
+    ]);
+
+    // Mark school ID as used
+    if ($validated['role'] === 'student' && !empty($validated['school_id_number'])) {
+        \App\Models\StudentSchoolId::where('school_id_number', $validated['school_id_number'])->update(['is_used' => true]);
+    }
+
+    // Send welcome email (silently ignore failures)
+    $needsApproval = $validated['role'] !== 'student';
+    try { MailHelper::sendWelcome($user->email, $user->name, $needsApproval); } catch (\Throwable) {}
+
+    $message = $validated['role'] === 'student'
+        ? 'Registration successful! Please log in with your credentials.'
+        : 'Registration successful! Please wait for the CCIT Head to approve your account before logging in.';
+
+    return redirect()->route('login')->with('success', $message);
+})->name('register.post')->middleware('guest');
+// Student Hours Routes: Log Hours feature removed
+
+Route::get('/dashboard', function () {
+    if (!session('user_id')) {
+        return redirect('/login');
+    }
+
+    $user = session('user');
+
+    // ===== AUTO-TIMEOUT: if student forgot to time out before lunch =====
+    if ($user->role === 'student') {
+        $today    = now()->toDateString();
+        $nowHour  = (int) now()->format('H');
+        // Only apply auto-timeout after 12:00
+        if ($nowHour >= 12) {
+            $openMorning = \App\Models\TimeInRecord::where('student_id', $user->id)
+                ->whereDate('date', $today)
+                ->where('session', 'morning')
+                ->whereNull('time_out')
+                ->first();
+            if ($openMorning) {
+                $autoOut = '12:00';
+                $openMorning->update(['time_out' => $autoOut]);
+                // Calculate hours for this session
+                $inTime  = \Carbon\Carbon::createFromTimeString($openMorning->time_in);
+                $outTime = \Carbon\Carbon::createFromTimeString($autoOut);
+                $hoursWorked = round(max(0, $inTime->diffInMinutes($outTime)) / 60, 2);
+                // Update student hours
+                $sh = \App\Models\StudentHours::where('student_id', $user->id)
+                    ->firstOrCreate(['student_id' => $user->id], ['total_hours_required' => 600]);
+                $sh->update([
+                    'hours_completed' => round(max(0, $sh->hours_completed + $hoursWorked), 2),
+                    'hours_remaining' => round(max(0, $sh->total_hours_required - $sh->hours_completed - $hoursWorked), 2),
+                ]);
+                // Log it
+                \App\Models\DailyHourLog::create([
+                    'student_id'   => $user->id,
+                    'log_date'     => $today,
+                    'hours_logged' => $hoursWorked,
+                    'is_overtime'  => false,
+                    'status'       => 'approved',
+                ]);
+            }
+        }
+    }
+    // ===== END AUTO-TIMEOUT =====
+
+    if ($user->role === 'ccit_head') {
+        return view('dashboards.ccit_head', ['user' => $user]);
+    } elseif ($user->role === 'coordinator') {
+        return view('dashboards.coordinator', ['user' => $user]);
+    } elseif ($user->role === 'supervisor') {
+        return view('dashboards.supervisor', ['user' => $user]);
+    } else {
+        return view('dashboards.student', ['user' => $user]);
+    }
+})->name('dashboard');
+
+Route::get('/logout', function () {
+    session()->flush();
+    return redirect('/');
+});
+
+// Time-In Routes
+Route::post('/time-in', function () {
+    $rules = [
+        'student_id' => 'required|exists:users,id',
+        'date'       => 'required|date',
+        'session'    => 'nullable|in:morning,afternoon',
+    ];
+
+    if (request()->hasFile('photo')) {
+        $rules['photo'] = 'required|image|mimes:jpeg,png,jpg,gif|max:5120';
+    } elseif (!request()->filled('photo_base64')) {
+        $rules['photo_base64'] = 'required_without:photo';
+    }
+
+    $validated = request()->validate($rules);
+
+    $student = User::findOrFail($validated['student_id']);
+
+    // Determine session: afternoon only allowed after 13:00
+    $nowHour = (int) now()->format('H');
+    $session = $validated['session'] ?? 'morning';
+
+    // Auto-detect afternoon if current time >= 13:00
+    if ($nowHour >= 13) {
+        $session = 'afternoon';
+    } else {
+        $session = 'morning';
+    }
+
+    // Check if already timed in for this session today
+    $existingRecord = \App\Models\TimeInRecord::where('student_id', $student->id)
+        ->whereDate('date', $validated['date'])
+        ->where('session', $session)
+        ->first();
+
+    if ($existingRecord) {
+        return back()->withErrors(['date' => 'Already timed in for the ' . $session . ' session today.']);
+    }
+
+    // Afternoon session: only allowed after 13:00
+    if ($session === 'afternoon' && $nowHour < 13) {
+        return back()->withErrors(['date' => 'Afternoon time-in is only available from 1:00 PM onwards.']);
+    }
+
+    // Store the photo
+    $photoPath = null;
+    
+    if (request()->hasFile('photo')) {
+        // File upload
+        $photoPath = request()->file('photo')->store('time-in-photos', 'public');
+    } elseif (request()->filled('photo_base64')) {
+        // Camera capture (base64)
+        $base64Image = request()->input('photo_base64');
+        
+        // Extract base64 data and convert to file
+        if (strpos($base64Image, 'data:image') === 0) {
+            $image_data = explode(',', $base64Image);
+            $image_data = base64_decode($image_data[1]);
+        } else {
+            $image_data = base64_decode($base64Image);
+        }
+        
+        $filename = 'time-in-' . $student->id . '-' . now()->timestamp . '.jpg';
+        $photoPath = 'time-in-photos/' . $filename;
+        
+        \Illuminate\Support\Facades\Storage::disk('public')->put($photoPath, $image_data);
+    }
+
+    // For security, always record server time for time-in to prevent client tampering
+    $serverTimeIn = now()->format('H:i');
+
+    $timeInRecord = \App\Models\TimeInRecord::create([
+        'student_id' => $student->id,
+        'date'       => $validated['date'],
+        'session'    => $session,
+        'time_in'    => $serverTimeIn,
+        'photo_path' => $photoPath,
+    ]);
+
+    return back()->with('success', 'Successfully timed in (' . ucfirst($session) . ' session)!');
+})->name('time-in');
+
+Route::post('/time-out', function () {
+    $rules = [
+        'student_id' => 'required|exists:users,id',
+        'date'       => 'required|date',
+        'session'    => 'nullable|in:morning,afternoon',
+    ];
+
+    if (request()->filled('photo_base64')) {
+        $rules['photo_base64'] = 'string';
+    }
+
+    $validated = request()->validate($rules);
+
+    // Find the open (no time_out) record for today matching session
+    $record = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
+        ->whereDate('date', $validated['date'])
+        ->whereNull('time_out')
+        ->when(isset($validated['session']), fn($q) => $q->where('session', $validated['session']))
+        ->latest()
+        ->first();
+
+    if (!$record) {
+        return back()->withErrors(['date' => 'No open time-in record found for this date.']);
+    }
+
+    // Store the timeout photo if provided
+    $timeOutPhotoPath = $record->photo_path; // Keep existing time-in photo
+    
+    if (request()->filled('photo_base64')) {
+        $base64Image = request()->input('photo_base64');
+        
+        // Extract base64 data and convert to file
+        if (strpos($base64Image, 'data:image') === 0) {
+            $image_data = explode(',', $base64Image);
+            $image_data = base64_decode($image_data[1]);
+        } else {
+            $image_data = base64_decode($base64Image);
+        }
+        
+        $student = User::findOrFail($validated['student_id']);
+        $filename = 'time-out-' . $student->id . '-' . now()->timestamp . '.jpg';
+        $timeOutPhotoPath = 'time-out-photos/' . $filename;
+        
+        \Illuminate\Support\Facades\Storage::disk('public')->put($timeOutPhotoPath, $image_data);
+    }
+
+    // Use server time for time-out to prevent tampering
+    $serverTimeOut = now()->format('H:i');
+    
+    // Add a new field to store timeout photo or update existing record
+    // Since we can't modify the schema, we'll store both time-in and time-out photos in the same record
+    // by creating the timeout photo path separately
+    $record->update([
+        'time_out' => $serverTimeOut,
+        'photo_path' => $timeOutPhotoPath // Update with timeout photo if captured
+    ]);
+
+    // Calculate hours for THIS session
+    $timeInParts  = explode(':', $record->time_in);
+    $timeOutParts = explode(':', $serverTimeOut);
+    $inTime  = \Carbon\Carbon::createFromTime($timeInParts[0], $timeInParts[1], 0);
+    $outTime = \Carbon\Carbon::createFromTime($timeOutParts[0], $timeOutParts[1], 0);
+    $minutesWorked = max(0, $inTime->diffInMinutes($outTime));
+    $hoursWorked   = round($minutesWorked / 60, 2);
+
+    // Calculate TOTAL hours for the day (all sessions combined after this timeout)
+    $allSessionsToday = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
+        ->whereDate('date', $validated['date'])
+        ->whereNotNull('time_out')
+        ->get();
+    $totalDayMinutes = $allSessionsToday->sum(fn($r) =>
+        max(0, \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)))
+    );
+    $totalDayHours = round($totalDayMinutes / 60, 2);
+
+    // OT = anything beyond 8 hours in a day
+    $regularHours = min($totalDayHours, 8);
+    $otHours      = max(0, round($totalDayHours - 8, 2));
+
+    // Update StudentHours table — only add the session hours worked
+    $studentHours = \App\Models\StudentHours::where('student_id', $validated['student_id'])
+        ->firstOrCreate(['student_id' => $validated['student_id']], ['total_hours_required' => 600]);
+
+    $newCompleted = round(max(0, $studentHours->hours_completed + $hoursWorked), 2);
+    $newRemaining = round(max(0, $studentHours->total_hours_required - $newCompleted), 2);
+
+    $studentHours->update([
+        'hours_completed' => $newCompleted,
+        'hours_remaining' => $newRemaining,
+    ]);
+
+    // Create daily log entry
+    \App\Models\DailyHourLog::create([
+        'student_id'   => $validated['student_id'],
+        'log_date'     => $validated['date'],
+        'hours_logged' => max(0, $hoursWorked),
+        'is_overtime'  => $otHours > 0,
+        'status'       => 'approved',
+    ]);
+
+    return back()->with('success', sprintf(
+        'Time-out recorded! Session: %.2f hrs | Day Total: %.2f hrs%s',
+        $hoursWorked,
+        $totalDayHours,
+        $otHours > 0 ? sprintf(' (Regular: %.2f hrs + OT: %.2f hrs)', $regularHours, $otHours) : ''
+    ));
+})->name('time-out');
+
+// AJAX time-out endpoint: returns JSON with updated student hours
+Route::post('/time-out-ajax', function () {
+    $rules = [
+        'student_id' => 'required|exists:users,id',
+        'date' => 'required|date',
+    ];
+
+    if (request()->filled('photo_base64')) {
+        $rules['photo_base64'] = 'string';
+    }
+
+    $validated = request()->validate($rules);
+
+    $record = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
+        ->whereDate('date', $validated['date'])
+        ->first();
+
+    if (!$record) {
+        return response()->json(['error' => 'No time-in record found for this date.'], 422);
+    }
+
+    $timeOutPhotoPath = $record->photo_path;
+    if (request()->filled('photo_base64')) {
+        $base64Image = request()->input('photo_base64');
+        if (strpos($base64Image, 'data:image') === 0) {
+            $image_data = explode(',', $base64Image);
+            $image_data = base64_decode($image_data[1]);
+        } else {
+            $image_data = base64_decode($base64Image);
+        }
+        $student = User::findOrFail($validated['student_id']);
+        $filename = 'time-out-' . $student->id . '-' . now()->timestamp . '.jpg';
+        $timeOutPhotoPath = 'time-out-photos/' . $filename;
+        \Illuminate\Support\Facades\Storage::disk('public')->put($timeOutPhotoPath, $image_data);
+    }
+
+    $serverTimeOut = now()->format('H:i');
+
+    $record->update([
+        'time_out' => $serverTimeOut,
+        'photo_path' => $timeOutPhotoPath,
+    ]);
+
+    $timeInParts = explode(':', $record->time_in);
+    $timeOutParts = explode(':', $serverTimeOut);
+    $inTime = \Carbon\Carbon::createFromTime($timeInParts[0], $timeInParts[1], 0);
+    $outTime = \Carbon\Carbon::createFromTime($timeOutParts[0], $timeOutParts[1], 0);
+    $minutesWorked = $outTime->diffInMinutes($inTime);
+    if ($minutesWorked < 0) $minutesWorked = 0;
+    $hoursWorked = round($minutesWorked / 60, 2);
+
+    $studentHours = \App\Models\StudentHours::where('student_id', $validated['student_id'])
+        ->firstOrCreate(['student_id' => $validated['student_id']], ['total_hours_required' => 600]);
+
+    $newCompleted = round(max(0, $studentHours->hours_completed + $hoursWorked), 2);
+    $newRemaining = round(max(0, $studentHours->total_hours_required - $newCompleted), 2);
+
+    $studentHours->update([
+        'hours_completed' => $newCompleted,
+        'hours_remaining' => $newRemaining,
+    ]);
+
+    \App\Models\DailyHourLog::create([
+        'student_id' => $validated['student_id'],
+        'log_date' => $validated['date'],
+        'hours_logged' => max(0, $hoursWorked),
+        'status' => 'approved',
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'hours_worked' => $hoursWorked,
+        'student_hours' => [
+            'hours_completed' => $studentHours->hours_completed,
+            'hours_remaining' => $studentHours->hours_remaining,
+            'total_hours_required' => $studentHours->total_hours_required,
+            'progress_percentage' => $studentHours->total_hours_required > 0 ? round(($studentHours->hours_completed / $studentHours->total_hours_required) * 100, 2) : 0,
+        ],
+    ]);
+})->name('time-out-ajax');
+
+Route::get('/time-in-status/{studentId}/{date}', function ($studentId, $date) {
+    $record = \App\Models\TimeInRecord::where('student_id', $studentId)
+        ->whereDate('date', $date)
+        ->first();
+
+    return response()->json([
+        'has_timed_in' => $record ? true : false,
+        'time_in' => $record?->time_in,
+        'time_out' => $record?->time_out,
+        'verified' => $record?->verified,
+    ]);
+})->name('time-in-status');
+
+// Student Hours Routes: Log Hours removed
+
+Route::get('/student-progress/{studentId}', function ($studentId) {
+    $student = User::findOrFail($studentId);
+    $studentHours = \App\Models\StudentHours::where('student_id', $studentId)->firstOrCreate(
+        ['student_id' => $studentId],
+        ['total_hours_required' => 600]
+    );
+    
+    $dailyLogs = \App\Models\DailyHourLog::where('student_id', $studentId)
+        ->orderBy('log_date', 'desc')
+        ->get();
+
+    return response()->json([
+        'student' => $student,
+        'hours' => $studentHours,
+        'daily_logs' => $dailyLogs,
+        'progress_percentage' => ($studentHours->hours_completed / 600) * 100,
+    ]);
+})->name('student-progress');
+
+// Approval Routes
+Route::post('/approve-hours/{logId}', function ($logId) {
+    $log = \App\Models\DailyHourLog::findOrFail($logId);
+    $coordinator = User::findOrFail(session('user_id'));
+
+    // If the log is pending, apply its hours to the student's totals
+    if ($log->status === 'pending') {
+        $hours = floatval($log->hours_logged);
+        if ($hours > 0) {
+            $studentHours = \App\Models\StudentHours::where('student_id', $log->student_id)
+                ->firstOrCreate(['student_id' => $log->student_id], ['total_hours_required' => 600]);
+
+            $newCompleted = round(max(0, $studentHours->hours_completed + $hours), 2);
+            $newRemaining = round(max(0, $studentHours->total_hours_required - $newCompleted), 2);
+
+            $studentHours->update([
+                'hours_completed' => $newCompleted,
+                'hours_remaining' => $newRemaining,
+            ]);
+        }
+    }
+
+    $log->update([
+        'status' => 'approved',
+        'approved_by' => $coordinator->id,
+        'approved_at' => now(),
+    ]);
+
+    return back()->with('success', 'Hours log approved!');
+})->name('approve-hours');
+
+Route::post('/deny-hours/{logId}', function ($logId) {
+    $validated = request()->validate([
+        'reason' => 'required|string',
+    ]);
+
+    $log = \App\Models\DailyHourLog::findOrFail($logId);
+    $coordinator = User::findOrFail(session('user_id'));
+    
+    $log->update([
+        'status' => 'denied',
+        'denial_reason' => $validated['reason'],
+        'approved_by' => $coordinator->id,
+        'approved_at' => now(),
+    ]);
+
+    return back()->with('success', 'Hours log denied with reason provided.');
+})->name('deny-hours');
+
+Route::post('/approve-time-in/{recordId}', function ($recordId) {
+    $record = \App\Models\TimeInRecord::findOrFail($recordId);
+    $coordinator = User::findOrFail(session('user_id'));
+    
+    $record->update([
+        'verified' => true,
+        'status' => 'approved',
+        'approved_by' => $coordinator->id,
+        'approved_at' => now(),
+    ]);
+
+    return back()->with('success', 'Time-in record approved!');
+})->name('approve-time-in');
+
+Route::post('/deny-time-in/{recordId}', function ($recordId) {
+    $validated = request()->validate([
+        'reason' => 'required|string',
+    ]);
+
+    $record = \App\Models\TimeInRecord::findOrFail($recordId);
+    $coordinator = User::findOrFail(session('user_id'));
+    
+    $record->update([
+        'status' => 'denied',
+        'denial_reason' => $validated['reason'],
+        'approved_by' => $coordinator->id,
+        'approved_at' => now(),
+    ]);
+
+    return back()->with('success', 'Time-in record denied.');
+})->name('deny-time-in');
+
+Route::post('/upload-requirement', function () {
+    $validated = request()->validate([
+        'student_id'  => 'required|exists:users,id',
+        'title'       => 'required|string|max:255',
+        'description' => 'nullable|string|max:1000',
+        'file'        => 'nullable',
+        'file.*'      => 'file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif,webp,txt|max:5120',
+    ]);
+
+    $files = request()->file('file');
+    if (empty($files)) {
+        return back()->withErrors(['file' => 'Please select at least one file.']);
+    }
+
+    // Normalise: single file or array
+    if (!is_array($files)) $files = [$files];
+
+    // Store each file as a separate requirement entry
+    foreach ($files as $index => $file) {
+        $filePath = $file->store('requirements', 'public');
+        $title = $validated['title'];
+        if (count($files) > 1) $title .= ' (' . ($index + 1) . ')';
+        \App\Models\StudentRequirement::create([
+            'student_id'  => $validated['student_id'],
+            'title'       => $title,
+            'description' => $validated['description'] ?? null,
+            'file_path'   => $filePath,
+            'status'      => 'pending',
+        ]);
+    }
+
+    return back()->with('success', 'Requirement submitted successfully! Waiting for approval.');
+})->name('upload-requirement');
+
+Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
+    $validated = request()->validate([
+        'feedback' => 'required|string|max:1000',
+    ]);
+
+    $requirement = \App\Models\StudentRequirement::with('student')->findOrFail($requirementId);
+    $coordinator = User::findOrFail(session('user_id'));
+    
+    $requirement->update([
+        'status' => 'approved',
+        'feedback' => $validated['feedback'],
+        'approved_by' => $coordinator->id,
+        'approved_at' => now(),
+    ]);
+
+    // Notify student via email
+    if ($requirement->student) {
+        try {
+            \App\Helpers\MailHelper::sendRequirementApproved(
+                $requirement->student->email,
+                $requirement->student->name,
+                $requirement->title,
+                $validated['feedback']
+            );
+        } catch (\Throwable) {}
+    }
+
+    return back()->with('success', 'Requirement approved!');
+})->name('approve-requirement');
+
+Route::post('/reject-requirement/{requirementId}', function ($requirementId) {
+    $validated = request()->validate([
+        'feedback' => 'required|string|max:1000',
+    ]);
+
+    $requirement = \App\Models\StudentRequirement::with('student')->findOrFail($requirementId);
+    $coordinator = User::findOrFail(session('user_id'));
+    
+    // Delete the old file so student must upload a new one
+    if ($requirement->file_path) {
+        \Illuminate\Support\Facades\Storage::disk('public')->delete($requirement->file_path);
+    }
+
+    // Reset to pending with no file so student resubmits
+    $requirement->update([
+        'status' => 'denied',
+        'feedback' => $validated['feedback'],
+        'file_path' => null,
+        'approved_by' => $coordinator->id,
+        'approved_at' => now(),
+    ]);
+
+    // Notify student via email
+    if ($requirement->student) {
+        try {
+            \App\Helpers\MailHelper::sendRequirementDenied(
+                $requirement->student->email,
+                $requirement->student->name,
+                $requirement->title,
+                $validated['feedback']
+            );
+        } catch (\Throwable) {}
+    }
+
+    return response()->json(['success' => true, 'message' => 'Requirement rejected!']);
+})->name('reject-requirement');
+
+Route::get('/generate-dtr-word/{studentId}', function ($studentId) {
+    $student = User::findOrFail($studentId);
+    $sh = \App\Models\StudentHours::where('student_id', $studentId)->first();
+    $timeInRecords = \App\Models\TimeInRecord::where('student_id', $studentId)->orderBy('date','asc')->get();
+    $required   = $sh->total_hours_required ?? 600;
+    $actual     = $timeInRecords->whereNotNull('time_out')->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
+    $totalHours = round(max($sh->hours_completed ?? 0, $actual), 2);
+    $remaining  = round(max(0, $required - $totalHours), 2);
+    $pct        = $required > 0 ? round(($totalHours / $required) * 100, 2) : 0;
+    $company    = $student->company->name ?? 'N/A';
+    $byMonth    = $timeInRecords->groupBy(fn($r) => $r->date->format('Y-m'));
+    $content    = view('reports.dtr_word', compact('student','company','byMonth','totalHours','required','remaining','pct'))->render();
+    return response($content)
+        ->header('Content-Type', 'application/msword')
+        ->header('Content-Disposition', 'attachment; filename="DTR_' . preg_replace('/[^A-Za-z0-9_]/','',$student->name) . '_' . now()->format('Y-m-d') . '.doc"');
+})->name('generate-dtr-word');
+
+Route::get('/generate-dtr/{studentId}', function ($studentId) {
+    $student = User::findOrFail($studentId);
+    $sh = \App\Models\StudentHours::where('student_id', $studentId)->first();
+    $timeInRecords = \App\Models\TimeInRecord::where('student_id', $studentId)->orderBy('date','asc')->get();
+    $required   = $sh->total_hours_required ?? 600;
+    $actual     = $timeInRecords->whereNotNull('time_out')->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
+    $totalHours = round(max($sh->hours_completed ?? 0, $actual), 2);
+    $remaining  = round(max(0, $required - $totalHours), 2);
+    $pct        = $required > 0 ? round(($totalHours / $required) * 100, 2) : 0;
+    $company    = $student->company->name ?? 'N/A';
+    $byMonth    = $timeInRecords->groupBy(fn($r) => $r->date->format('Y-m'));
+    return view('reports.dtr', compact('student','company','byMonth','totalHours','required','remaining','pct'));
+})->name('generate-dtr');
+// Company Routes
+Route::post('/add-company', function () {
+    $validated = request()->validate([
+        'name' => 'required|string|max:255|unique:companies,name',
+        'industry' => 'nullable|string|max:255',
+        'location' => 'nullable|string|max:255',
+        'contact_person' => 'nullable|string|max:255',
+        'contact_email' => 'nullable|email|max:255',
+        'contact_phone' => 'nullable|string|max:20',
+    ]);
+
+    \App\Models\Company::create($validated);
+
+    return back()->with('success', 'Company added successfully!');
+})->name('add-company');
+
+Route::delete('/delete-company/{id}', function ($id) {
+    \App\Models\Company::findOrFail($id)->delete();
+    return back()->with('success', 'Company removed successfully!');
+})->name('delete-company');
+
+// Forgot Password
+Route::post('/forgot-password', function () {
+    $validated = request()->validate(['email' => 'required|email']);
+    $user = User::where('email', $validated['email'])->first();
+
+    if ($user) {
+        $token = bin2hex(random_bytes(32));
+        \Illuminate\Support\Facades\DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $user->email],
+            ['token' => hash('sha256', $token), 'created_at' => now()]
+        );
+        $resetUrl = config('app.url') . '/reset-password?token=' . $token . '&email=' . urlencode($user->email);
+        try { MailHelper::sendPasswordReset($user->email, $user->name, $resetUrl); } catch (\Throwable) {}
+    }
+
+    return back()->with('success', 'If an account with that email exists, a password reset link has been sent.');
+})->name('forgot-password')->middleware('guest');
+
+// Reset Password GET (token link from email)
+Route::get('/reset-password', function () {
+    $token = request('token');
+    $email = request('email');
+    return view('auth.reset-password', compact('token', 'email'));
+})->name('reset-password.form')->middleware('guest');
+
+// Reset Password POST
+Route::post('/reset-password', function () {
+    $validated = request()->validate([
+        'email'                 => 'required|email',
+        'token'                 => 'required',
+        'password'              => 'required|min:8|confirmed',
+        'password_confirmation' => 'required',
+    ]);
+
+    $record = \Illuminate\Support\Facades\DB::table('password_reset_tokens')
+        ->where('email', $validated['email'])
+        ->first();
+
+    if (!$record || !hash_equals($record->token, hash('sha256', $validated['token']))) {
+        return back()->withErrors(['token' => 'Invalid or expired reset link.']);
+    }
+
+    if (now()->diffInMinutes($record->created_at) > 60) {
+        \Illuminate\Support\Facades\DB::table('password_reset_tokens')->where('email', $validated['email'])->delete();
+        return back()->withErrors(['token' => 'This reset link has expired. Please request a new one.']);
+    }
+
+    $user = User::where('email', $validated['email'])->first();
+    if (!$user) {
+        return back()->withErrors(['email' => 'No account found with that email.']);
+    }
+
+    $user->update(['password' => Hash::make($validated['password'])]);
+    \Illuminate\Support\Facades\DB::table('password_reset_tokens')->where('email', $validated['email'])->delete();
+
+    return redirect()->route('login')->with('success', 'Password reset successfully! You can now log in.');
+})->name('reset-password')->middleware('guest');
+
+// Student School ID Routes
+Route::get('/api/school-ids', function () {
+    $sy = request('school_year');
+    $query = \App\Models\StudentSchoolId::orderBy('created_at', 'desc');
+    if ($sy) $query->where('school_year', $sy);
+    $ids = $query->get();
+    return response()->json(['school_ids' => $ids]);
+});
+
+Route::post('/api/school-ids', function () {
+    $validated = request()->validate([
+        'school_id_number' => 'required|string|regex:/^\d{2}-\d{1}-\d{1}-\d{4}$/|unique:student_school_ids,school_id_number',
+        'school_year'      => 'nullable|string|max:20',
+    ]);
+    $id = \App\Models\StudentSchoolId::create([
+        'school_id_number' => $validated['school_id_number'],
+        'school_year'      => $validated['school_year'] ?? null,
+    ]);
+    return response()->json(['success' => true, 'school_id' => $id]);
+});
+
+Route::delete('/api/school-ids/{id}', function ($id) {
+    \App\Models\StudentSchoolId::findOrFail($id)->delete();
+    return response()->json(['success' => true]);
+});
+
+Route::put('/api/school-ids/{id}', function ($id) {
+    $sid = \App\Models\StudentSchoolId::findOrFail($id);
+    $validated = request()->validate([
+        'school_id_number' => 'required|string|regex:/^\d{2}-\d{1}-\d{1}-\d{4}$/|unique:student_school_ids,school_id_number,' . $id,
+        'school_year'      => 'nullable|string|max:20',
+    ]);
+    $sid->update($validated);
+    return response()->json(['success' => true, 'school_id' => $sid]);
+});
+
+Route::get('/api/companies', function () {
+    $companies = \App\Models\Company::all();
+    return response()->json(['companies' => $companies]);
+});
+
+// School Year Routes
+Route::get('/api/school-years', function () {
+    $years = \App\Models\SchoolYear::orderBy('label', 'desc')->get();
+    return response()->json(['school_years' => $years]);
+});
+
+Route::post('/api/school-years', function () {
+    $validated = request()->validate([
+        'label' => 'required|string|regex:/^\d{4}-\d{4}$/|unique:school_years,label',
+    ]);
+    $sy = \App\Models\SchoolYear::create(['label' => $validated['label'], 'is_active' => false]);
+    return response()->json(['success' => true, 'school_year' => $sy]);
+});
+
+Route::delete('/api/school-years/{id}', function ($id) {
+    \App\Models\SchoolYear::findOrFail($id)->delete();
+    return response()->json(['success' => true]);
+});
+
+Route::post('/api/school-years/{id}/activate', function ($id) {
+    \App\Models\SchoolYear::query()->update(['is_active' => false]);
+    \App\Models\SchoolYear::findOrFail($id)->update(['is_active' => true]);
+    return response()->json(['success' => true]);
+});
+
+// save global settings (required hours and email notification flag)
+Route::post('/api/settings', function () {
+    \Illuminate\Support\Facades\Log::info('settings POST hit', request()->all());
+    // manual validation so we can return JSON on failure
+    $validator = \Illuminate\Support\Facades\Validator::make(request()->all(), [
+        'required_hours' => 'required|integer|min:0',
+        // will manually cast checkbox value later
+        'email_notifications' => 'nullable',
+    ]);
+
+    if ($validator->fails()) {
+        \Illuminate\Support\Facades\Log::warning('settings validation failed', $validator->errors()->toArray());
+        return response()->json([
+            'success' => false,
+            'message' => 'Validation failed',
+            'errors' => $validator->errors(),
+        ], 422);
+    }
+
+    $validated = $validator->validated();
+    \Illuminate\Support\Facades\Log::info('settings validated', $validated);
+
+    // update student hours requirement for all students
+    \App\Models\StudentHours::query()->update(['total_hours_required' => $validated['required_hours']]);
+    // ensure rows exist for any student missing an entry
+    $studentIds = User::where('role', 'student')->pluck('id');
+    foreach ($studentIds as $sid) {
+        \App\Models\StudentHours::firstOrCreate(
+            ['student_id' => $sid],
+            ['hours_completed' => 0, 'total_hours_required' => $validated['required_hours']]
+        );
+    }
+
+    // cache email notification flag for future use
+    $notify = isset($validated['email_notifications']) ? boolval($validated['email_notifications']) : false;
+    \Illuminate\Support\Facades\Log::info('settings email flag', ['raw' => request()->input('email_notifications'), 'cast' => $notify]);
+    cache(['settings.email_notifications' => $notify]);
+
+    return response()->json(['success' => true]);
+});
+
+// retrieve current settings
+Route::get('/api/settings', function () {
+    $required = \App\Models\StudentHours::query()->value('total_hours_required') ?? 600;
+    $email = cache('settings.email_notifications', false);
+    return response()->json(['required_hours' => $required, 'email_notifications' => $email]);
+});
+
+Route::get('/api/dashboard-stats', function () {
+    $sy = request('school_year');
+    $query = User::where('role', 'student');
+    if ($sy) $query->where('school_year', $sy);
+    $totalStudents = $query->count();
+    $totalUsers = $sy ? $query->count() : User::count();
+    $activePrograms = (clone $query)->distinct('company_id')->count();
+
+    $required = \App\Models\StudentHours::query()->value('total_hours_required') ?? 600;
+    $students = (clone $query)->pluck('id');
+    $completedCount = 0;
+    $totalProgress = 0;
+    foreach ($students as $sid) {
+        $sh = \App\Models\StudentHours::where('student_id', $sid)->first();
+        $actual = \App\Models\TimeInRecord::where('student_id', $sid)
+            ->whereNotNull('time_out')
+            ->get()
+            ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
+        $hours = max($sh->hours_completed ?? 0, $actual);
+        $pct = $required > 0 ? ($hours / $required) * 100 : 0;
+        $totalProgress += $pct;
+        if ($hours >= $required) $completedCount++;
+    }
+    $completionRate = $totalStudents > 0 ? round($totalProgress / $totalStudents) : 0;
+
+    return response()->json([
+        'total_users' => $totalUsers,
+        'total_students' => $totalStudents,
+        'active_programs' => $activePrograms,
+        'completion_rate' => $completionRate . '%',
+    ]);
+});
+
+Route::get('/api/users', function () {
+    $sy = request('school_year');
+    $query = User::query();
+    if ($sy) {
+        $query->where(function($q) use ($sy) {
+            // students: must match school year
+            $q->where(function($sq) use ($sy) {
+                $sq->where('role', 'student')->where('school_year', $sy);
+            })
+            // non-students: match school year OR have no school year (system-level users)
+            ->orWhere(function($sq) use ($sy) {
+                $sq->whereNotIn('role', ['student'])
+                   ->where(function($inner) use ($sy) {
+                       $inner->where('school_year', $sy)->orWhereNull('school_year');
+                   });
+            });
+        });
+    }
+    $users = $query->get();
+    $usersData = $users->map(function ($user) {
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'school_year' => $user->school_year,
+            'school_id_number' => $user->school_id_number,
+            'company' => $user->company ? $user->company->name : null,
+            'company_id' => $user->company_id,
+            'is_approved' => $user->is_approved,
+        ];
+    });
+    return response()->json(['users' => $usersData]);
+});
+
+// return single user for editing
+Route::get('/api/users/{id}', function ($id) {
+    $user = User::findOrFail($id);
+    return response()->json([
+        'id' => $user->id,
+        'name' => $user->name,
+        'email' => $user->email,
+        'role' => $user->role,
+        'school_year' => $user->school_year,
+        'company_id' => $user->company_id,
+    ]);
+});
+
+// create user (used by ccit head form)
+Route::post('/api/users', function () {
+    $validated = request()->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|max:255|unique:users',
+        'password' => ['required','min:8','max:128','confirmed','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/'],
+        'role' => 'required|in:student,supervisor,coordinator,ccit_head',
+        'company_id' => 'nullable|exists:companies,id',
+        'school_year' => 'nullable|string|max:20',
+    ]);
+
+    // Company required for student/supervisor
+    if (in_array($validated['role'], ['student','supervisor']) && !$validated['company_id']) {
+        return response()->json(['success' => false, 'message' => 'Company is required for students and supervisors'], 422);
+    }
+
+    $user = User::create([
+        'name' => $validated['name'],
+        'email' => $validated['email'],
+        'password' => Hash::make($validated['password']),
+        'role' => $validated['role'],
+        'company_id' => $validated['company_id'],
+        'school_year' => $validated['school_year'] ?? null,
+    ]);
+
+    return response()->json(['success' => true, 'user' => $user]);
+});
+
+// update existing user
+Route::put('/api/users/{id}', function ($id) {
+    $user = User::findOrFail($id);
+
+    $validated = request()->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|max:255|unique:users,email,' . $user->id,
+        'password' => ['nullable','min:8','max:128','confirmed','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/'],
+        'role' => 'required|in:student,supervisor,coordinator,ccit_head',
+        'company_id' => 'nullable|exists:companies,id',
+        'school_year' => 'nullable|string|max:20',
+    ]);
+
+    if (in_array($validated['role'], ['student','supervisor']) && !$validated['company_id']) {
+        return response()->json(['success' => false, 'message' => 'Company is required for students and supervisors'], 422);
+    }
+
+    $user->name = $validated['name'];
+    $user->email = $validated['email'];
+    $user->role = $validated['role'];
+    $user->company_id = $validated['company_id'];
+    $user->school_year = $validated['school_year'] ?? null;
+    if (!empty($validated['password'])) {
+        $user->password = Hash::make($validated['password']);
+    }
+    $user->save();
+
+    return response()->json(['success' => true, 'user' => $user]);
+});
+
+Route::get('/api/analytics', function () {
+    $sy = request('school_year');
+    $query = User::where('role', 'student');
+    if ($sy) $query->where('school_year', $sy);
+    $students = $query->get();
+    $required = \App\Models\StudentHours::query()->value('total_hours_required') ?? 600;
+
+    $analytics = $students->map(function ($student) use ($required) {
+        $sh = \App\Models\StudentHours::where('student_id', $student->id)->first();
+        $actual = \App\Models\TimeInRecord::where('student_id', $student->id)
+            ->whereNotNull('time_out')
+            ->get()
+            ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
+        $completed = round(max($sh->hours_completed ?? 0, $actual), 4);
+        return [
+            'student_id' => $student->id,
+            'student_name' => $student->name,
+            'school_year' => $student->school_year,
+            'hours_completed' => $completed,
+            'hours_required' => $required,
+            'status' => $completed >= $required ? 'Completed' : 'In Progress',
+        ];
+    });
+
+    return response()->json([
+        'students' => $students,
+        'analytics' => $analytics,
+    ]);
+});
+
+Route::delete('/api/users/{id}', function ($id) {
+    $user = User::findOrFail($id);
+    $user->delete();
+    return response()->json(['success' => true, 'message' => 'User removed successfully']);
+});
+
+Route::post('/api/users/{id}/approve', function ($id) {
+    $user = User::findOrFail($id);
+    $user->update(['is_approved' => true]);
+    try { MailHelper::sendApproved($user->email, $user->name); } catch (\Throwable) {}
+    return response()->json(['success' => true]);
+});
+
+Route::delete('/api/users/{id}/deny', function ($id) {
+    $user = User::findOrFail($id);
+    try { MailHelper::sendDenied($user->email, $user->name); } catch (\Throwable) {}
+    $user->delete();
+    return response()->json(['success' => true]);
+});
+
+Route::get('/api/reports/system', function () {
+    $required          = \App\Models\StudentHours::query()->value('total_hours_required') ?? 600;
+    $totalUsers        = User::count();
+    $totalStudents     = User::where('role','student')->count();
+    $totalSupervisors  = User::where('role','supervisor')->count();
+    $totalCoordinators = User::where('role','coordinator')->count();
+    $completedCount    = 0;
+    $totalProgress     = 0;
+    $studentRows       = [];
+    foreach (User::where('role','student')->get() as $s) {
+        $sh     = \App\Models\StudentHours::where('student_id',$s->id)->first();
+        $actual = \App\Models\TimeInRecord::where('student_id',$s->id)->whereNotNull('time_out')->get()
+                    ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out))/60);
+        $hours  = round(max($sh->hours_completed ?? 0, $actual), 4);
+        $rem    = round(max(0, $required - $hours), 4);
+        $pct    = $required > 0 ? round(($hours/$required)*100,2) : 0;
+        $totalProgress += $pct;
+        if ($hours >= $required) $completedCount++;
+        $studentRows[] = ['name'=>$s->name,'email'=>$s->email,'company'=>$s->company->name??'N/A','hours_completed'=>$hours,'required'=>$required,'remaining'=>$rem,'pct'=>$pct,'status'=>$hours>=$required?'Completed':'In Progress'];
+    }
+    $completionRate = $totalStudents > 0 ? round($totalProgress/$totalStudents) : 0;
+    $students = $studentRows;
+    $content = view('reports.system', compact('totalUsers','totalStudents','totalSupervisors','totalCoordinators','required','completedCount','completionRate','students'))->render();
+    return response($content)
+        ->header('Content-Type', 'application/vnd.ms-excel; charset=utf-8')
+        ->header('Content-Disposition', 'attachment; filename="System_Report_' . now()->format('Y-m-d') . '.xls"');
+});
+
+Route::get('/api/reports/students', function () {
+    $required = \App\Models\StudentHours::query()->value('total_hours_required') ?? 600;
+    $students = [];
+    foreach (User::where('role','student')->get() as $s) {
+        $sh     = \App\Models\StudentHours::where('student_id',$s->id)->first();
+        $actual = \App\Models\TimeInRecord::where('student_id',$s->id)->whereNotNull('time_out')->get()
+                    ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out))/60);
+        $hours  = round(max($sh->hours_completed ?? 0, $actual), 4);
+        $rem    = round(max(0, $required - $hours), 4);
+        $pct    = $required > 0 ? round(($hours/$required)*100,2) : 0;
+        $students[] = ['name'=>$s->name,'email'=>$s->email,'company'=>$s->company->name??'N/A','hours_completed'=>$hours,'required'=>$required,'remaining'=>$rem,'pct'=>$pct,'status'=>$hours>=$required?'Completed':'In Progress'];
+    }
+    $totalUsers=$totalSupervisors=$totalCoordinators=$completedCount=$completionRate=0;
+    $totalStudents=count($students);
+    $content = view('reports.system', compact('totalUsers','totalStudents','totalSupervisors','totalCoordinators','required','completedCount','completionRate','students'))->render();
+    return response($content)
+        ->header('Content-Type', 'application/vnd.ms-excel; charset=utf-8')
+        ->header('Content-Disposition', 'attachment; filename="Student_Progress_Report_' . now()->format('Y-m-d') . '.xls"');
+});
+
+Route::get('/api/reports/attendance', function () {
+    $rows = [];
+    foreach (\App\Models\TimeInRecord::with('student')->orderBy('date','desc')->get() as $rec) {
+        $hrs = $rec->time_out ? round(\Carbon\Carbon::parse($rec->time_in)->diffInMinutes(\Carbon\Carbon::parse($rec->time_out))/60,4) : 0;
+        $rows[] = ['date'=>$rec->date->format('Y-m-d'),'name'=>$rec->student->name,'company'=>$rec->student->company->name??'N/A','time_in'=>$rec->time_in,'time_out'=>$rec->time_out??'-','hours'=>$hrs,'status'=>$rec->status,'verified'=>$rec->verified];
+    }
+    $records = $rows;
+    $content = view('reports.attendance', compact('records'))->render();
+    return response($content)
+        ->header('Content-Type', 'application/vnd.ms-excel; charset=utf-8')
+        ->header('Content-Disposition', 'attachment; filename="Attendance_Report_' . now()->format('Y-m-d') . '.xls"');
+});
+
