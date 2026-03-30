@@ -199,7 +199,7 @@
                     <input type="checkbox" name="terms" id="terms" required
                         class="w-4 h-4 mt-0.5 rounded border-blue-700 bg-blue-900/50 text-blue-500 cursor-pointer">
                     <label for="terms" class="text-sm text-blue-300">
-                        I agree to the <a href="#" class="text-blue-400 hover:text-blue-300">Terms of Service</a>
+                        I agree to the <button type="button" onclick="openTermsModal()" class="text-blue-400 hover:text-blue-300 underline font-semibold">Terms of Service &amp; Privacy Policy</button>
                     </label>
                     @error('terms')<span class="text-red-400 text-xs mt-1 block">{{ $message }}</span>@enderror
                 </div>
@@ -319,6 +319,142 @@
             }
         }
         document.addEventListener('DOMContentLoaded', updateFormVisibility);
+    </script>
+
+    <!-- Terms & Privacy Modal -->
+    <div id="termsModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4">
+        <div class="bg-slate-900 border border-blue-700/50 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+            <!-- Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-blue-800/50 shrink-0">
+                <h2 class="text-lg font-bold text-white">📋 Terms of Service &amp; Privacy Policy</h2>
+                <button onclick="closeTermsModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-lg">&times;</button>
+            </div>
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto px-6 py-4 text-sm text-gray-300 space-y-5">
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">1. Acceptance of Terms</h3>
+                    <p>By registering and using the PRMSU Sta. Cruz OJT Monitoring System, you agree to comply with and be bound by these Terms of Service. If you do not agree, please do not use this system.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">2. Purpose of the System</h3>
+                    <p>This system is developed exclusively for the <strong class="text-white">PRMSU Sta. Cruz Campus — BSCS Program</strong> to digitize and manage On-the-Job Training (OJT) activities including time-in/out tracking, daily logs, requirements submission, supervisor evaluations, and DTR generation.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">3. User Responsibilities</h3>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li>You must provide accurate and truthful information during registration.</li>
+                        <li>You are responsible for maintaining the confidentiality of your account credentials.</li>
+                        <li>You must not share your account with others.</li>
+                        <li>You must not use this system for any unauthorized or illegal purposes.</li>
+                        <li>Students must only record their own attendance and submissions.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">4. Camera &amp; Photo Usage</h3>
+                    <p>This system requires camera access for time-in/out verification. Photos captured are stored securely and used solely for attendance verification purposes. By using the time-in feature, you consent to your photo being captured and stored.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">5. Account Approval</h3>
+                    <p>All accounts require approval from the CCIT Head or Coordinator before access is granted. The system administrators reserve the right to deny or revoke access at any time.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">6. Prohibited Activities</h3>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li>Falsifying attendance records or time logs.</li>
+                        <li>Uploading inappropriate, offensive, or irrelevant files.</li>
+                        <li>Attempting to access other users' accounts or data.</li>
+                        <li>Tampering with or manipulating system data.</li>
+                    </ul>
+                </div>
+
+                <hr class="border-blue-800/50">
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">🔒 Privacy Policy — Data Privacy Act of 2012 (R.A. 10173)</h3>
+                    <p>In compliance with the <strong class="text-white">Republic Act No. 10173</strong>, also known as the <strong class="text-white">Data Privacy Act of 2012</strong> of the Philippines, we are committed to protecting your personal information.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">7. Data We Collect</h3>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li>Full name, email address, and school ID number</li>
+                        <li>Company/organization assignment</li>
+                        <li>Time-in/out records and attendance photos</li>
+                        <li>Daily task logs and OJT hours</li>
+                        <li>Uploaded requirement documents</li>
+                        <li>Supervisor evaluations and feedback</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">8. How We Use Your Data</h3>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li>To monitor and track OJT progress and attendance</li>
+                        <li>To generate Daily Time Records (DTR)</li>
+                        <li>To facilitate communication between students, supervisors, and coordinators</li>
+                        <li>To comply with PRMSU academic requirements</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">9. Data Protection</h3>
+                    <p>Your personal data is stored securely and accessed only by authorized personnel (Coordinators and CCIT Head). We implement appropriate technical and organizational measures to protect your data against unauthorized access, alteration, or disclosure.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">10. Your Rights Under R.A. 10173</h3>
+                    <ul class="list-disc list-inside space-y-1">
+                        <li><strong class="text-white">Right to be informed</strong> — You have the right to know how your data is collected and used.</li>
+                        <li><strong class="text-white">Right to access</strong> — You may request access to your personal data.</li>
+                        <li><strong class="text-white">Right to correction</strong> — You may request correction of inaccurate data.</li>
+                        <li><strong class="text-white">Right to erasure</strong> — You may request deletion of your data after OJT completion.</li>
+                        <li><strong class="text-white">Right to data portability</strong> — You may request a copy of your data.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">11. Data Retention</h3>
+                    <p>Personal data collected through this system will be retained for the duration of the OJT program and for a reasonable period thereafter as required by PRMSU academic records policy.</p>
+                </div>
+
+                <div>
+                    <h3 class="text-blue-400 font-bold text-base mb-2">12. Contact</h3>
+                    <p>For concerns regarding your personal data or these terms, please contact the <strong class="text-white">CCIT Department — PRMSU Sta. Cruz Campus</strong>.</p>
+                </div>
+
+                <div class="bg-blue-900/20 border border-blue-700/40 rounded-lg p-3 text-xs text-blue-300">
+                    <p>📅 Last updated: {{ date('F Y') }} &nbsp;|&nbsp; PRMSU Sta. Cruz Campus — BSCS OJT Monitoring System</p>
+                </div>
+
+            </div>
+            <!-- Footer -->
+            <div class="px-6 py-4 border-t border-blue-800/50 shrink-0 flex gap-3">
+                <button onclick="closeTermsModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition-all">Close</button>
+                <button onclick="acceptTerms()" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all">✓ I Accept</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openTermsModal() {
+            document.getElementById('termsModal').classList.remove('hidden');
+        }
+        function closeTermsModal() {
+            document.getElementById('termsModal').classList.add('hidden');
+        }
+        function acceptTerms() {
+            document.getElementById('terms').checked = true;
+            closeTermsModal();
+        }
+        document.getElementById('termsModal')?.addEventListener('click', function(e) {
+            if (e.target === this) closeTermsModal();
+        });
     </script>
 
 </body>
