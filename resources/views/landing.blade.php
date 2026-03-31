@@ -115,14 +115,14 @@
     </nav>
 
     <!-- HERO -->
-    <section class="hero-bg relative overflow-hidden min-h-screen flex items-center">
+    <section class="hero-bg relative overflow-hidden min-h-screen flex items-start sm:items-center">
         <!-- dot pattern -->
         <div class="dot-pattern absolute inset-0 opacity-40"></div>
         <!-- glow orbs -->
         <div class="absolute top-20 left-10 w-72 h-72 bg-blue-600 rounded-full blur-3xl opacity-20"></div>
         <div class="absolute bottom-10 right-10 w-96 h-96 bg-blue-800 rounded-full blur-3xl opacity-25"></div>
 
-        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center w-full">
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center w-full">
 
             <!-- Left -->
             <div class="space-y-6">
