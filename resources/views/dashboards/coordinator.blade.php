@@ -1784,11 +1784,16 @@
         })();
 
         // ===== EVALUATION SCORE MODAL =====
-        const _evalData = @json(
-            \App\Models\StudentEvaluation::whereIn('student_id',
-                \App\Models\User::where('role','student')->pluck('id')
-            )->get()->keyBy('student_id')
-        );
+        @php
+            try {
+                $__evalData = \App\Models\StudentEvaluation::whereIn('student_id',
+                    \App\Models\User::where('role','student')->pluck('id')
+                )->get()->keyBy('student_id');
+            } catch(\Exception $e) {
+                $__evalData = collect([]);
+            }
+        @endphp
+        const _evalData = @json($__evalData);
 
         function showEvalModal(studentId, studentName) {
             document.getElementById('evalModalName').textContent = studentName;
