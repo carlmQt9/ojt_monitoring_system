@@ -55,7 +55,7 @@
         body.light .header-info-card .divider { background: #cbd5e1 !important; }
 
         /* SIDEBAR */
-        #sidebar { position:fixed; top:0; left:0; height:100vh; width:16rem; background:#1e3a5f; z-index:40; display:flex; flex-direction:column; transition:width .3s,transform .3s; overflow:hidden; }
+        #sidebar { position:fixed; top:0; left:0; height:100%; min-height:100vh; width:16rem; background:#1e3a5f; z-index:40; display:flex; flex-direction:column; transition:width .3s,transform .3s; overflow:hidden; }
         #sidebar.collapsed { width:4rem; }
         #sidebar.mobile-hidden { transform:translateX(-100%); }
         #top-header { position:fixed; top:0; left:0; right:0; height:3.5rem; background:rgba(15,23,42,0.95); backdrop-filter:blur(8px); border-bottom:1px solid rgba(239,68,68,0.3); z-index:30; display:flex; align-items:center; padding:0 1rem; gap:.75rem; }
@@ -131,33 +131,33 @@
             </div>
         </div>
         <!-- Nav -->
-        <nav class="flex-1 overflow-y-auto px-2 py-3 space-y-1">
-            <button class="nav-item active" onclick="showSection('overview')">
+        <nav class="flex-1 overflow-y-auto px-2 py-3 space-y-1 min-h-0">
+            <button class="nav-item active" onclick="showSection('overview'); closeSidebar();" data-section="overview">
                 <span class="nav-icon">📊</span><span class="nav-label">Overview</span>
             </button>
-            <button class="nav-item" onclick="showSection('users')">
+            <button class="nav-item" onclick="showSection('users'); closeSidebar();" data-section="users">
                 <span class="nav-icon">👥</span><span class="nav-label">Users</span>
             </button>
-            <button class="nav-item" onclick="showSection('analytics')">
+            <button class="nav-item" onclick="showSection('analytics'); closeSidebar();" data-section="analytics">
                 <span class="nav-icon">📈</span><span class="nav-label">Analytics</span>
             </button>
-            <button class="nav-item" onclick="showSection('schoolyears')">
+            <button class="nav-item" onclick="showSection('schoolyears'); closeSidebar();" data-section="schoolyears">
                 <span class="nav-icon">🗓️</span><span class="nav-label">School Years</span>
             </button>
-            <button class="nav-item" onclick="showSection('schoolids')">
+            <button class="nav-item" onclick="showSection('schoolids'); closeSidebar();" data-section="schoolids">
                 <span class="nav-icon">🪪</span><span class="nav-label">School IDs</span>
             </button>
-            <button class="nav-item" onclick="showSection('reports')">
+            <button class="nav-item" onclick="showSection('reports'); closeSidebar();" data-section="reports">
                 <span class="nav-icon">📝</span><span class="nav-label">Reports</span>
             </button>
-            <button class="nav-item" onclick="showSection('settings')">
+            <button class="nav-item" onclick="showSection('settings'); closeSidebar();" data-section="settings">
                 <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
             </button>
         </nav>
-        <!-- Footer -->
-        <div class="px-2 py-3 border-t border-white/10 space-y-1">
-            <button class="nav-item" onclick="showConfirm('logout')">
-                <span class="nav-icon">🚪</span><span class="nav-label">Logout</span>
+        <!-- Footer — always visible at bottom -->
+        <div class="px-2 py-3 border-t border-white/10 shrink-0">
+            <button class="nav-item text-red-400 hover:bg-red-500/10" onclick="showConfirm('logout')">
+                <span class="nav-icon">🚪</span><span class="nav-label font-semibold">Logout</span>
             </button>
         </div>
     </aside>
@@ -1904,9 +1904,8 @@
             document.querySelectorAll('.dash-section').forEach(s => s.classList.add('hidden'));
             const target = document.getElementById('section-' + name);
             if (target) target.classList.remove('hidden');
-            document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(b => {
-                if (b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + name + "'")) b.classList.add('active');
+            document.querySelectorAll('.nav-item[data-section]').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-section') === name);
             });
             const ht = document.getElementById('headerTitle');
             if (ht) ht.textContent = sectionTitles[name] || name;
