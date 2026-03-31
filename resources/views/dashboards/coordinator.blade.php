@@ -651,7 +651,14 @@
 
                                     <tr id="details-{{ $student->id }}" class="hidden bg-slate-900/40">
                                         <td colspan="5" class="p-4">
-                                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            @php
+                                                $coordEval = class_exists('App\\Models\\StudentEvaluation')
+                                                    ? \App\Models\StudentEvaluation::where('student_id', $student->id)->first()
+                                                    : null;
+                                                $evalRating = $coordEval ? $coordEval->rating : null;
+                                                $evalMean = $coordEval ? $coordEval->mean_score : null;
+                                            @endphp
+                                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                                                 <div class="bg-slate-800/50 p-3 rounded">
                                                     <p class="text-xs text-gray-400">Completed</p>
                                                     <p class="text-lg font-bold text-green-400">{{ number_format($displayCompleted, 2) }}</p>
@@ -664,13 +671,25 @@
                                                     <p class="text-xs text-gray-400">Pending Items</p>
                                                     <p class="text-lg font-bold text-yellow-400">{{ $pendingLogs + $pendingTimeIns + $pendingReq }}</p>
                                                 </div>
+                                                <div class="bg-slate-800/50 p-3 rounded">
+                                                    <p class="text-xs text-gray-400">⭐ Eval Score</p>
+                                                    @if($coordEval)
+                                                        <p class="text-lg font-bold text-yellow-400">{{ $evalMean }}/5</p>
+                                                        <div class="flex gap-0.5 mt-1">
+                                                            @for($i=1;$i<=5;$i++)
+                                                            <span class="text-sm @if($i <= $evalRating) text-yellow-400 @else text-gray-600 @endif">★</span>
+                                                            @endfor
+                                                        </div>
+                                                    @else
+                                                        <p class="text-sm text-gray-500">Not evaluated</p>
+                                                    @endif
+                                                </div>
                                             </div>
 
                                             <div class="mt-4 flex gap-2 flex-wrap">
                                                 <button onclick="showLogsModal({{ $student->id }}, '{{ $student->name }}')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">View Logs</button>
-                                                <!-- replaced Add Requirement with View DTR above; removed Profile button per request -->
-                                                
                                                 <button onclick="openDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">View DTR</button>
+                                                <button onclick="showEvalModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm">⭐ Evaluation Score</button>
                                             </div>
                                         </td>
                                     </tr>
@@ -745,14 +764,20 @@
                                 </div>
                             </div>
                             <!-- Actions side by side -->
-                            <div class="flex gap-2">
-                                <button onclick="toggleStudentDetails({{ $student->id }})" class="flex-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold">View Details</button>
-                                <button onclick="showLogsModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold">Logs</button>
-                                <button onclick="openDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="flex-1 px-3 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-semibold">DTR</button>
+                            <div class="grid grid-cols-2 gap-2 mb-2">
+                                <button onclick="toggleStudentDetails({{ $student->id }})" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold">View Details</button>
+                                <button onclick="showLogsModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold">Logs</button>
+                                <button onclick="openDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-semibold">DTR</button>
+                                <button onclick="showEvalModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-semibold">⭐ Eval Score</button>
                             </div>
                             <!-- Expandable details -->
                             <div id="details-{{ $student->id }}-mobile" class="hidden mt-3 pt-3 border-t border-slate-600">
-                                <div class="grid grid-cols-3 gap-2 text-center">
+                                @php
+                                    $mobileEval = class_exists('App\\Models\\StudentEvaluation')
+                                        ? \App\Models\StudentEvaluation::where('student_id', $student->id)->first()
+                                        : null;
+                                @endphp
+                                <div class="grid grid-cols-2 gap-2 text-center">
                                     <div class="bg-slate-800/50 p-2 rounded">
                                         <p class="text-xs text-gray-400">Done</p>
                                         <p class="text-sm font-bold text-green-400">{{ number_format($displayCompleted2, 1) }}</p>
@@ -764,6 +789,14 @@
                                     <div class="bg-slate-800/50 p-2 rounded">
                                         <p class="text-xs text-gray-400">Pending</p>
                                         <p class="text-sm font-bold text-yellow-400">{{ $pendingTotal2 }}</p>
+                                    </div>
+                                    <div class="bg-slate-800/50 p-2 rounded">
+                                        <p class="text-xs text-gray-400">⭐ Eval</p>
+                                        @if($mobileEval)
+                                            <p class="text-sm font-bold text-yellow-400">{{ $mobileEval->mean_score }}/5</p>
+                                        @else
+                                            <p class="text-xs text-gray-500">None</p>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -1541,7 +1574,15 @@
             // Mobile accordion
             document.querySelectorAll('[id^="details-"][id$="-mobile"]').forEach(el => {
                 if (el.id === 'details-' + studentId + '-mobile') {
+                    const isHidden = el.classList.contains('hidden');
                     el.classList.toggle('hidden');
+                    if (isHidden) {
+                        // Scroll to the parent card
+                        setTimeout(() => {
+                            const card = el.closest('[data-student-name]');
+                            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 80);
+                    }
                 } else {
                     el.classList.add('hidden');
                 }
@@ -1741,6 +1782,62 @@
                 document.getElementById('iconSun').classList.remove('hidden');
             }
         })();
+
+        // ===== EVALUATION SCORE MODAL =====
+        const _evalData = @json(
+            \App\Models\StudentEvaluation::whereIn('student_id',
+                \App\Models\User::where('role','student')->pluck('id')
+            )->get()->keyBy('student_id')
+        );
+
+        function showEvalModal(studentId, studentName) {
+            document.getElementById('evalModalName').textContent = studentName;
+            const body = document.getElementById('evalModalBody');
+            const ev = _evalData[studentId];
+            if (!ev) {
+                body.innerHTML = '<div class="text-center py-8"><p class="text-4xl mb-3">⭐</p><p class="text-gray-400">No evaluation submitted yet for this student.</p></div>';
+            } else {
+                const labels = {
+                    attendance:'📅 Attendance',communication:'💬 Communication',
+                    collaboration:'🤝 Collaboration',problem_solving:'🧠 Problem-Solving',
+                    work_ethics:'💼 Work Ethics',time_management:'⏱️ Time Management',
+                    job_skills:'🛠️ Job Skills',employability:'🎯 Employability'
+                };
+                const scores = Object.keys(labels).map(f => ev[f]||0);
+                const mean = (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(2);
+                const overallLabels=['','Poor','Below Average','Average','Good','Excellent'];
+                let html = `<div class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-4 text-center">
+                    <p class="text-xs text-gray-400 mb-1">Overall Rating</p>
+                    <div class="flex justify-center gap-1 mb-1">${[1,2,3,4,5].map(i=>`<span class="text-2xl ${i<=ev.rating?'text-yellow-400':'text-gray-600'}">★</span>`).join('')}</div>
+                    <p class="text-yellow-400 font-semibold">${overallLabels[ev.rating]||''}</p>
+                    <p class="text-gray-400 text-xs mt-1">Mean Score: <span class="text-white font-bold">${mean}/5</span></p>
+                </div><div class="space-y-2">`;
+                Object.entries(labels).forEach(([f,label])=>{
+                    const s=ev[f]||0, pct=(s/5)*100;
+                    html+=`<div class="bg-slate-800/50 rounded-lg p-3"><div class="flex justify-between mb-1"><span class="text-sm text-gray-300">${label}</span><span class="text-sm font-bold text-yellow-400">${s}/5</span></div><div class="w-full bg-slate-700 rounded-full h-2"><div class="h-2 rounded-full bg-gradient-to-r from-yellow-500 to-orange-400" style="width:${pct}%"></div></div></div>`;
+                });
+                html += '</div>';
+                if (ev.feedback) html += `<div class="mt-4 bg-slate-800/50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-1">📝 Feedback</p><p class="text-sm text-gray-300">${ev.feedback}</p></div>`;
+                body.innerHTML = html;
+            }
+            document.getElementById('evalModal').classList.remove('hidden');
+        }
+        function closeEvalModal() { document.getElementById('evalModal').classList.add('hidden'); }
+        document.getElementById('evalModal')?.addEventListener('click', e=>{ if(e.target===document.getElementById('evalModal')) closeEvalModal(); });
+        // ===== END EVALUATION SCORE MODAL =====
     </script>
+    <!-- Evaluation Score Modal -->
+    <div id="evalModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center px-5 py-4 border-b border-slate-700 shrink-0">
+                <h3 class="text-base font-bold text-white">⭐ Evaluation Score — <span id="evalModalName"></span></h3>
+                <button onclick="closeEvalModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white">✕</button>
+            </div>
+            <div id="evalModalBody" class="flex-1 overflow-y-auto px-5 py-4">
+                <p class="text-gray-400 text-sm text-center py-6">Loading...</p>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

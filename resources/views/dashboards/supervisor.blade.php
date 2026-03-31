@@ -1152,8 +1152,15 @@
         function toggleStudentExpand(element) {
             const card = element.closest('.student-card');
             const isExpanded = card.classList.contains('expanded');
+            // Collapse all cards first
             document.querySelectorAll('.student-card.expanded').forEach(c => c.classList.remove('expanded'));
-            if (!isExpanded) card.classList.add('expanded');
+            if (!isExpanded) {
+                card.classList.add('expanded');
+                // Scroll to card on mobile
+                setTimeout(() => {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 100);
+            }
         }
 
         // Robust per-card tab switching (avoids global ID problems and freezing)
