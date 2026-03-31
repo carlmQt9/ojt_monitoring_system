@@ -1937,7 +1937,7 @@
                 if (th) th.style.left = '4rem';
             }
             /* restore last section */
-            const saved = localStorage.getItem('ccitSection') || localStorage.getItem('activeSection') || 'overview';
+            const saved = localStorage.getItem('ccitSection') || 'overview';
             if (saved) showSection(saved);
         });
 
