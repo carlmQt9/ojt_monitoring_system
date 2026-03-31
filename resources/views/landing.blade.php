@@ -73,6 +73,15 @@
         body.light .border-purple-700\/40 { border-color: rgba(109,40,217,0.4) !important; }
         body.light .border-orange-700\/40 { border-color: rgba(194,65,12,0.4) !important; }
         body.light .border-red-700\/40 { border-color: rgba(185,28,28,0.4) !important; }
+        /* Contact section light mode */
+        body.light #contact { background: linear-gradient(180deg,#ddeaf8,#cce0f5) !important; }
+        body.light #contact h2,
+        body.light #contact h3 { color: #0f2460 !important; }
+        body.light #contact p,
+        body.light #contact .text-blue-300 { color: #1e3a6e !important; }
+        body.light #contact .text-blue-400 { color: #1d4ed8 !important; }
+        body.light #contact .bg-blue-900\/20 { background: rgba(255,255,255,0.85) !important; border-color: #93b8dc !important; }
+        body.light #contact .text-white { color: #0f2460 !important; }
     </style>
 </head>
 <body class="text-white">
