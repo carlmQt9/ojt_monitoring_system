@@ -64,7 +64,10 @@
         body.light .bg-blue-600\/30 { background: rgba(160,195,235,0.85) !important; }
         body.light .inline-flex.bg-blue-900\/50 { background: rgba(160,195,235,0.85) !important; border-color: #6a9fd0 !important; }
         body.light .border-blue-700\/50 { border-color: #6a9fd0 !important; }
-        body.light footer { background: #a8c4e0 !important; }
+        body.light footer { background: #6a90b0 !important; }
+        body.light .light-footer { background: #7da8cb !important; }
+        body.light footer span, body.light footer a, body.light footer p { color: #0f2460 !important; }
+        body.light footer a:hover { color: #1e3a8a !important; }
         body.light .bg-green-900\/20 { background: rgba(187,247,208,0.5) !important; }
         body.light .bg-purple-900\/20 { background: rgba(233,213,255,0.5) !important; }
         body.light .bg-orange-900\/20 { background: rgba(254,215,170,0.5) !important; }
@@ -370,7 +373,7 @@
     </section>
 
     <!-- FOOTER -->
-    <footer class="border-t border-blue-900/40 py-10" style="background:#030a1e">
+    <footer class="border-t border-blue-900/40 py-10 light-footer" style="background:#030a1e">
         <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-700 flex items-center justify-center">
