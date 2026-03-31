@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Supervisor Dashboard - OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -581,15 +582,20 @@
                                     📋 Requirements ({{ count($requirements) }})
                                 </button>
                                 @if($canEvaluate)
-                                <button onclick="showEvaluationModal({{ $student->id }}, '{{ $student->name }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm transition-colors text-center">
-                                    ⭐ Evaluate Student
-                                </button>
+                                    @if($evaluation)
+                                    <button onclick="showEvaluationModal({{ $student->id }}, '{{ $student->name }}', true)" class="px-3 py-2 bg-green-700 hover:bg-green-800 text-white rounded text-sm transition-colors text-center">
+                                        ✅ Already Evaluated
+                                    </button>
+                                    @else
+                                    <button onclick="showEvaluationModal({{ $student->id }}, '{{ $student->name }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm transition-colors text-center">
+                                        ⭐ Evaluate Student
+                                    </button>
+                                    @endif
                                 @else
                                 <button disabled title="Student must complete {{ $studentHours->total_hours_required ?? 600 }} hours before evaluation" class="px-3 py-2 bg-slate-600 text-slate-400 rounded text-sm cursor-not-allowed opacity-60 text-center">
                                     ⭐ Evaluate Student
                                 </button>
-                                @endif
-                                <button onclick="openSupDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="col-span-2 sm:col-span-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors text-center">
+                                @endif                                <button onclick="openSupDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="col-span-2 sm:col-span-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors text-center">
                                     📄 Final DTR Report
                                 </button>
                             </div>
@@ -745,22 +751,46 @@
                                     <p class="text-gray-500 text-xs mt-1">Current: {{ number_format($studentHours->hours_completed, 2) }} / {{ $studentHours->total_hours_required ?? 600 }} hrs</p>
                                 </div>
                                 @elseif($evaluation)
-                                <div class="bg-slate-700/30 p-4 rounded-lg">
-                                    <div class="mb-4">
-                                        <p class="text-gray-300 text-sm mb-2">Current Rating:</p>
-                                        <div class="flex gap-2 text-2xl">
-                                            @for($i = 1; $i <= 5; $i++)
-                                                <span class="@if($i <= $studentRating) text-yellow-400 @else text-gray-600 @endif">★</span>
+                                <div class="bg-slate-700/30 p-4 rounded-lg space-y-3">
+                                    <div class="grid grid-cols-2 gap-2 text-xs">
+                                        @php
+                                        $evalFields = [
+                                            'attendance' => '📅 Attendance',
+                                            'communication' => '💬 Communication',
+                                            'collaboration' => '🤝 Collaboration',
+                                            'problem_solving' => '🧠 Problem-Solving',
+                                            'work_ethics' => '💼 Work Ethics',
+                                            'time_management' => '⏱️ Time Management',
+                                            'job_skills' => '🛠️ Job Skills',
+                                            'employability' => '🎯 Employability',
+                                        ];
+                                        @endphp
+                                        @foreach($evalFields as $field => $label)
+                                        <div class="bg-slate-800/50 p-2 rounded">
+                                            <p class="text-gray-400">{{ $label }}</p>
+                                            <div class="flex gap-0.5 mt-1">
+                                                @for($i=1;$i<=5;$i++)
+                                                <span class="text-sm @if($i <= ($evaluation->$field ?? 0)) text-yellow-400 @else text-gray-600 @endif">★</span>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                        @endforeach
+                                    </div>
+                                    <div class="border-t border-slate-600 pt-3">
+                                        <p class="text-gray-400 text-xs mb-1">Overall Rating</p>
+                                        <div class="flex gap-1">
+                                            @for($i=1;$i<=5;$i++)
+                                            <span class="text-xl @if($i <= $studentRating) text-yellow-400 @else text-gray-600 @endif">★</span>
                                             @endfor
                                         </div>
                                     </div>
                                     @if($studentFeedback)
                                     <div>
-                                        <p class="text-gray-300 text-sm mb-2">Feedback:</p>
+                                        <p class="text-gray-400 text-xs mb-1">Feedback:</p>
                                         <p class="text-gray-300 text-sm bg-slate-600/50 p-3 rounded">{{ $studentFeedback }}</p>
                                     </div>
                                     @endif
-                                    <button onclick="showEvaluationModal({{ $student->id }}, '{{ $student->name }}')" class="mt-4 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm transition-colors">Update Evaluation</button>
+                                    <button onclick="showEvaluationModal({{ $student->id }}, '{{ $student->name }}')" class="w-full mt-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm transition-colors">Update Evaluation</button>
                                 </div>
                                 @else
                                 <p class="text-gray-400 text-sm mb-4">No evaluation yet</p>
@@ -868,34 +898,79 @@
     </div>
 
     <!-- Evaluation Modal -->
-    <div id="evaluationModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop">
-        <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
-            <h3 class="text-2xl font-bold text-white mb-6">Evaluate <span id="evalStudentName"></span></h3>
-            
-            <form id="evaluationForm" method="POST" class="space-y-4">
+    <div id="evaluationModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-2xl mx-auto max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center px-6 py-4 border-b border-slate-700 shrink-0">
+                <h3 class="text-xl font-bold text-white">⭐ Evaluate <span id="evalStudentName"></span></h3>
+                <button onclick="closeEvaluationModal()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-6 py-4">
+            <form id="evaluationForm" method="POST" class="space-y-5">
                 @csrf
+                <input type="hidden" name="supervisor_id" value="{{ $user->id }}">
+
+                <!-- Competency Ratings -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-4">Rating (1-5 Stars)</label>
-                    <div class="star-rating" id="starRating">
-                        <span class="star text-3xl cursor-pointer" data-value="1">★</span>
-                        <span class="star text-3xl cursor-pointer" data-value="2">★</span>
-                        <span class="star text-3xl cursor-pointer" data-value="3">★</span>
-                        <span class="star text-3xl cursor-pointer" data-value="4">★</span>
-                        <span class="star text-3xl cursor-pointer" data-value="5">★</span>
+                    <p class="text-sm font-semibold text-yellow-400 mb-3">Performance Competency Ratings <span class="text-gray-400 font-normal">(1 = Poor, 5 = Excellent)</span></p>
+                    <div class="space-y-3">
+                        @php
+                        $competencies = [
+                            'attendance'      => ['label' => 'Attendance & Punctuality',    'icon' => '📅', 'desc' => 'Regularity and timeliness in reporting to work'],
+                            'communication'   => ['label' => 'Communication Skills',         'icon' => '💬', 'desc' => 'Ability to express ideas clearly verbally and in writing'],
+                            'collaboration'   => ['label' => 'Collaboration & Teamwork',     'icon' => '🤝', 'desc' => 'Works effectively with colleagues and supervisors'],
+                            'problem_solving' => ['label' => 'Problem-Solving',              'icon' => '🧠', 'desc' => 'Ability to analyze and resolve work-related challenges'],
+                            'work_ethics'     => ['label' => 'Work Ethics & Professionalism','icon' => '💼', 'desc' => 'Demonstrates integrity, responsibility, and professional conduct'],
+                            'time_management' => ['label' => 'Time Management',              'icon' => '⏱️', 'desc' => 'Efficiently manages tasks and meets deadlines'],
+                            'job_skills'      => ['label' => 'Job Skills & Competence',      'icon' => '🛠️', 'desc' => 'Technical skills and ability to perform assigned tasks'],
+                            'employability'   => ['label' => 'Employability Potential',      'icon' => '🎯', 'desc' => 'Readiness and potential for future employment'],
+                        ];
+                        @endphp
+                        @foreach($competencies as $field => $info)
+                        <div class="bg-slate-700/30 rounded-lg p-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-white text-sm font-semibold">{{ $info['icon'] }} {{ $info['label'] }}</p>
+                                    <p class="text-gray-400 text-xs mt-0.5">{{ $info['desc'] }}</p>
+                                </div>
+                                <div class="flex gap-1 shrink-0" id="stars_{{ $field }}">
+                                    @for($i = 1; $i <= 5; $i++)
+                                    <span class="competency-star text-2xl cursor-pointer text-gray-600 hover:text-yellow-400 transition-colors"
+                                          data-field="{{ $field }}" data-value="{{ $i }}">★</span>
+                                    @endfor
+                                </div>
+                            </div>
+                            <input type="hidden" name="{{ $field }}" id="input_{{ $field }}" value="0">
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- Overall Rating -->
+                <div class="bg-slate-700/40 rounded-lg p-4">
+                    <p class="text-sm font-semibold text-white mb-3">⭐ Overall Performance Rating</p>
+                    <div class="flex gap-2" id="overallStars">
+                        @for($i = 1; $i <= 5; $i++)
+                        <span class="overall-star text-3xl cursor-pointer text-gray-600 hover:text-yellow-400 transition-colors" data-value="{{ $i }}">★</span>
+                        @endfor
                     </div>
                     <input type="hidden" name="rating" id="ratingInput" value="0">
+                    <p class="text-xs text-gray-400 mt-2" id="overallRatingLabel">Select overall rating</p>
                 </div>
 
+                <!-- Feedback -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-2">Feedback</label>
-                    <textarea name="feedback" rows="4" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-yellow-500 focus:outline-none" placeholder="Provide your feedback..."></textarea>
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">📝 Supervisor Feedback / Comments</label>
+                    <textarea name="feedback" rows="3"
+                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-yellow-500 focus:outline-none text-sm"
+                        placeholder="Provide detailed feedback on the student's overall OJT performance, strengths, and areas for improvement..."></textarea>
                 </div>
 
-                <div class="flex gap-3 pt-4">
+                <div class="flex gap-3 pt-2">
                     <button type="button" onclick="closeEvaluationModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">Cancel</button>
                     <button type="submit" class="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors font-semibold">Submit Evaluation</button>
                 </div>
             </form>
+            </div>
         </div>
     </div>
 
@@ -1158,37 +1233,75 @@
         }
 
         // Evaluation Modal
-        function showEvaluationModal(studentId, studentName) {
+        function showEvaluationModal(studentId, studentName, isEvaluated = false) {
             const student = document.querySelector(`.student-card[data-student-id="${studentId}"]`);
             if (student && !student.classList.contains('expanded')) student.classList.add('expanded');
             document.getElementById('evalStudentName').textContent = studentName;
-            document.getElementById('evaluationForm').action = `{{ url('/save-evaluation') }}/${studentId}`;
+            const form = document.getElementById('evaluationForm');
+            form.action = `{{ url('/save-evaluation') }}/${studentId}`;
+            // Reset all stars
+            document.querySelectorAll('.competency-star').forEach(s => {
+                s.classList.remove('text-yellow-400'); s.classList.add('text-gray-600');
+            });
+            document.querySelectorAll('.overall-star').forEach(s => {
+                s.classList.remove('text-yellow-400'); s.classList.add('text-gray-600');
+            });
+            ['attendance','communication','collaboration','problem_solving','work_ethics','time_management','job_skills','employability'].forEach(f => {
+                const el = document.getElementById('input_' + f);
+                if (el) el.value = 0;
+            });
+            document.getElementById('ratingInput').value = 0;
+            document.getElementById('overallRatingLabel').textContent = 'Select overall rating';
+
+            // Disable form if already evaluated
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const allStars = form.querySelectorAll('.competency-star, .overall-star');
+            const feedbackArea = form.querySelector('textarea[name="feedback"]');
+            if (isEvaluated) {
+                if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '✅ Already Submitted'; submitBtn.className = submitBtn.className.replace('bg-yellow-600 hover:bg-yellow-700', 'bg-slate-600 cursor-not-allowed'); }
+                allStars.forEach(s => s.style.pointerEvents = 'none');
+                if (feedbackArea) feedbackArea.disabled = true;
+            } else {
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Evaluation'; submitBtn.className = submitBtn.className.replace('bg-slate-600 cursor-not-allowed', 'bg-yellow-600 hover:bg-yellow-700'); }
+                allStars.forEach(s => s.style.pointerEvents = '');
+                if (feedbackArea) feedbackArea.disabled = false;
+            }
+
             document.getElementById('evaluationModal').classList.remove('hidden');
-            setTimeout(() => {
-                if (student) window.scrollTo({ top: student.getBoundingClientRect().top + window.pageYOffset - 80, behavior: 'smooth' });
-            }, 80);
         }
 
         function closeEvaluationModal() {
             document.getElementById('evaluationModal').classList.add('hidden');
         }
 
-        // Star Rating Handler (modal-wide)
-        document.querySelectorAll('#starRating .star').forEach(star => {
-            star.addEventListener('click', function() {
-                const value = parseInt(this.getAttribute('data-value'), 10);
-                const input = document.getElementById('ratingInput');
-                if (input) input.value = value;
+        // Competency star ratings
+        const overallLabels = ['', 'Poor', 'Below Average', 'Average', 'Good', 'Excellent'];
+        const competencyFields = ['attendance','communication','collaboration','problem_solving','work_ethics','time_management','job_skills','employability'];
 
-                document.querySelectorAll('#starRating .star').forEach((s, index) => {
-                    if (index < value) {
-                        s.classList.add('text-yellow-400');
-                        s.classList.remove('text-gray-600');
-                    } else {
-                        s.classList.remove('text-yellow-400');
-                        s.classList.add('text-gray-600');
-                    }
+        function recalcOverallRating() {
+            const scores = competencyFields.map(f => parseInt(document.getElementById('input_' + f).value) || 0);
+            const filled = scores.filter(s => s > 0);
+            if (filled.length === 0) return;
+            const avg = Math.round(filled.reduce((a,b) => a+b, 0) / filled.length);
+            // Set overall rating
+            document.getElementById('ratingInput').value = avg;
+            document.getElementById('overallRatingLabel').textContent = overallLabels[avg] || '';
+            document.querySelectorAll('.overall-star').forEach((s, idx) => {
+                s.classList.toggle('text-yellow-400', idx < avg);
+                s.classList.toggle('text-gray-600', idx >= avg);
+            });
+        }
+
+        document.querySelectorAll('.competency-star').forEach(star => {
+            star.addEventListener('click', function() {
+                const field = this.getAttribute('data-field');
+                const value = parseInt(this.getAttribute('data-value'));
+                document.getElementById('input_' + field).value = value;
+                document.querySelectorAll(`.competency-star[data-field="${field}"]`).forEach((s, idx) => {
+                    s.classList.toggle('text-yellow-400', idx < value);
+                    s.classList.toggle('text-gray-600', idx >= value);
                 });
+                recalcOverallRating();
             });
         });
 
@@ -1220,12 +1333,67 @@
             activateCardTab(studentId, 'requirements');
         }
 
+        // Evaluation form — submit via AJAX
+        document.getElementById('evaluationForm')?.addEventListener('submit', function(e) {
+            e.preventDefault();
+            e.stopImmediatePropagation(); // prevent pixel-loader from firing
+            const form = this;
+            const rating = parseInt(document.getElementById('ratingInput').value);
+            if (rating < 1) {
+                alert('Please select an overall rating.');
+                return;
+            }
+            const fields = ['attendance','communication','collaboration','problem_solving','work_ethics','time_management','job_skills','employability'];
+            for (const f of fields) {
+                if (parseInt(document.getElementById('input_' + f).value) < 1) {
+                    alert('Please rate all competency areas.');
+                    return;
+                }
+            }
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            if (typeof showPixelLoader === 'function') showPixelLoader('SAVING');
+
+            const fd = new FormData(form);
+            fetch(form.action, {
+                method: 'POST',
+                body: fd,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                }
+            })
+            .then(r => {
+                if (!r.ok) throw new Error('Server error ' + r.status);
+                return r.json();
+            })
+            .then(data => {
+                if (typeof hidePixelLoader === 'function') hidePixelLoader();
+                if (data.success) {
+                    closeEvaluationModal();
+                    if (typeof showSuccess === 'function') showSuccess('Evaluation submitted successfully!');
+                    setTimeout(() => { _allowLeave = true; window.location.reload(); }, 3500);
+                } else {
+                    alert('Failed to submit. Please try again.');
+                }
+            })
+            .catch(err => {
+                if (typeof hidePixelLoader === 'function') hidePixelLoader();
+                console.error('Evaluation error:', err);
+                alert('Submission failed: ' + err.message);
+            })
+            .finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Evaluation';
+            });
+        }, true); // capture phase — runs before pixel-loader listener
+
         // Close modals when clicking outside
         document.querySelectorAll('[id$="Modal"]').forEach(modal => {
             modal.addEventListener('click', function(e) {
-                if (e.target === this) {
-                    this.classList.add('hidden');
-                }
+                if (e.target === this) this.classList.add('hidden');
             });
         });
 

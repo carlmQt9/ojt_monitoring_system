@@ -617,6 +617,29 @@ Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
     return back()->with('success', 'Requirement approved!');
 })->name('approve-requirement');
 
+Route::post('/save-evaluation/{studentId}', function ($studentId) {
+    $data = request()->validate([
+        'supervisor_id'   => 'required|integer',
+        'rating'          => 'required|integer|min:1|max:5',
+        'attendance'      => 'required|integer|min:1|max:5',
+        'communication'   => 'required|integer|min:1|max:5',
+        'collaboration'   => 'required|integer|min:1|max:5',
+        'problem_solving' => 'required|integer|min:1|max:5',
+        'work_ethics'     => 'required|integer|min:1|max:5',
+        'time_management' => 'required|integer|min:1|max:5',
+        'job_skills'      => 'required|integer|min:1|max:5',
+        'employability'   => 'required|integer|min:1|max:5',
+        'feedback'        => 'nullable|string|max:2000',
+    ]);
+    $supervisorId = $data['supervisor_id'];
+    unset($data['supervisor_id']);
+    $eval = \App\Models\StudentEvaluation::updateOrCreate(
+        ['student_id' => $studentId, 'supervisor_id' => $supervisorId],
+        $data
+    );
+    return response()->json(['success' => true, 'rating' => $eval->rating, 'message' => 'Evaluation submitted successfully!']);
+})->name('save-evaluation');
+
 Route::post('/reject-requirement/{requirementId}', function ($requirementId) {
     $validated = request()->validate([
         'feedback' => 'required|string|max:1000',
