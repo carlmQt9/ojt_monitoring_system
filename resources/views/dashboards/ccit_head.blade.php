@@ -63,10 +63,12 @@
         #main-content { padding-top:3.5rem; }
         @media(min-width:1024px){ #main-content { margin-left:16rem; transition:margin-left .3s; } body.sidebar-collapsed #main-content { margin-left:4rem; } }
         .nav-item { display:flex; align-items:center; gap:.75rem; padding:.65rem .75rem; border-radius:.5rem; cursor:pointer; transition:background .2s; color:#cbd5e1; white-space:nowrap; border:none; background:none; width:100%; text-align:left; }
+        @media(max-width:1023px){ .nav-item { padding:.5rem .75rem; } }
         .nav-item:hover { background:rgba(239,68,68,0.15); color:#fff; }
         .nav-item.active { background:rgba(239,68,68,0.38); color:#f87171; }
         .nav-icon { font-size:1.1rem; flex-shrink:0; width:1.5rem; text-align:center; }
         .nav-label { font-size:.875rem; font-weight:500; }
+        @media(max-width:1023px){ .nav-label { font-size:.8rem; } }
         #sidebar.collapsed .nav-label, #sidebar.collapsed .sidebar-title, #sidebar.collapsed .sidebar-subtitle { display:none; }
         .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:35; }
         .sidebar-overlay.active { display:block; }
@@ -121,7 +123,7 @@
     <!-- Sidebar -->
     <aside id="sidebar" class="mobile-hidden">
         <!-- Logo -->
-        <div class="flex items-center gap-3 px-4 py-4 border-b border-white/10">
+        <div class="flex items-center gap-3 px-4 py-3 border-b border-white/10">
             <div class="w-9 h-9 bg-gradient-to-br from-red-400 to-red-600 rounded-lg flex items-center justify-center shrink-0">
                 <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422A12.083 12.083 0 0112 21a12.083 12.083 0 01-6.16-10.422L12 14z"/></svg>
             </div>
@@ -131,7 +133,7 @@
             </div>
         </div>
         <!-- Nav -->
-        <nav class="flex-1 overflow-y-auto px-2 py-3 space-y-1 min-h-0">
+        <nav class="flex-1 overflow-hidden px-2 py-2 space-y-0.5 min-h-0">
             <button class="nav-item active" onclick="showSection('overview'); closeSidebar();" data-section="overview">
                 <span class="nav-icon">📊</span><span class="nav-label">Overview</span>
             </button>
