@@ -211,42 +211,42 @@
         <section id="section-overview" class="dash-section">
 
         <!-- Header Info Card -->
-        <div class="header-info-card mb-8 bg-gradient-to-r from-slate-800/50 to-red-900/30 border border-slate-700 rounded-xl p-6">
-            <h1 class="text-4xl font-bold text-white mb-1">CCIT Head Dashboard</h1>
-            <p class="subtitle text-gray-400 mb-5">Oversee all OJT monitoring and system coordination</p>
-            <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div class="header-info-card mb-6 bg-gradient-to-r from-slate-800/50 to-red-900/30 border border-slate-700 rounded-xl p-4 sm:p-6">
+            <h1 class="text-2xl sm:text-4xl font-bold text-white mb-1">CCIT Head Dashboard</h1>
+            <p class="subtitle text-gray-400 mb-4 text-sm">Oversee all OJT monitoring and system coordination</p>
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <div>
-                    <span class="stat-label text-sm text-gray-400">👤 CCIT Head:</span>
-                    <p class="stat-value-white text-lg font-semibold text-white">{{ $user->name }}</p>
+                    <span class="stat-label text-xs text-gray-400">👤 CCIT Head:</span>
+                    <p class="stat-value-white text-base font-semibold text-white">{{ $user->name }}</p>
                 </div>
                 @if($_activeSY)
-                <div class="divider h-8 w-px bg-slate-600 hidden sm:block"></div>
+                <div class="divider h-6 w-px bg-slate-600 hidden sm:block"></div>
                 <div>
-                    <span class="stat-label text-sm text-gray-400">📅 School Year:</span>
-                    <p class="stat-value-red text-lg font-semibold text-red-400">{{ $_activeSY->label }}</p>
+                    <span class="stat-label text-xs text-gray-400">📅 School Year:</span>
+                    <p class="stat-value-red text-base font-semibold text-red-400">{{ $_activeSY->label }}</p>
                 </div>
                 @endif
             </div>
         </div>
 
         <!-- Head Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
                 <div class="text-gray-400 text-sm font-medium mb-2">👥 Total Users</div>
                 <div class="text-3xl font-bold text-white" id="totalUsers">0</div>
                 <p class="text-xs text-gray-500 mt-2">All system users</p>
             </div>
-            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
                 <div class="text-gray-400 text-sm font-medium mb-2">🎓 Total Students</div>
                 <div class="text-3xl font-bold text-white" id="totalStudents">0</div>
                 <p class="text-xs text-gray-500 mt-2">Currently registered</p>
             </div>
-            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
                 <div class="text-gray-400 text-sm font-medium mb-2">📋 Active Programs</div>
                 <div class="text-3xl font-bold text-white" id="activePrograms">0</div>
                 <p class="text-xs text-gray-500 mt-2">Ongoing OJT programs</p>
             </div>
-            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
                 <div class="text-gray-400 text-sm font-medium mb-2">✅ Completion Rate</div>
                 <div class="text-3xl font-bold text-white" id="completionRate">0%</div>
                 <p class="text-xs text-gray-500 mt-2">Overall system</p>
@@ -254,26 +254,30 @@
         </div>
 
         <!-- Charts Row -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
             <!-- Donut: Completion Rate -->
-            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex flex-col items-center">
-                <h3 class="text-sm font-semibold text-gray-400 mb-4 self-start">✅ Completion Rate</h3>
-                <div class="relative w-40 h-40">
+            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6 flex flex-col items-center">
+                <h3 class="text-sm font-semibold text-gray-400 mb-4 self-start">✅ Completion Status</h3>
+                <div class="relative w-36 h-36">
                     <canvas id="chartCompletion"></canvas>
                     <div class="absolute inset-0 flex items-center justify-center">
                         <span id="chartCompletionLabel" class="text-2xl font-bold text-white">0%</span>
                     </div>
                 </div>
-                <p class="text-xs text-gray-500 mt-3">Completed vs In-Progress</p>
+                <div class="flex flex-col gap-1 mt-3 text-xs">
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500 inline-block"></span><span id="completedCountLabel">0 completed</span></span>
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-orange-400 inline-block"></span><span id="inProgressCountLabel">0 in progress</span></span>
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-slate-500 inline-block"></span><span id="notStartedCountLabel">0 not started</span></span>
+                </div>
             </div>
             <!-- Bar: Users by Role -->
-            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
                 <h3 class="text-sm font-semibold text-gray-400 mb-4">👥 Users by Role</h3>
                 <canvas id="chartRoles" height="160"></canvas>
             </div>
             <!-- Line: Student Registration Trend -->
-            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <h3 class="text-sm font-semibold text-gray-400 mb-4">📈 Student Trend</h3>
+            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
+                <h3 class="text-sm font-semibold text-gray-400 mb-4">📈 Student Trend (6 months)</h3>
                 <canvas id="chartTrend" height="160"></canvas>
             </div>
         </div>
@@ -1791,23 +1795,39 @@
         function updateCharts(data) {
             const rate = parseFloat(data.completion_rate) || 0;
             const completed = Math.round(rate);
-            const remaining = 100 - completed;
-            document.getElementById('chartCompletionLabel').textContent = completed + '%';
+            const completedCount = data.completed_count || 0;
+            const inProgressCount = data.in_progress_count || 0;
+            const totalStudents = data.total_students || 0;
+            const notStarted = Math.max(0, totalStudents - completedCount - inProgressCount);
 
-            const donutData = { datasets: [{ data: [completed, remaining], backgroundColor: ['#ef4444','#334155'], borderWidth: 0, hoverOffset: 4 }] };
+            document.getElementById('chartCompletionLabel').textContent = completed + '%';
+            const completedLbl = document.getElementById('completedCountLabel');
+            const inProgressLbl = document.getElementById('inProgressCountLabel');
+            const notStartedLbl = document.getElementById('notStartedCountLabel');
+            if (completedLbl) completedLbl.textContent = completedCount + ' completed';
+            if (inProgressLbl) inProgressLbl.textContent = inProgressCount + ' in progress';
+            if (notStartedLbl) notStartedLbl.textContent = notStarted + ' not started';
+
+            const donutData = {
+                datasets: [{
+                    data: [completedCount, inProgressCount, notStarted],
+                    backgroundColor: ['#ef4444', '#fb923c', '#475569'],
+                    borderWidth: 0, hoverOffset: 4
+                }]
+            };
             if (chartCompletion) { chartCompletion.data = donutData; chartCompletion.update(); }
             else {
                 chartCompletion = new Chart(document.getElementById('chartCompletion'), {
                     type: 'doughnut', data: donutData,
-                    options: { cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: false } }, animation: { duration: 800 } }
+                    options: { cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: true } }, animation: { duration: 800 } }
                 });
             }
 
-            const roles = data.users_by_role || { student: 0, supervisor: 0, coordinator: 0 };
+            const roles = data.users_by_role || { student: 0, supervisor: 0, coordinator: 0, ccit_head: 0 };
             const barData = {
-                labels: ['Students', 'Supervisors', 'Coordinators'],
-                datasets: [{ data: [roles.student||0, roles.supervisor||0, roles.coordinator||0],
-                    backgroundColor: ['rgba(239,68,68,0.7)','rgba(251,146,60,0.7)','rgba(96,165,250,0.7)'],
+                labels: ['Students', 'Supervisors', 'Coordinators', 'CCIT Head'],
+                datasets: [{ data: [roles.student||0, roles.supervisor||0, roles.coordinator||0, roles.ccit_head||0],
+                    backgroundColor: ['rgba(239,68,68,0.7)','rgba(251,146,60,0.7)','rgba(96,165,250,0.7)','rgba(167,139,250,0.7)'],
                     borderRadius: 6, borderSkipped: false }]
             };
             const barOpts = { plugins: { legend: { display: false } }, scales: { x: { ticks: { color:'#94a3b8' }, grid: { display:false } }, y: { ticks: { color:'#94a3b8', stepSize:1 }, grid: { color:'rgba(148,163,184,0.1)' }, beginAtZero:true } }, animation: { duration:800 } };

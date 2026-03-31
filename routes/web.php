@@ -882,12 +882,13 @@ Route::get('/api/dashboard-stats', function () {
     $query = User::where('role', 'student');
     if ($sy) $query->where('school_year', $sy);
     $totalStudents = $query->count();
-    $totalUsers = $sy ? $query->count() : User::count();
-    $activePrograms = (clone $query)->distinct('company_id')->count();
+    $totalUsers = User::count();
+    $activePrograms = (clone $query)->whereNotNull('company_id')->distinct('company_id')->count();
 
     $required = \App\Models\StudentHours::query()->value('total_hours_required') ?? 600;
     $students = (clone $query)->pluck('id');
     $completedCount = 0;
+    $inProgressCount = 0;
     $totalProgress = 0;
     foreach ($students as $sid) {
         $sh = \App\Models\StudentHours::where('student_id', $sid)->first();
@@ -896,17 +897,43 @@ Route::get('/api/dashboard-stats', function () {
             ->get()
             ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
         $hours = max($sh->hours_completed ?? 0, $actual);
-        $pct = $required > 0 ? ($hours / $required) * 100 : 0;
+        $req = $sh->total_hours_required ?? 600;
+        $pct = $req > 0 ? ($hours / $req) * 100 : 0;
         $totalProgress += $pct;
-        if ($hours >= $required) $completedCount++;
+        if ($hours >= $req) $completedCount++;
+        elseif ($hours > 0) $inProgressCount++;
     }
     $completionRate = $totalStudents > 0 ? round($totalProgress / $totalStudents) : 0;
 
+    // Users by role
+    $usersByRole = [
+        'student'     => User::where('role', 'student')->when($sy, fn($q) => $q->where('school_year', $sy))->count(),
+        'supervisor'  => User::where('role', 'supervisor')->count(),
+        'coordinator' => User::where('role', 'coordinator')->count(),
+        'ccit_head'   => User::where('role', 'ccit_head')->count(),
+    ];
+
+    // Student registration trend — last 6 months
+    $trend = [];
+    for ($i = 5; $i >= 0; $i--) {
+        $month = \Carbon\Carbon::now()->subMonths($i);
+        $count = User::where('role', 'student')
+            ->whereYear('created_at', $month->year)
+            ->whereMonth('created_at', $month->month)
+            ->when($sy, fn($q) => $q->where('school_year', $sy))
+            ->count();
+        $trend[] = $count;
+    }
+
     return response()->json([
-        'total_users' => $totalUsers,
-        'total_students' => $totalStudents,
+        'total_users'     => $totalUsers,
+        'total_students'  => $totalStudents,
         'active_programs' => $activePrograms,
         'completion_rate' => $completionRate . '%',
+        'completed_count' => $completedCount,
+        'in_progress_count' => $inProgressCount,
+        'users_by_role'   => $usersByRole,
+        'student_trend'   => $trend,
     ]);
 });
 
