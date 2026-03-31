@@ -314,6 +314,44 @@
         </div>
     </section>
 
+   
+    <!-- CONTACT -->
+    <section id="contact" class="py-20 border-t border-blue-900/40" style="background:linear-gradient(180deg,#050d2e,#030a1e)">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-12">
+                <div class="text-blue-400 text-sm font-semibold uppercase tracking-widest mb-3">Contact</div>
+                <h2 class="text-3xl font-bold text-white">Get in Touch</h2>
+                <p class="text-blue-300 mt-2">For concerns, issues, or inquiries about the OJT Monitoring System</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+                <div class="bg-blue-900/20 border border-blue-800/40 rounded-xl p-6 text-center hover:border-blue-500/60 transition-all">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    </div>
+                    <h3 class="text-white font-semibold mb-2">Location</h3>
+                    <p class="text-blue-300 text-sm leading-relaxed">PRMSU Sta. Cruz Campus<br>Sta. Cruz, Zambales<br>Philippines</p>
+                </div>
+                <div class="bg-blue-900/20 border border-blue-800/40 rounded-xl p-6 text-center hover:border-blue-500/60 transition-all">
+                    <div class="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    </div>
+                    <h3 class="text-white font-semibold mb-2">Department</h3>
+                    <p class="text-blue-300 text-sm leading-relaxed">College of Computing &amp;<br>Information Technology<br><span class="text-blue-400 font-medium">(CCIT Department)</span></p>
+                </div>
+                <div class="bg-blue-900/20 border border-blue-800/40 rounded-xl p-6 text-center hover:border-blue-500/60 transition-all">
+                    <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                    <h3 class="text-white font-semibold mb-2">System Support</h3>
+                    <p class="text-blue-300 text-sm leading-relaxed">For account issues &amp; technical concerns, contact your<br><span class="text-blue-400 font-medium">OJT Coordinator</span> or<br><span class="text-blue-400 font-medium">CCIT Head</span></p>
+                </div>
+            </div>
+            <div class="mt-10 max-w-2xl mx-auto bg-blue-900/20 border border-blue-800/40 rounded-xl p-5 text-center">
+                <p class="text-blue-300 text-sm">📌 This system is exclusively for <span class="text-white font-semibold">PRMSU Sta. Cruz Campus — CCIT students and faculty</span>. Registration requires a valid school-issued ID number provided by the CCIT department.</p>
+            </div>
+        </div>
+    </section>
+
     <!-- CTA -->
     <section class="py-20 border-t border-blue-900/40 relative overflow-hidden" style="background:linear-gradient(135deg,#0a1a5c,#0d2d8a)">
         <div class="dot-pattern absolute inset-0 opacity-30"></div>
@@ -327,47 +365,6 @@
                 <a href="{{ route('login') }}" class="px-8 py-3 border border-blue-400/60 text-blue-200 hover:text-white hover:border-blue-300 rounded-full font-semibold transition-all">
                     Sign In
                 </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- CONTACT -->
-    <section id="contact" class="py-20 border-t border-blue-900/40" style="background:linear-gradient(180deg,#050d2e,#030a1e)">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="text-center mb-12">
-                <div class="text-blue-400 text-sm font-semibold uppercase tracking-widest mb-3">Contact</div>
-                <h2 class="text-3xl font-bold text-white">Get in Touch</h2>
-                <p class="text-blue-300 mt-2">For concerns, issues, or inquiries about the OJT Monitoring System</p>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                <!-- Location -->
-                <div class="bg-blue-900/20 border border-blue-800/40 rounded-xl p-6 text-center hover:border-blue-500/60 transition-all">
-                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                    </div>
-                    <h3 class="text-white font-semibold mb-2">Location</h3>
-                    <p class="text-blue-300 text-sm leading-relaxed">PRMSU Sta. Cruz Campus<br>Sta. Cruz, Zambales<br>Philippines</p>
-                </div>
-                <!-- Department -->
-                <div class="bg-blue-900/20 border border-blue-800/40 rounded-xl p-6 text-center hover:border-blue-500/60 transition-all">
-                    <div class="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                    </div>
-                    <h3 class="text-white font-semibold mb-2">Department</h3>
-                    <p class="text-blue-300 text-sm leading-relaxed">College of Communication &amp;<br>Information Technology<br><span class="text-blue-400 font-medium">(CCIT Department)</span></p>
-                </div>
-                <!-- System Support -->
-                <div class="bg-blue-900/20 border border-blue-800/40 rounded-xl p-6 text-center hover:border-blue-500/60 transition-all">
-                    <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    </div>
-                    <h3 class="text-white font-semibold mb-2">System Support</h3>
-                    <p class="text-blue-300 text-sm leading-relaxed">For account issues &amp; technical concerns, contact your<br><span class="text-blue-400 font-medium">OJT Coordinator</span> or<br><span class="text-blue-400 font-medium">CCIT Head</span></p>
-                </div>
-            </div>
-            <!-- Note -->
-            <div class="mt-10 max-w-2xl mx-auto bg-blue-900/20 border border-blue-800/40 rounded-xl p-5 text-center">
-                <p class="text-blue-300 text-sm">📌 This system is exclusively for <span class="text-white font-semibold">PRMSU Sta. Cruz Campus — CCIT students and faculty</span>. Registration requires a valid school-issued ID number provided by the CCIT department.</p>
             </div>
         </div>
     </section>
