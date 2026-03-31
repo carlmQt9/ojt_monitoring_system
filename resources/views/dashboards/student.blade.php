@@ -424,6 +424,35 @@
         <!-- ===== SECTION: TIME IN ===== -->
         <section id="section-timein" class="dash-section hidden">
 
+        @php
+            $_timeinSH = \App\Models\StudentHours::where('student_id', $user->id)->first();
+            $_timeinRequired = $_timeinSH ? $_timeinSH->total_hours_required : 600;
+            $_timeinActual = \App\Models\TimeInRecord::where('student_id', $user->id)
+                ->whereNotNull('time_out')->get()
+                ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
+            $_timeinCompleted = max($_timeinSH->hours_completed ?? 0, $_timeinActual);
+            $_ojtDone = $_timeinCompleted >= $_timeinRequired;
+            $required = $_timeinRequired;
+            $today = date('Y-m-d');
+            $totalDayHours = 0;
+        @endphp
+
+        @if($_ojtDone)
+        <!-- OJT Completed Banner -->
+        <div class="mb-8">
+            <div class="bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-2 border-green-500/60 rounded-2xl p-8 text-center">
+                <div class="text-6xl mb-4">🎉</div>
+                <h2 class="text-3xl font-bold text-green-400 mb-2">Congratulations!</h2>
+                <p class="text-white text-lg font-semibold mb-1">You have completed your OJT!</p>
+                <p class="text-gray-300 text-sm mb-4">You have successfully completed <span class="text-green-400 font-bold">{{ number_format($_timeinCompleted, 2) }} / {{ $_timeinRequired }} hours</span> of On-the-Job Training.</p>
+                <div class="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/40 rounded-full px-6 py-2">
+                    <span class="text-green-400 text-lg">✓</span>
+                    <span class="text-green-300 font-semibold">OJT Hours Requirement Fulfilled</span>
+                </div>
+                <p class="text-gray-400 text-xs mt-4">Time-in is no longer required. Please coordinate with your supervisor for final evaluation.</p>
+            </div>
+        </div>
+        @else
         <!-- Time-In Card -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <div class="lg:col-span-1">
@@ -665,6 +694,7 @@
                 </div>
             </div>
         </div>
+        @endif
 
         </section><!-- end timein -->
 
