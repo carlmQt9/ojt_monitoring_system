@@ -20,6 +20,10 @@
         .form-container {
             animation: fadeInUp 0.6s ease-out;
         }
+        input[type="password"]::-ms-reveal,
+        input[type="password"]::-ms-clear { display: none; }
+        input[type="password"]::-webkit-contacts-auto-fill-button,
+        input[type="password"]::-webkit-credentials-auto-fill-button { visibility: hidden; display: none !important; pointer-events: none; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-gray-100 min-h-screen flex items-center justify-center">
@@ -95,10 +99,10 @@
     <script>
         function togglePw(id, iconId) {
             const input = document.getElementById(id);
-            const isText = input.type === 'text';
-            input.type = isText ? 'password' : 'text';
+            const show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
             const icon = document.getElementById(iconId);
-            icon.innerHTML = isText
+            icon.innerHTML = show
                 ? '<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>'
                 : '<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.97 9.97 0 012.084-3.416M6.53 6.53A9.97 9.97 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.97 9.97 0 01-4.293 5.411M3 3l18 18"/>';
         }

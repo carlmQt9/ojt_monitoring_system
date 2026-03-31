@@ -14,6 +14,10 @@
         .input-field::placeholder { color: rgba(147,197,253,0.4); }
         .input-field option { background: #0d1b4b; color: white; }
         .glow-btn { box-shadow: 0 0 20px rgba(59,130,246,0.4); }
+        input[type="password"]::-ms-reveal,
+        input[type="password"]::-ms-clear { display: none; }
+        input[type="password"]::-webkit-contacts-auto-fill-button,
+        input[type="password"]::-webkit-credentials-auto-fill-button { visibility: hidden; display: none !important; pointer-events: none; }
         /* LIGHT MODE */
         body.light { background: linear-gradient(135deg, #b8cef0 0%, #a0bce8 40%, #b8d4f5 70%, #cce0fa 100%); }
         body.light .text-white { color: #0f2460 !important; }
@@ -242,10 +246,10 @@
     <script>
         function togglePw(id, iconId) {
             const input = document.getElementById(id);
-            const isText = input.type === 'text';
-            input.type = isText ? 'password' : 'text';
+            const show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
             const icon = document.getElementById(iconId);
-            icon.innerHTML = isText
+            icon.innerHTML = show
                 ? '<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>'
                 : '<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.97 9.97 0 012.084-3.416M6.53 6.53A9.97 9.97 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.97 9.97 0 01-4.293 5.411M3 3l18 18"/>';
         }
