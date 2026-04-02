@@ -76,9 +76,13 @@
 
     function pixelAction(label, action, successMsg) {
         showPixelLoader(label);
-        return Promise.resolve(action()).finally(() => {
+        return Promise.resolve(action()).then(result => {
             hidePixelLoader();
-            showPixelSuccess(successMsg);
+            if (successMsg) showPixelSuccess(successMsg);
+            return result;
+        }).catch(err => {
+            hidePixelLoader();
+            throw err;
         });
     }
 

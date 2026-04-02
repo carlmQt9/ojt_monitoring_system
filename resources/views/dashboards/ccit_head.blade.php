@@ -809,6 +809,15 @@
     </div>
 
     <script>
+        // Global: ensure all fetch calls to /api/* include Accept: application/json
+        // so Laravel returns JSON errors instead of HTML redirects
+        const _origFetch = window.fetch;
+        window.fetch = function(url, opts = {}) {
+            if (typeof url === 'string' && url.includes('/api/')) {
+                opts.headers = Object.assign({ 'Accept': 'application/json' }, opts.headers || {});
+            }
+            return _origFetch(url, opts);
+        };
         let allUsers = [];
         let editingUserId = null;
         let currentSchoolYear = '';
@@ -1732,23 +1741,33 @@
                 formData.append('_method', 'PUT');
             }
 
-            pixelAction(editingUserId ? 'UPDATING' : 'SAVING', () =>
-                fetch(url, {
-                    method,
-                    body: formData,
-                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }
-                }).then(async response => {
-                    if (response.status === 419) { alert('Session expired; please reload and try again.'); return; }
-                    const data = await response.json().catch(() => ({}));
-                    if (response.ok && data.success) {
-                        closeAddUserModal(); loadUsers(); form.reset();
-                        editingUserId = null;
-                    } else {
-                        const msg = data.message || `Error (${response.status})`;
-                        alert(msg);
-                    }
-                })
-            , editingUserId ? 'USER UPDATED!' : 'USER ADDED!');
+            const label = editingUserId ? 'UPDATING' : 'SAVING';
+            const successMsg = editingUserId ? 'USER UPDATED!' : 'USER ADDED!';
+            showPixelLoader(label);
+            fetch(url, {
+                method,
+                body: formData,
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+                    'Accept': 'application/json'
+                }
+            }).then(async response => {
+                hidePixelLoader();
+                if (response.status === 419) { alert('Session expired; please reload and try again.'); return; }
+                const text = await response.text();
+                let data = {};
+                try { data = JSON.parse(text); } catch(e) { alert('Server error: ' + text.substring(0, 300)); return; }
+                if (response.ok && data.success) {
+                    showPixelSuccess(successMsg);
+                    closeAddUserModal(); loadUsers(); form.reset();
+                    editingUserId = null;
+                } else if (response.status === 422 && data.errors) {
+                    const msgs = Object.values(data.errors).flat().join('\n');
+                    alert(msgs);
+                } else {
+                    alert(data.message || `Error (${response.status}): Please check all fields and try again.`);
+                }
+            }).catch(err => { hidePixelLoader(); alert('Network error: ' + err.message); });
         });
 
         document.getElementById('settingsForm')?.addEventListener('submit', function(e) {

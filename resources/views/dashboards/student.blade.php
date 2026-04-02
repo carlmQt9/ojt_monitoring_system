@@ -718,9 +718,10 @@
                 <div class="flex items-center justify-between bg-slate-700/30 p-4 rounded-lg hover:bg-slate-700/50 transition-colors">
                     <div class="flex items-center gap-4">
                         @if($record->photo_path)
-                        <img src="{{ asset('storage/' . $record->photo_path) }}" alt="Time-in photo"
+                        <img src="{{ url('storage/' . $record->photo_path) }}" alt="Time-in photo"
                             class="w-12 h-12 rounded-lg object-cover cursor-pointer hover:ring-2 hover:ring-green-400 transition-all"
-                            onclick="openFileViewer('{{ asset('storage/' . $record->photo_path) }}','{{ $record->date->format('M d, Y') }} — Time-in Photo')">
+                            onerror="this.onerror=null;this.src='';this.closest('div').innerHTML='<div class=\'w-12 h-12 bg-slate-600 rounded-lg flex items-center justify-center\'><span class=\'text-gray-400\'>📸</span></div>';"
+                            onclick="openFileViewer('{{ url('storage/' . $record->photo_path) }}','{{ $record->date->format('M d, Y') }} — Time-in Photo')">
                         @else
                         <div class="w-12 h-12 bg-slate-600 rounded-lg flex items-center justify-center">
                             <span class="text-gray-400">📸</span>
@@ -1045,7 +1046,7 @@
 
             <!-- Fixed-size media container so capture/preview do not change layout -->
             <div class="relative mb-4 rounded-lg overflow-hidden border-2 border-dashed border-slate-600 h-64">
-                <video id="cameraModalVideo" class="w-full h-full object-cover camera-video" playsinline autoplay muted></video>
+                <video id="cameraModalVideo" class="w-full h-full object-cover camera-video" playsinline webkit-playsinline autoplay muted></video>
                 <img id="cameraModalImage" src="" alt="Preview" class="hidden absolute inset-0 w-full h-full object-cover">
             </div>
 
@@ -1106,28 +1107,30 @@
         async function startCamera() {
             const cameraModalVideo = document.getElementById('cameraModalVideo');
             const cameraModalCaptureBtn = document.getElementById('cameraModalCaptureBtn');
-
             if (!cameraModalVideo) return;
 
-            // Check if any getUserMedia API is available
-            const hasModernAPI = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-            const hasLegacyAPI = !!(navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia);
-
-            if (!hasModernAPI && !hasLegacyAPI) {
-                alert('Camera is not supported in this browser. Please use Chrome, Firefox, Safari, or Edge.');
+            // Require HTTPS (except localhost/127.0.0.1)
+            const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+            if (!isSecure) {
+                alert('Camera requires a secure connection (HTTPS). Please ask your administrator to enable HTTPS.');
                 return;
             }
 
-            // Polyfill: wrap legacy getUserMedia in a Promise
-            if (!hasModernAPI && hasLegacyAPI) {
-                const legacyGUM = (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia).bind(navigator);
-                navigator.mediaDevices = navigator.mediaDevices || {};
-                navigator.mediaDevices.getUserMedia = (constraints) => new Promise((resolve, reject) => {
-                    legacyGUM(constraints, resolve, reject);
-                });
+            // Polyfill legacy getUserMedia for older browsers
+            if (!navigator.mediaDevices) navigator.mediaDevices = {};
+            if (!navigator.mediaDevices.getUserMedia) {
+                const legacyGUM = navigator.getUserMedia
+                    || navigator.webkitGetUserMedia
+                    || navigator.mozGetUserMedia
+                    || navigator.msGetUserMedia;
+                if (!legacyGUM) {
+                    alert('Your browser does not support camera access. Please update your browser or use Chrome, Firefox, Safari, or Edge.');
+                    return;
+                }
+                navigator.mediaDevices.getUserMedia = (c) => new Promise((res, rej) => legacyGUM.call(navigator, c, res, rej));
             }
 
-            // Constraint sets to try in order (most specific → most permissive)
+            // Constraint sets: front camera preferred, fallback to any camera
             const constraintSets = [
                 { video: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
                 { video: { facingMode: 'user' }, audio: false },
@@ -1142,24 +1145,24 @@
                     break;
                 } catch (err) {
                     lastError = err;
-                    // If permission denied, no point trying other constraints
                     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') break;
                 }
             }
 
             if (!cameraStream) {
                 const err = lastError;
-                let msg = 'Unable to access camera. ';
-                if (err && (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) {
-                    msg += 'Please allow camera access in your browser settings and reload.';
-                } else if (err && (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError')) {
-                    msg += 'No camera device found.';
-                } else if (err && err.name === 'SecurityError') {
-                    msg += 'Camera requires a secure connection (HTTPS). Please access this site via HTTPS or localhost.';
-                } else if (err && err.name === 'NotReadableError') {
-                    msg += 'Camera is already in use by another app. Please close other apps using the camera.';
+                let msg = 'Unable to access camera.\n';
+                if (!err || err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    msg += 'Camera permission was denied.\n\n';
+                    msg += 'To fix:\n• iOS Safari: Settings → Safari → Camera → Allow\n• Android Chrome: tap the 🔒 icon in the address bar → Camera → Allow\n• Desktop: click the camera icon in the address bar and allow access, then reload.';
+                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                    msg += 'No camera device was found on this device.';
+                } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                    msg += 'Camera is already in use by another app. Please close other apps using the camera and try again.';
+                } else if (err.name === 'OverconstrainedError') {
+                    msg += 'Camera does not meet the required settings. Try reloading.';
                 } else {
-                    msg += (err ? err.message : 'Unknown error') + '. Try reloading the page.';
+                    msg += (err.message || 'Unknown error') + '.\nTry reloading the page.';
                 }
                 alert(msg);
                 return;
@@ -1167,19 +1170,25 @@
 
             try {
                 cameraModalVideo.srcObject = cameraStream;
-                cameraModalVideo.setAttribute('playsinline', '');
+                cameraModalVideo.setAttribute('playsinline', 'true');  // critical for iOS Safari
+                cameraModalVideo.setAttribute('webkit-playsinline', 'true'); // older iOS
                 cameraModalVideo.setAttribute('autoplay', '');
                 cameraModalVideo.setAttribute('muted', '');
                 cameraModalVideo.muted = true;
+                cameraModalVideo.playsInline = true;
                 await cameraModalVideo.play();
-                if (cameraModalCaptureBtn) cameraModalCaptureBtn.disabled = false;
+                if (cameraModalCaptureBtn) {
+                    cameraModalCaptureBtn.disabled = false;
+                    cameraModalCaptureBtn.textContent = '📸 Capture';
+                    cameraModalCaptureBtn.onclick = null;
+                }
             } catch (err) {
-                // Some browsers need a user gesture to play — show a tap-to-start button
+                // Some browsers (iOS) need explicit user gesture to play
                 if (cameraModalCaptureBtn) {
                     cameraModalCaptureBtn.disabled = false;
                     cameraModalCaptureBtn.textContent = '▶ Tap to Start Camera';
                     cameraModalCaptureBtn.onclick = async () => {
-                        await cameraModalVideo.play();
+                        try { await cameraModalVideo.play(); } catch(e) {}
                         cameraModalCaptureBtn.textContent = '📸 Capture';
                         cameraModalCaptureBtn.onclick = null;
                     };
