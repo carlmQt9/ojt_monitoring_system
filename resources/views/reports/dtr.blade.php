@@ -5,11 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DTR - {{ strtoupper($student->name) }}</title>
 <style>
-@page { size: A4; margin: 12mm; }
+@page { size: A4 portrait; margin: 8mm; }
 @media print {
   .no-print { display: none !important; }
-  body { margin: 0; padding: 0; background: #fff; }
-  .dtr-scale-wrapper { transform: none !important; width: auto !important; }
+  html, body { margin: 0; padding: 0; background: #fff; width: 100%; }
+  .dtr-scale-wrapper { width: 100% !important; overflow: visible !important; }
+  .dtr-wrapper { width: 100% !important; border: 2px solid #000; font-size: 9px; }
+  table.dtr-table thead tr th { font-size: 8px; padding: 4px 2px; }
+  table.dtr-table tbody td { font-size: 8px; padding: 3px 4px; }
+  .sum-value { font-size: 13px; }
+  .summary-box { grid-template-columns: repeat(4,1fr); }
+  .info-value { font-size: 10px; }
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, sans-serif; font-size: 11px; color: #000; background: #e8e8e8; padding: 20px; }
@@ -147,11 +153,11 @@ table.dtr-table tbody tr:nth-child(even) { background: #f9f9f9; }
           <tr>
             <td style="text-align:center">{{ $rec->date->format('d') }}</td>
             <td style="text-align:center">{{ $rec->date->format('D') }}</td>
-            <td style="text-align:center">{{ $amIn ?: '&mdash;' }}</td>
-            <td style="text-align:center">{{ $amOut ?: '&mdash;' }}</td>
-            <td style="text-align:center">{{ $pmIn ?: '&mdash;' }}</td>
-            <td style="text-align:center">{{ $pmOut ?: '&mdash;' }}</td>
-            <td style="text-align:center">{{ $hrs > 0 ? number_format($hrs,2) : '&mdash;' }}</td>
+            <td style="text-align:center">{!! $amIn ?: '&mdash;' !!}</td>
+            <td style="text-align:center">{!! $amOut ?: '&mdash;' !!}</td>
+            <td style="text-align:center">{!! $pmIn ?: '&mdash;' !!}</td>
+            <td style="text-align:center">{!! $pmOut ?: '&mdash;' !!}</td>
+            <td style="text-align:center">{!! $hrs > 0 ? number_format($hrs,2) : '&mdash;' !!}</td>
             <td style="text-align:center">
               @if($rec->verified)
                 <span style="color:green;font-weight:bold">&#10003; Verified</span>

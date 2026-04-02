@@ -484,7 +484,7 @@
                                     @endif
                                 </td>
                                 <td class="py-3 px-3 text-center">
-                                    <button onclick="showDeleteCompanyModal({{ $company->id }}, '{{ addslashes($company->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Remove</button>
+                                    <button onclick="showDeleteCompanyModal({{ $company->id }}, '{{ addslashes($company->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Archive</button>
                                 </td>
                             </tr>
                             @endforeach
@@ -672,7 +672,7 @@
                                                     <p class="text-lg font-bold text-yellow-400">{{ $pendingLogs + $pendingTimeIns + $pendingReq }}</p>
                                                 </div>
                                                 <div class="bg-slate-800/50 p-3 rounded">
-                                                    <p class="text-xs text-gray-400">⭐ Eval Score</p>
+                                                    <p class="text-xs text-gray-400">⭐ Evaluation Score</p>
                                                     @if($coordEval)
                                                         <p class="text-lg font-bold text-yellow-400">{{ $evalMean }}/5</p>
                                                         <div class="flex gap-0.5 mt-1">
@@ -768,7 +768,7 @@
                                 <button onclick="toggleStudentDetails({{ $student->id }})" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold">View Details</button>
                                 <button onclick="showLogsModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold">Logs</button>
                                 <button onclick="openDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-semibold">DTR</button>
-                                <button onclick="showEvalModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-semibold">⭐ Eval Score</button>
+                                <button onclick="showEvalModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-semibold">⭐ Evaluation Score</button>
                             </div>
                             <!-- Expandable details -->
                             <div id="details-{{ $student->id }}-mobile" class="hidden mt-3 pt-3 border-t border-slate-600">
@@ -791,7 +791,7 @@
                                         <p class="text-sm font-bold text-yellow-400">{{ $pendingTotal2 }}</p>
                                     </div>
                                     <div class="bg-slate-800/50 p-2 rounded">
-                                        <p class="text-xs text-gray-400">⭐ Eval</p>
+                                        <p class="text-xs text-gray-400">⭐ Eval. Score</p>
                                         @if($mobileEval)
                                             <p class="text-sm font-bold text-yellow-400">{{ $mobileEval->mean_score }}/5</p>
                                         @else
@@ -861,7 +861,7 @@
                                                 <td class="py-2 px-4 text-gray-300 text-sm">{{ $report->title }}</td>
                                                 <td class="py-2 px-2 text-gray-400 text-xs whitespace-nowrap">{{ $report->created_at->format('M d, Y') }}</td>
                                                 <td class="py-2 px-2">
-                                                    <span class="px-2 py-0.5 text-xs rounded-full @if($report->status === 'approved') bg-green-500/20 text-green-300 @elseif($report->status === 'rejected') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
+                                                    <span class="px-2 py-0.5 text-xs rounded-full @if($report->status === 'approved') bg-green-500/20 text-green-300 @elseif($report->status === 'rejected' || $report->status === 'denied') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
                                                         {{ ucfirst($report->status) }}
                                                     </span>
                                                 </td>
@@ -884,7 +884,7 @@
                                                     <p class="text-gray-300 text-sm font-medium">{{ $report->title }}</p>
                                                     <p class="text-gray-500 text-xs mt-0.5">{{ $report->created_at->format('M d, Y') }}</p>
                                                 </div>
-                                                <span class="shrink-0 px-2 py-0.5 text-xs rounded-full @if($report->status === 'approved') bg-green-500/20 text-green-300 @elseif($report->status === 'rejected') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
+                                                <span class="shrink-0 px-2 py-0.5 text-xs rounded-full @if($report->status === 'approved') bg-green-500/20 text-green-300 @elseif($report->status === 'rejected' || $report->status === 'denied') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
                                                     {{ ucfirst($report->status) }}
                                                 </span>
                                             </div>
@@ -1097,14 +1097,14 @@
     <!-- Delete Company Modal -->
     <div id="deleteCompanyModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
-            <h3 class="text-xl font-bold text-white mb-4">Remove Company</h3>
-            <p class="text-gray-300 mb-6">Are you sure you want to remove <span id="deleteCompanyName" class="text-red-400 font-semibold"></span>? This cannot be undone.</p>
+            <h3 class="text-xl font-bold text-white mb-4">Archive Company</h3>
+            <p class="text-gray-300 mb-6">Are you sure you want to archive <span id="deleteCompanyName" class="text-red-400 font-semibold"></span>? This cannot be undone.</p>
             <form id="deleteCompanyForm" method="POST">
                 @csrf
                 @method('DELETE')
                 <div class="flex gap-3">
                     <button type="button" onclick="closeDeleteCompanyModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">Cancel</button>
-                    <button type="submit" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Remove</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Archive</button>
                 </div>
             </form>
         </div>
@@ -1454,7 +1454,7 @@
                             <button onclick="showCoordDenyTimeModal(${l.id})" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Deny</button>
                            </div>`
                         : '-';
-                    html += `<tr class="border-b border-slate-700/30"><td class="py-2 pr-3 text-sm">${l.date || '-'}</td><td class="py-2 pr-3 text-sm">${l.time_in || '-'}</td><td class="py-2 pr-3 text-sm">${l.time_out || '-'}</td><td class="py-2 pr-3 text-sm">${statusBadge}</td><td class="py-2 pr-3 text-sm">${l.photo ? '<a target="_blank" href="'+l.photo+'" class="text-blue-400 hover:underline">View</a>' : '-'}</td><td class="py-2 text-sm">${actions}</td></tr>`;
+                    html += `<tr class="border-b border-slate-700/30"><td class="py-2 pr-3 text-sm">${l.date || '-'}</td><td class="py-2 pr-3 text-sm">${l.time_in || '-'}</td><td class="py-2 pr-3 text-sm">${l.time_out || '-'}</td><td class="py-2 pr-3 text-sm">${statusBadge}</td><td class="py-2 pr-3 text-sm">${l.photo ? '<button onclick="openPhotoPopup(\'' + l.photo + '\')" class="text-blue-400 hover:underline">View</button>' : '-'}</td><td class="py-2 text-sm">${actions}</td></tr>`;
                 });
                 html += '</tbody></table>';
                 body.innerHTML = html;
@@ -1830,7 +1830,27 @@
         function closeEvalModal() { document.getElementById('evalModal').classList.add('hidden'); }
         document.getElementById('evalModal')?.addEventListener('click', e=>{ if(e.target===document.getElementById('evalModal')) closeEvalModal(); });
         // ===== END EVALUATION SCORE MODAL =====
+
+        // ===== PHOTO POPUP =====
+        function openPhotoPopup(url) {
+            document.getElementById('photoPopupImg').src = url;
+            document.getElementById('photoPopupModal').classList.remove('hidden');
+        }
+        function closePhotoPopup() {
+            document.getElementById('photoPopupModal').classList.add('hidden');
+            document.getElementById('photoPopupImg').src = '';
+        }
+        document.getElementById('photoPopupModal')?.addEventListener('click', function(e){ if(e.target===this) closePhotoPopup(); });
+        // ===== END PHOTO POPUP =====
     </script>
+    <!-- Photo Popup Modal -->
+    <div id="photoPopupModal" class="hidden fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4">
+        <div class="relative max-w-lg w-full">
+            <button onclick="closePhotoPopup()" class="absolute -top-3 -right-3 w-8 h-8 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center z-10">✕</button>
+            <img id="photoPopupImg" src="" alt="Time-in Photo" class="w-full rounded-xl object-contain max-h-[80vh]">
+        </div>
+    </div>
+
     <!-- Evaluation Score Modal -->
     <div id="evalModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">

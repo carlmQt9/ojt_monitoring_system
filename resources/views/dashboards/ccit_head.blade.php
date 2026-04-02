@@ -991,7 +991,7 @@
                             </div>
                             <div class="flex gap-2">
                                 ${!sy.is_active ? `<button onclick="activateSchoolYear(${sy.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs">Set Active</button>` : ''}
-                                <button onclick="deleteSchoolYear(${sy.id})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">Remove</button>
+                                <button onclick="deleteSchoolYear(${sy.id})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">Archive</button>
                             </div>
                         </div>
                     `).join('');
@@ -1112,7 +1112,7 @@
                            </div>`
                         : `<div class="flex gap-1">
                                <button onclick="editUser(${user.id})" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">Edit</button>
-                               <button onclick="removeUser(${user.id})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">Remove</button>
+                               <button onclick="removeUser(${user.id})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">Archive</button>
                            </div>`;
                     // Desktop table row
                     tableBody.innerHTML += `
@@ -1136,7 +1136,7 @@
                                </div>`
                             : `<div class="grid grid-cols-2 gap-2 mt-3">
                                    <button onclick="editUser(${user.id})" class="py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold">Edit</button>
-                                   <button onclick="removeUser(${user.id})" class="py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Remove</button>
+                                   <button onclick="removeUser(${user.id})" class="py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Archive</button>
                                </div>`;
                         mobileContainer.innerHTML += `
                             <div class="${isPending ? 'border-l-2 border-yellow-500/50 bg-yellow-900/10' : 'bg-slate-700/30'} rounded-xl p-4 mb-3 border border-slate-700">
