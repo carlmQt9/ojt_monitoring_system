@@ -185,12 +185,13 @@ Route::post('/time-in', function () {
 
     $student = User::findOrFail($validated['student_id']);
 
-    // Determine session: afternoon only allowed after 13:00
+    // Determine session: afternoon only allowed after 12:50
     $nowHour = (int) now()->format('H');
+    $nowMin  = (int) now()->format('i');
     $session = $validated['session'] ?? 'morning';
 
-    // Auto-detect afternoon if current time >= 13:00
-    if ($nowHour >= 13) {
+    // Auto-detect afternoon if current time >= 12:50
+    if ($nowHour > 12 || ($nowHour === 12 && $nowMin >= 50)) {
         $session = 'afternoon';
     } else {
         $session = 'morning';
@@ -206,9 +207,9 @@ Route::post('/time-in', function () {
         return back()->withErrors(['date' => 'Already timed in for the ' . $session . ' session today.']);
     }
 
-    // Afternoon session: only allowed after 13:00
-    if ($session === 'afternoon' && $nowHour < 13) {
-        return back()->withErrors(['date' => 'Afternoon time-in is only available from 1:00 PM onwards.']);
+    // Afternoon session: only allowed after 12:50
+    if ($session === 'afternoon' && !($nowHour > 12 || ($nowHour === 12 && $nowMin >= 50))) {
+        return back()->withErrors(['date' => 'Afternoon time-in is only available from 12:50 PM onwards.']);
     }
 
     // Store the photo

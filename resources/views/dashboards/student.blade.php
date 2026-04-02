@@ -483,15 +483,12 @@
                     $regularHours  = min($totalDayHours, 8);
                     $otHours       = max(0, round($totalDayHours - 8, 2));
 
-                    // Can time in afternoon? Morning must be timed out and now >= 13:00
+                    // Can time in afternoon? Morning must be timed out and now >= 12:50
+                    $nowMin = (int) date('i');
                     $canTimeInAfternoon = false;
-                    if ($morningRecord && $morningRecord->time_out && !$afternoonRecord && $nowHour >= 13) {
-                        $timeOutHour = (int) \Carbon\Carbon::parse($morningRecord->time_out)->format('H');
-                        $timeOutMin  = (int) \Carbon\Carbon::parse($morningRecord->time_out)->format('i');
-                        // Allow if timed out between 12:00 and 12:30 (includes auto-timeout at 12:00)
-                        if ($timeOutHour === 12 && $timeOutMin <= 30) {
-                            $canTimeInAfternoon = true;
-                        }
+                    if ($morningRecord && $morningRecord->time_out && !$afternoonRecord
+                        && ($nowHour > 12 || ($nowHour === 12 && $nowMin >= 50))) {
+                        $canTimeInAfternoon = true;
                     }
 
                     // Determine what to show
@@ -1075,6 +1072,21 @@
         }
         updateCurrentTime();
         setInterval(updateCurrentTime, 1000);
+
+        // Auto-reload at 12:00 (morning auto-timeout) and 12:50 (afternoon time-in opens)
+        (function() {
+            function msUntil(h, m) {
+                const now = new Date();
+                const target = new Date();
+                target.setHours(h, m, 0, 0);
+                if (target <= now) return null;
+                return target - now;
+            }
+            const t1 = msUntil(12, 0);   // noon: morning auto-timeout fires
+            const t2 = msUntil(12, 50);  // 12:50: afternoon time-in button opens
+            if (t1 !== null) setTimeout(() => location.reload(), t1);
+            if (t2 !== null) setTimeout(() => location.reload(), t2);
+        })();
 
         // ============ AUTO SET TIME IN ============
         const autoSetTimeInBtn = document.getElementById('autoSetTimeIn');
