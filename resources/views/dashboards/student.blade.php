@@ -1109,25 +1109,31 @@
             const cameraModalCaptureBtn = document.getElementById('cameraModalCaptureBtn');
             if (!cameraModalVideo) return;
 
-            // Require HTTPS (except localhost/127.0.0.1)
-            const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-            if (!isSecure) {
-                alert('Camera requires a secure connection (HTTPS). Please ask your administrator to enable HTTPS.');
-                return;
-            }
-
-            // Polyfill legacy getUserMedia for older browsers
-            if (!navigator.mediaDevices) navigator.mediaDevices = {};
-            if (!navigator.mediaDevices.getUserMedia) {
+            // Build getUserMedia function — supports all browsers including Edge
+            let getMedia = null;
+            if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+                getMedia = (c) => navigator.mediaDevices.getUserMedia(c);
+            } else {
+                // Legacy prefixed versions (older Edge, Firefox, Chrome)
                 const legacyGUM = navigator.getUserMedia
                     || navigator.webkitGetUserMedia
                     || navigator.mozGetUserMedia
                     || navigator.msGetUserMedia;
-                if (!legacyGUM) {
-                    alert('Your browser does not support camera access. Please update your browser or use Chrome, Firefox, Safari, or Edge.');
-                    return;
+                if (legacyGUM) {
+                    getMedia = (c) => new Promise((res, rej) => legacyGUM.call(navigator, c, res, rej));
                 }
-                navigator.mediaDevices.getUserMedia = (c) => new Promise((res, rej) => legacyGUM.call(navigator, c, res, rej));
+            }
+
+            // Last resort for Edge: try creating mediaDevices manually
+            if (!getMedia && window.MediaStreamTrack && window.MediaStreamTrack.getSources) {
+                getMedia = (c) => new Promise((res, rej) => {
+                    navigator.getUserMedia(c, res, rej);
+                });
+            }
+
+            if (!getMedia) {
+                alert('Camera is not available.\n\nIf you are using Edge:\n• Click the \ud83d\udd12 lock icon in the address bar\n• Set Camera to \'Allow\'\n• Reload the page\n\nOr try opening this page in Chrome.');
+                return;
             }
 
             // Constraint sets: front camera preferred, fallback to any camera
@@ -1141,7 +1147,7 @@
             let lastError = null;
             for (const constraints of constraintSets) {
                 try {
-                    cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    cameraStream = await getMedia(constraints);
                     break;
                 } catch (err) {
                     lastError = err;
@@ -1151,10 +1157,15 @@
 
             if (!cameraStream) {
                 const err = lastError;
+                const isEdge = navigator.userAgent.includes('Edg/');
                 let msg = 'Unable to access camera.\n';
                 if (!err || err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
                     msg += 'Camera permission was denied.\n\n';
-                    msg += 'To fix:\n• iOS Safari: Settings → Safari → Camera → Allow\n• Android Chrome: tap the 🔒 icon in the address bar → Camera → Allow\n• Desktop: click the camera icon in the address bar and allow access, then reload.';
+                    if (isEdge) {
+                        msg += 'Edge fix: Click the 🔒 lock icon in the address bar → Camera → Allow → Reload the page.';
+                    } else {
+                        msg += 'To fix:\n• iOS Safari: Settings → Safari → Camera → Allow\n• Android Chrome: tap the 🔒 icon in the address bar → Camera → Allow\n• Desktop: click the camera icon in the address bar and allow access, then reload.';
+                    }
                 } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
                     msg += 'No camera device was found on this device.';
                 } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
