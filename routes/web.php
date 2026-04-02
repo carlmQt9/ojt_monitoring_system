@@ -1017,6 +1017,7 @@ Route::post('/api/users', function () {
         'role' => 'required|in:student,supervisor,coordinator,ccit_head',
         'company_id' => 'nullable|exists:companies,id',
         'school_year' => 'nullable|string|max:20',
+        'school_id_number' => 'nullable|string|max:50',
     ]);
 
     // Company required for student/supervisor
@@ -1031,6 +1032,7 @@ Route::post('/api/users', function () {
         'role' => $validated['role'],
         'company_id' => $validated['company_id'],
         'school_year' => $validated['school_year'] ?? null,
+        'school_id_number' => $validated['school_id_number'] ?? null,
     ]);
 
     return response()->json(['success' => true, 'user' => $user]);
@@ -1047,6 +1049,7 @@ Route::put('/api/users/{id}', function ($id) {
         'role' => 'required|in:student,supervisor,coordinator,ccit_head',
         'company_id' => 'nullable|exists:companies,id',
         'school_year' => 'nullable|string|max:20',
+        'school_id_number' => 'nullable|string|max:50',
     ]);
 
     if (in_array($validated['role'], ['student','supervisor']) && !$validated['company_id']) {
@@ -1058,6 +1061,7 @@ Route::put('/api/users/{id}', function ($id) {
     $user->role = $validated['role'];
     $user->company_id = $validated['company_id'];
     $user->school_year = $validated['school_year'] ?? null;
+    $user->school_id_number = $validated['school_id_number'] ?? null;
     if (!empty($validated['password'])) {
         $user->password = Hash::make($validated['password']);
     }

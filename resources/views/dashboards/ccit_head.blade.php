@@ -603,6 +603,10 @@
                                 <option value="">Select Company</option>
                             </select>
                         </div>
+                        <div id="schoolIdNumberField" class="hidden">
+                            <label class="block text-gray-300 mb-2">Student ID Number</label>
+                            <input type="text" name="school_id_number" class="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500" placeholder="e.g. 2021-00123">
+                        </div>
                         <div>
                             <label class="block text-gray-300 mb-2">School Year</label>
                             <select name="school_year" class="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500">
@@ -903,6 +907,7 @@
                 form.email.value = user.email;
                 form.role.value = user.role;
                 form.company_id.value = user.company_id || '';
+                if (form.school_id_number) form.school_id_number.value = user.school_id_number || '';
                 // leave password blank to keep existing password
                 form.password.value = '';
                 form.password_confirmation.value = '';
@@ -913,8 +918,11 @@
             // show/hide & require company based on role
             function updateCompanyField() {
                 const needsCompany = roleSelect.value === 'student' || roleSelect.value === 'supervisor';
+                const isStudent = roleSelect.value === 'student';
                 const field = document.getElementById('companyField');
+                const idField = document.getElementById('schoolIdNumberField');
                 if (field) field.classList.toggle('hidden', !needsCompany);
+                if (idField) idField.classList.toggle('hidden', !isStudent);
                 if (needsCompany) {
                     companySelect?.setAttribute('required', '');
                 } else {
