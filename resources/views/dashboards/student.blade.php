@@ -171,7 +171,7 @@
         $_sh = \App\Models\StudentHours::where('student_id', $user->id)->first();
         $_required = $_sh ? $_sh->total_hours_required : 600;
         $_allRecordsTotal = \App\Models\TimeInRecord::where('student_id', $user->id)
-            ->whereNotNull('time_out')->get()
+            ->whereNotNull('time_out')->where('status', 'approved')->get()
             ->sum(fn($r) => max(0, \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out))) / 60);
         $_completed = $_sh ? $_sh->hours_completed : round($_allRecordsTotal, 2);
         $_progress = $_required > 0 ? min(100, round(($_completed / $_required) * 100, 1)) : 0;
@@ -958,7 +958,7 @@
                 <input type="hidden" name="student_id" value="{{ $user->id }}">
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-1">Title *</label>
-                    <input type="text" name="title" id="modal_req_title" required maxlength="255"
+                <input type="text" name="title" id="modal_req_title" required maxlength="255"
                         class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-green-500 focus:outline-none"
                         placeholder="e.g., Narrative Report, Resume">
                 </div>
@@ -971,10 +971,10 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-1">File *</label>
                     <input type="file" name="file[]" id="modal_req_file"
-                        accept=".pdf,.doc,.docx,.xlsx,.xls,.ppt,.pptx,.jpg,.jpeg,.png,.txt"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp"
                         onchange="handleFileSelect(this, 5)"
                         class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-green-500 focus:outline-none file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700 cursor-pointer">
-                    <small id="modal_file_hint" class="text-gray-400 block mt-1">PDF, Word, Excel, PPT, Images, TXT &mdash; Max <strong>5 MB</strong> each</small>
+                    <small id="modal_file_hint" class="text-gray-400 block mt-1">PDF, Word, Images/Files &mdash; Max <strong>5 MB</strong> each</small>
                     <!-- Selected files preview -->
                     <div id="modal_file_preview" class="hidden mt-2 space-y-1"></div>
                     <p id="modal_file_error" class="text-red-400 text-xs mt-1 hidden"></p>
@@ -1888,7 +1888,16 @@
             maxFiles = maxFiles || 1;
             _maxFilesAllowed = maxFiles;
             _selectedFiles = [];
-            document.getElementById('modal_req_title').value = title || '';
+            const titleInput = document.getElementById('modal_req_title');
+            titleInput.value = title || '';
+            // Lock title if it's a pre-defined onboarding item
+            if (title) {
+                titleInput.setAttribute('readonly', 'readonly');
+                titleInput.classList.add('opacity-60', 'cursor-not-allowed');
+            } else {
+                titleInput.removeAttribute('readonly');
+                titleInput.classList.remove('opacity-60', 'cursor-not-allowed');
+            }
             const fileInput = document.getElementById('modal_req_file');
             const preview = document.getElementById('modal_file_preview');
             if (preview) { preview.innerHTML = ''; preview.classList.add('hidden'); }
@@ -1902,8 +1911,8 @@
             } else {
                 fileInput.removeAttribute('multiple');
                 document.getElementById('modal_file_hint').innerHTML =
-                    'PDF, Word, Excel, PPT, Images, TXT &mdash; Max <strong>5 MB</strong>';
-                fileInput.setAttribute('accept', '.pdf,.doc,.docx,.xlsx,.xls,.ppt,.pptx,.jpg,.jpeg,.png,.txt');
+                    'PDF, Word, Images/Files &mdash; Max <strong>5 MB</strong>';
+                fileInput.setAttribute('accept', '.pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp');
             }
             fileInput.value = '';
             document.getElementById('uploadModal').classList.remove('hidden');

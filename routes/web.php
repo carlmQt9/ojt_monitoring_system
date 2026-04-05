@@ -329,32 +329,19 @@ Route::post('/time-out', function () {
     $regularHours = min($totalDayHours, 8);
     $otHours      = max(0, round($totalDayHours - 8, 2));
 
-    // Update StudentHours table — only add the session hours worked
-    $studentHours = \App\Models\StudentHours::where('student_id', $validated['student_id'])
-        ->firstOrCreate(['student_id' => $validated['student_id']], ['total_hours_required' => 600]);
-
-    $newCompleted = round(max(0, $studentHours->hours_completed + $hoursWorked), 2);
-    $newRemaining = round(max(0, $studentHours->total_hours_required - $newCompleted), 2);
-
-    $studentHours->update([
-        'hours_completed' => $newCompleted,
-        'hours_remaining' => $newRemaining,
-    ]);
-
-    // Create daily log entry
+    // DO NOT add hours yet — wait for supervisor/coordinator approval
+    // Create daily log entry as pending
     \App\Models\DailyHourLog::create([
         'student_id'   => $validated['student_id'],
         'log_date'     => $validated['date'],
         'hours_logged' => max(0, $hoursWorked),
         'is_overtime'  => $otHours > 0,
-        'status'       => 'approved',
+        'status'       => 'pending',
     ]);
 
     return back()->with('success', sprintf(
-        'Time-out recorded! Session: %.2f hrs | Day Total: %.2f hrs%s',
-        $hoursWorked,
-        $totalDayHours,
-        $otHours > 0 ? sprintf(' (Regular: %.2f hrs + OT: %.2f hrs)', $regularHours, $otHours) : ''
+        'Time-out recorded! Session: %.2f hrs — awaiting approval.',
+        $hoursWorked
     ));
 })->name('time-out');
 
@@ -524,16 +511,32 @@ Route::post('/deny-hours/{logId}', function ($logId) {
 
 Route::post('/approve-time-in/{recordId}', function ($recordId) {
     $record = \App\Models\TimeInRecord::findOrFail($recordId);
-    $coordinator = User::findOrFail(session('user_id'));
-    
+    $reviewer = User::findOrFail(session('user_id'));
+
+    // Only credit hours if not already approved
+    if ($record->status !== 'approved' && $record->time_in && $record->time_out) {
+        $hoursWorked = round(max(0, \Carbon\Carbon::parse($record->time_in)->diffInMinutes(\Carbon\Carbon::parse($record->time_out))) / 60, 2);
+        $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)
+            ->firstOrCreate(['student_id' => $record->student_id], ['total_hours_required' => 600]);
+        $studentHours->update([
+            'hours_completed' => round(max(0, $studentHours->hours_completed + $hoursWorked), 2),
+            'hours_remaining' => round(max(0, $studentHours->total_hours_required - $studentHours->hours_completed - $hoursWorked), 2),
+        ]);
+        // Mark the matching pending daily log as approved
+        \App\Models\DailyHourLog::where('student_id', $record->student_id)
+            ->whereDate('log_date', $record->date)
+            ->where('status', 'pending')
+            ->update(['status' => 'approved']);
+    }
+
     $record->update([
         'verified' => true,
         'status' => 'approved',
-        'approved_by' => $coordinator->id,
+        'approved_by' => $reviewer->id,
         'approved_at' => now(),
     ]);
 
-    return back()->with('success', 'Time-in record approved!');
+    return back()->with('success', 'Time-in record approved and hours credited!');
 })->name('approve-time-in');
 
 Route::post('/deny-time-in/{recordId}', function ($recordId) {
@@ -542,12 +545,30 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
     ]);
 
     $record = \App\Models\TimeInRecord::findOrFail($recordId);
-    $coordinator = User::findOrFail(session('user_id'));
-    
+    $reviewer = User::findOrFail(session('user_id'));
+
+    // If previously approved, deduct the hours back
+    if ($record->status === 'approved' && $record->time_in && $record->time_out) {
+        $hoursWorked = round(max(0, \Carbon\Carbon::parse($record->time_in)->diffInMinutes(\Carbon\Carbon::parse($record->time_out))) / 60, 2);
+        $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)->first();
+        if ($studentHours) {
+            $studentHours->update([
+                'hours_completed' => round(max(0, $studentHours->hours_completed - $hoursWorked), 2),
+                'hours_remaining' => round(min($studentHours->total_hours_required, $studentHours->hours_remaining + $hoursWorked), 2),
+            ]);
+        }
+    }
+
+    // Mark matching daily log as denied
+    \App\Models\DailyHourLog::where('student_id', $record->student_id)
+        ->whereDate('log_date', $record->date)
+        ->whereIn('status', ['pending', 'approved'])
+        ->update(['status' => 'denied']);
+
     $record->update([
         'status' => 'denied',
         'denial_reason' => $validated['reason'],
-        'approved_by' => $coordinator->id,
+        'approved_by' => $reviewer->id,
         'approved_at' => now(),
     ]);
 
@@ -560,7 +581,7 @@ Route::post('/upload-requirement', function () {
         'title'       => 'required|string|max:255',
         'description' => 'nullable|string|max:1000',
         'file'        => 'nullable',
-        'file.*'      => 'file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif,webp,txt|max:5120',
+        'file.*'      => 'file|mimes:pdf,doc,docx,jpg,jpeg,png,gif,webp|max:5120',
     ]);
 
     $files = request()->file('file');
@@ -1167,6 +1188,23 @@ Route::get('/api/reports/students', function () {
     return response($content)
         ->header('Content-Type', 'application/vnd.ms-excel; charset=utf-8')
         ->header('Content-Disposition', 'attachment; filename="Student_Progress_Report_' . now()->format('Y-m-d') . '.xls"');
+});
+
+Route::get('/api/reports/attendance-data', function () {
+    $rows = [];
+    foreach (\App\Models\TimeInRecord::with('student')->orderBy('date','desc')->get() as $rec) {
+        if (!$rec->student) continue;
+        $hrs = $rec->time_out ? round(\Carbon\Carbon::parse($rec->time_in)->diffInMinutes(\Carbon\Carbon::parse($rec->time_out))/60, 2) : 0;
+        $rows[] = [
+            'student_name' => $rec->student->name,
+            'date'         => $rec->date->format('Y-m-d'),
+            'time_in'      => $rec->time_in ?? '—',
+            'time_out'     => $rec->time_out ?? '—',
+            'hours'        => $hrs,
+            'status'       => $rec->status ?? 'pending',
+        ];
+    }
+    return response()->json(['records' => $rows]);
 });
 
 Route::get('/api/reports/attendance', function () {

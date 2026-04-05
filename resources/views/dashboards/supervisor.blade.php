@@ -620,7 +620,6 @@
                                         <div class="flex justify-between items-start mb-2">
                                             <div>
                                                 <p class="text-gray-200 font-semibold">{{ $log->log_date->format('M d, Y') }}</p>
-                                                <p class="text-gray-400 text-sm">{{ $log->description ?? 'No description' }}</p>
                                             </div>
                                             <span class="px-2 py-1 text-xs rounded-full @if($log->status === 'approved') bg-green-500/20 text-green-300 @elseif($log->status === 'denied') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
                                                 {{ ucfirst($log->status) }}
@@ -861,10 +860,6 @@
                         <label class="flex items-center">
                             <input type="checkbox" name="send_email" value="1" checked class="w-4 h-4 bg-slate-700 border-slate-600 rounded cursor-pointer">
                             <span class="ml-2 text-sm text-gray-300">📧 Email</span>
-                        </label>
-                        <label class="flex items-center">
-                            <input type="checkbox" name="send_sms" value="1" class="w-4 h-4 bg-slate-700 border-slate-600 rounded cursor-pointer">
-                            <span class="ml-2 text-sm text-gray-300">📱 SMS</span>
                         </label>
                     </div>
                 </div>

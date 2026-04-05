@@ -5,17 +5,34 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DTR - {{ strtoupper($student->name) }}</title>
 <style>
-@page { size: A4 portrait; margin: 8mm; }
+@page { size: A4 portrait; margin: 6mm 7mm; }
 @media print {
   .no-print { display: none !important; }
   html, body { margin: 0; padding: 0; background: #fff; width: 100%; }
   .dtr-scale-wrapper { width: 100% !important; overflow: visible !important; }
-  .dtr-wrapper { width: 100% !important; border: 2px solid #000; font-size: 9px; }
-  table.dtr-table thead tr th { font-size: 8px; padding: 4px 2px; }
-  table.dtr-table tbody td { font-size: 8px; padding: 3px 4px; }
-  .sum-value { font-size: 13px; }
-  .summary-box { grid-template-columns: repeat(4,1fr); }
-  .info-value { font-size: 10px; }
+  .dtr-wrapper { width: 100% !important; border: 1.5px solid #000; font-size: 7.5px; }
+  .dtr-header { padding: 5px 8px 4px; }
+  .dtr-header .republic { font-size: 8px; }
+  .dtr-header .dept { font-size: 8.5px; margin: 1px 0; }
+  .dtr-header h1 { font-size: 13px; margin: 2px 0 1px; }
+  .dtr-header .subtitle { font-size: 7px; }
+  .info-cell { padding: 3px 7px; }
+  .info-label { font-size: 7px; }
+  .info-value { font-size: 8.5px; min-height: 14px; margin-top: 1px; }
+  table.dtr-table thead tr th { font-size: 7px; padding: 3px 2px; }
+  table.dtr-table tbody td { font-size: 7.5px; padding: 2px 3px; }
+  .month-header td { font-size: 8px; padding: 3px 6px; }
+  .month-total td { font-size: 7.5px; }
+  .sum-cell { padding: 5px 6px; }
+  .sum-label { font-size: 7px; }
+  .sum-value { font-size: 12px; margin: 1px 0; }
+  .progress-wrap { height: 5px; margin-top: 2px; }
+  .progress-fill { height: 5px; }
+  .cert-section { padding: 6px 10px 10px; }
+  .cert-text { font-size: 7.5px; margin-bottom: 12px; }
+  .sig-name { font-size: 8.5px; min-height: 18px; }
+  .sig-role { font-size: 7px; }
+  .sig-grid { gap: 20px; }
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: Arial, sans-serif; font-size: 11px; color: #000; background: #e8e8e8; padding: 20px; }
@@ -217,11 +234,6 @@ table.dtr-table tbody tr:nth-child(even) { background: #f9f9f9; }
 
 </div><!-- end dtr-wrapper -->
 </div><!-- end dtr-scale-wrapper -->
-
-<div class="no-print"
-  <button class="btn btn-pdf" onclick="window.print()">🖨️ Print / Save as PDF</button>
-  <a class="btn btn-word" href="{{ route('generate-dtr-word', $student->id) }}">📄 Download as Word (.doc)</a>
-</div>
 
 </body>
 </html>

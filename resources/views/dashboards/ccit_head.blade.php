@@ -595,6 +595,7 @@
                                 <option value="student">Student</option>
                                 <option value="supervisor">Supervisor</option>
                                 <option value="coordinator">Coordinator</option>
+                                <option value="ccit_head">CCIT Head</option>
                             </select>
                         </div>
                         <div id="companyField">
