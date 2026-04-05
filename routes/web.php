@@ -589,6 +589,17 @@ Route::post('/upload-requirement', function () {
         return back()->withErrors(['file' => 'Please select at least one file.']);
     }
 
+    // Ensure storage directories exist (fixes shared hosting 500 error)
+    $dirs = [
+        storage_path('app/public'),
+        storage_path('app/public/requirements'),
+        storage_path('app/public/time-in-photos'),
+        storage_path('app/public/time-out-photos'),
+    ];
+    foreach ($dirs as $dir) {
+        if (!file_exists($dir)) @mkdir($dir, 0755, true);
+    }
+
     // Normalise: single file or array
     if (!is_array($files)) $files = [$files];
 
