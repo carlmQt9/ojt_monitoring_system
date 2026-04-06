@@ -112,6 +112,11 @@
         @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
         .pixel-check { image-rendering:pixelated; font-size:3rem; animation:popIn .5s cubic-bezier(.36,.07,.19,.97) forwards; }
         .pixel-success-text { animation:fadeUp .4s .3s ease forwards; opacity:0; }
+        /* Hide browser native password reveal icons (Edge, IE, Chrome) */
+        .hide-pwd-reveal::-ms-reveal,
+        .hide-pwd-reveal::-ms-clear { display: none !important; }
+        .hide-pwd-reveal::-webkit-credentials-auto-fill-button { display: none !important; }
+        .hide-pwd-reveal::-webkit-textfield-decoration-container { display: none !important; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-gray-100">
@@ -485,9 +490,10 @@
                     <div class="border-b border-slate-700 pb-6">
                         <h4 class="text-lg font-semibold text-white mb-4">Email Settings</h4>
                         <label class="flex items-center">
-                            <input type="checkbox" name="email_notifications" class="w-4 h-4 rounded bg-slate-700 border-slate-600 text-red-600">
+                            <input type="checkbox" name="email_notifications" id="emailNotifCheck" class="w-4 h-4 rounded bg-slate-700 border-slate-600 text-red-600" checked>
                             <span class="ml-2 text-gray-300">Enable email notifications</span>
                         </label>
+                        <p class="text-xs text-gray-500 mt-2 ml-6">When unchecked, no emails will be sent via Gmail for any system events.</p>
                     </div>
                     <div class="flex gap-4">
                         <button type="submit" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">Save Settings</button>
@@ -582,11 +588,23 @@
                         </div>
                         <div>
                             <label class="block text-gray-300 mb-2">Password</label>
-                            <input type="password" name="password" required class="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500">
+                            <div class="relative">
+                                <input type="password" name="password" id="addUserPassword" required
+                                    class="w-full px-4 py-2 pr-10 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500 hide-pwd-reveal">
+                                <button type="button" onclick="togglePwd('addUserPassword','eyeIcon1')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white focus:outline-none" tabindex="-1">
+                                    <svg id="eyeIcon1" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.477 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-gray-300 mb-2">Confirm Password</label>
-                            <input type="password" name="password_confirmation" required class="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500">
+                            <div class="relative">
+                                <input type="password" name="password_confirmation" id="addUserPasswordConf" required
+                                    class="w-full px-4 py-2 pr-10 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500 hide-pwd-reveal">
+                                <button type="button" onclick="togglePwd('addUserPasswordConf','eyeIcon2')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white focus:outline-none" tabindex="-1">
+                                    <svg id="eyeIcon2" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.477 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-gray-300 mb-2">Role</label>
@@ -697,9 +715,10 @@
                             <h4 class="text-lg font-semibold text-white mb-4">Email Settings</h4>
                             <div class="space-y-4">
                                 <label class="flex items-center">
-                                    <input type="checkbox" name="email_notifications" class="w-4 h-4 rounded bg-slate-700 border-slate-600 text-red-600">
+                                    <input type="checkbox" name="email_notifications" class="w-4 h-4 rounded bg-slate-700 border-slate-600 text-red-600" checked>
                                     <span class="ml-2 text-gray-300">Enable email notifications</span>
                                 </label>
+                                <p class="text-xs text-gray-500 ml-6">When unchecked, no emails will be sent via Gmail for any system events.</p>
                             </div>
                         </div>
                         <div class="flex space-x-4">
@@ -823,6 +842,19 @@
             }
             return _origFetch(url, opts);
         };
+
+        function togglePwd(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (!input) return;
+            const isHidden = input.type === 'password';
+            input.type = isHidden ? 'text' : 'password';
+            // isHidden=true means we just revealed — show open-eye
+            // isHidden=false means we just hid — show closed-eye
+            icon.innerHTML = isHidden
+                ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>'
+                : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.477 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
+        }
         let allUsers = [];
         let editingUserId = null;
         let currentSchoolYear = '';
@@ -1050,7 +1082,15 @@
         }
 
         function deleteSchoolYear(id) {
-            if (!confirm('Remove this school year?')) return;
+            document.getElementById('deleteSchoolYearModal').dataset.syId = id;
+            document.getElementById('deleteSchoolYearModal').classList.remove('hidden');
+        }
+        function closeDeleteSchoolYearModal() {
+            document.getElementById('deleteSchoolYearModal').classList.add('hidden');
+        }
+        function confirmDeleteSchoolYear() {
+            const id = document.getElementById('deleteSchoolYearModal').dataset.syId;
+            closeDeleteSchoolYearModal();
             pixelAction('DELETING', () =>
                 fetch(`/api/school-years/${id}`, {
                     method: 'DELETE',
@@ -1333,11 +1373,22 @@
         }
 
         function removeUser(userId) {
-            if (confirm('Are you sure you want to remove this user?')) {
-                pixelAction('DELETING', () =>
-                    fetch(`/api/users/${userId}`, {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }
+            const user = allUsers.find(u => u.id === userId);
+            const name = user ? user.name : 'this user';
+            document.getElementById('deleteUserName').textContent = name;
+            document.getElementById('deleteUserModal').dataset.userId = userId;
+            document.getElementById('deleteUserModal').classList.remove('hidden');
+        }
+        function closeDeleteUserModal() {
+            document.getElementById('deleteUserModal').classList.add('hidden');
+        }
+        function confirmDeleteUser() {
+            const userId = document.getElementById('deleteUserModal').dataset.userId;
+            closeDeleteUserModal();
+            pixelAction('DELETING', () =>
+                fetch(`/api/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }
                     }).then(async response => {
                         if (response.status === 419) { alert('Session expired. Please reload.'); return; }
                         const data = await response.json().catch(()=>({}));
@@ -1345,7 +1396,6 @@
                         else alert(data.message || 'Failed to remove user');
                     })
                 , 'USER REMOVED!');
-            }
         }
 
         function renderAnalytics(items) {
@@ -1630,14 +1680,17 @@
             modal.innerHTML = `
                 <div class="bg-slate-800 border border-red-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
                     <div class="text-center mb-4">
-                        <div class="text-5xl mb-3">⚠️</div>
-                        <h3 class="text-lg font-bold text-white mb-2">Danger: Permanent Action</h3>
-                        <p class="text-gray-300 text-sm mb-2">Deleting this School ID will <span class="text-red-400 font-semibold">also permanently delete the student account</span> that used it.</p>
-                        <p class="text-red-400 text-xs font-semibold bg-red-900/30 border border-red-700/40 rounded-lg px-3 py-2 mt-3">⛔ This action cannot be undone.</p>
+                        <div class="text-5xl mb-3">🪹</div>
+                        <h3 class="text-lg font-bold text-white mb-2">Archive School ID?</h3>
+                        <p class="text-gray-300 text-sm mb-2">Are you sure you want to archive this School ID?</p>
+                        <div class="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 mt-3 text-left">
+                            <p class="text-red-400 text-xs font-semibold">⚠️ This action cannot be undone.</p>
+                            <p class="text-gray-400 text-xs mt-1">The student who used this ID will no longer be able to register with it.</p>
+                        </div>
                     </div>
                     <div class="flex gap-3 mt-5">
                         <button onclick="this.closest('.fixed').remove()" class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">Cancel</button>
-                        <button id="confirmDeleteSidBtn" class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all">Yes, Delete</button>
+                        <button id="confirmDeleteSidBtn" class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all">Yes, Archive</button>
                     </div>
                 </div>
             `;
@@ -2005,6 +2058,44 @@
         </div>
     </div>
     <!-- End DTR Viewer Modal -->
+
+    <!-- Delete School Year Confirmation Modal -->
+    <div id="deleteSchoolYearModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
+        <div class="bg-slate-800 border border-red-500/50 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div class="text-center mb-4">
+                <div class="text-5xl mb-3">📅</div>
+                <h3 class="text-lg font-bold text-white mb-2">Archive School Year?</h3>
+                <p class="text-gray-300 text-sm">Are you sure you want to archive this school year?</p>
+                <div class="mt-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+                    <p class="text-red-400 text-xs font-semibold">⚠️ This action cannot be undone.</p>
+                    <p class="text-gray-400 text-xs mt-1">Students and records linked to this school year will remain but the school year will no longer be selectable.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-5">
+                <button onclick="closeDeleteSchoolYearModal()" class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">Cancel</button>
+                <button onclick="confirmDeleteSchoolYear()" class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all">Yes, Archive</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete User Confirmation Modal -->
+    <div id="deleteUserModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
+        <div class="bg-slate-800 border border-red-500/50 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div class="text-center mb-4">
+                <div class="text-5xl mb-3">⚠️</div>
+                <h3 class="text-lg font-bold text-white mb-2">Archive User?</h3>
+                <p class="text-gray-300 text-sm">You are about to archive <span id="deleteUserName" class="text-red-400 font-semibold"></span>.</p>
+                <div class="mt-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+                    <p class="text-red-400 text-xs font-semibold">⚠️ This action cannot be undone.</p>
+                    <p class="text-gray-400 text-xs mt-1">All records associated with this user will be permanently removed from the system.</p>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-5">
+                <button onclick="closeDeleteUserModal()" class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">Cancel</button>
+                <button onclick="confirmDeleteUser()" class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all">Yes, Archive</button>
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>

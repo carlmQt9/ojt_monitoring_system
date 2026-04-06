@@ -635,16 +635,15 @@ Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
         'approved_at' => now(),
     ]);
 
-    // Notify student via email
+    // Send email after response to avoid blocking
     if ($requirement->student) {
-        try {
-            \App\Helpers\MailHelper::sendRequirementApproved(
-                $requirement->student->email,
-                $requirement->student->name,
-                $requirement->title,
-                $validated['feedback']
-            );
-        } catch (\Throwable) {}
+        $email = $requirement->student->email;
+        $name  = $requirement->student->name;
+        $title = $requirement->title;
+        $fb    = $validated['feedback'];
+        register_shutdown_function(function() use ($email, $name, $title, $fb) {
+            try { \App\Helpers\MailHelper::sendRequirementApproved($email, $name, $title, $fb); } catch (\Throwable) {}
+        });
     }
 
     return back()->with('success', 'Requirement approved!');
@@ -686,7 +685,6 @@ Route::post('/reject-requirement/{requirementId}', function ($requirementId) {
         \Illuminate\Support\Facades\Storage::disk('public')->delete($requirement->file_path);
     }
 
-    // Reset to pending with no file so student resubmits
     $requirement->update([
         'status' => 'denied',
         'feedback' => $validated['feedback'],
@@ -695,16 +693,15 @@ Route::post('/reject-requirement/{requirementId}', function ($requirementId) {
         'approved_at' => now(),
     ]);
 
-    // Notify student via email
+    // Send email after response to avoid blocking
     if ($requirement->student) {
-        try {
-            \App\Helpers\MailHelper::sendRequirementDenied(
-                $requirement->student->email,
-                $requirement->student->name,
-                $requirement->title,
-                $validated['feedback']
-            );
-        } catch (\Throwable) {}
+        $email = $requirement->student->email;
+        $name  = $requirement->student->name;
+        $title = $requirement->title;
+        $fb    = $validated['feedback'];
+        register_shutdown_function(function() use ($email, $name, $title, $fb) {
+            try { \App\Helpers\MailHelper::sendRequirementDenied($email, $name, $title, $fb); } catch (\Throwable) {}
+        });
     }
 
     return response()->json(['success' => true, 'message' => 'Requirement rejected!']);
@@ -929,7 +926,7 @@ Route::post('/api/settings', function () {
 // retrieve current settings
 Route::get('/api/settings', function () {
     $required = \App\Models\StudentHours::query()->value('total_hours_required') ?? 600;
-    $email = cache('settings.email_notifications', false);
+    $email = cache('settings.email_notifications', true);
     return response()->json(['required_hours' => $required, 'email_notifications' => $email]);
 });
 
@@ -1068,6 +1065,12 @@ Route::post('/api/users', function () {
         'school_id_number' => $validated['school_id_number'] ?? null,
     ]);
 
+    // Mark school ID as used when adding a student
+    if ($validated['role'] === 'student' && !empty($validated['school_id_number'])) {
+        \App\Models\StudentSchoolId::where('school_id_number', $validated['school_id_number'])
+            ->update(['is_used' => true]);
+    }
+
     return response()->json(['success' => true, 'user' => $user]);
 });
 
@@ -1089,6 +1092,8 @@ Route::put('/api/users/{id}', function ($id) {
         return response()->json(['success' => false, 'message' => 'Company is required for students and supervisors'], 422);
     }
 
+    $oldSchoolId = $user->school_id_number;
+
     $user->name = $validated['name'];
     $user->email = $validated['email'];
     $user->role = $validated['role'];
@@ -1099,6 +1104,17 @@ Route::put('/api/users/{id}', function ($id) {
         $user->password = Hash::make($validated['password']);
     }
     $user->save();
+
+    // Sync school ID used status when editing a student
+    if ($validated['role'] === 'student') {
+        $newSchoolId = $validated['school_id_number'] ?? null;
+        if ($oldSchoolId && $oldSchoolId !== $newSchoolId) {
+            \App\Models\StudentSchoolId::where('school_id_number', $oldSchoolId)->update(['is_used' => false]);
+        }
+        if ($newSchoolId && $newSchoolId !== $oldSchoolId) {
+            \App\Models\StudentSchoolId::where('school_id_number', $newSchoolId)->update(['is_used' => true]);
+        }
+    }
 
     return response()->json(['success' => true, 'user' => $user]);
 });
@@ -1135,6 +1151,11 @@ Route::get('/api/analytics', function () {
 
 Route::delete('/api/users/{id}', function ($id) {
     $user = User::findOrFail($id);
+    // Free the school ID back to available if student had one
+    if ($user->role === 'student' && $user->school_id_number) {
+        \App\Models\StudentSchoolId::where('school_id_number', $user->school_id_number)
+            ->update(['is_used' => false]);
+    }
     $user->delete();
     return response()->json(['success' => true, 'message' => 'User removed successfully']);
 });

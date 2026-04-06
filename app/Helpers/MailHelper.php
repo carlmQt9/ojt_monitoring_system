@@ -6,6 +6,11 @@ use PHPMailer\PHPMailer\PHPMailer;
 
 class MailHelper
 {
+    private static function isEnabled(): bool
+    {
+        return (bool) cache('settings.email_notifications', true);
+    }
+
     private static function mailer(): PHPMailer
     {
         $mail = new PHPMailer(true);
@@ -23,6 +28,7 @@ class MailHelper
 
     public static function sendWelcome(string $toEmail, string $toName, bool $needsApproval = false): void
     {
+        if (!self::isEnabled()) return;
         $mail = self::mailer();
         $mail->addAddress($toEmail, $toName);
 
@@ -71,6 +77,7 @@ class MailHelper
 
     public static function sendApproved(string $toEmail, string $toName): void
     {
+        if (!self::isEnabled()) return;
         $mail = self::mailer();
         $mail->addAddress($toEmail, $toName);
         $mail->Subject = 'Account Approved - PRMSU OJT Monitoring System';
@@ -98,6 +105,7 @@ class MailHelper
 
     public static function sendDenied(string $toEmail, string $toName): void
     {
+        if (!self::isEnabled()) return;
         $mail = self::mailer();
         $mail->addAddress($toEmail, $toName);
         $mail->Subject = 'Account Registration Denied - PRMSU OJT Monitoring System';
@@ -123,6 +131,7 @@ class MailHelper
 
     public static function sendRequirementApproved(string $toEmail, string $toName, string $title, string $feedback): void
     {
+        if (!self::isEnabled()) return;
         $mail = self::mailer();
         $mail->addAddress($toEmail, $toName);
         $mail->Subject = 'Requirement Approved - PRMSU OJT Monitoring System';
@@ -152,6 +161,7 @@ class MailHelper
 
     public static function sendRequirementDenied(string $toEmail, string $toName, string $title, string $feedback): void
     {
+        if (!self::isEnabled()) return;
         $mail = self::mailer();
         $mail->addAddress($toEmail, $toName);
         $mail->Subject = 'Requirement Denied - Action Required - PRMSU OJT Monitoring System';
@@ -182,6 +192,7 @@ class MailHelper
 
     public static function sendPasswordReset(string $toEmail, string $toName, string $resetUrl): void
     {
+        if (!self::isEnabled()) return;
         $mail = self::mailer();
         $mail->addAddress($toEmail, $toName);
         $mail->Subject = 'Password Reset - PRMSU OJT Monitoring System';

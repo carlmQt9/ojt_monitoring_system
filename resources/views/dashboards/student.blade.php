@@ -1879,9 +1879,22 @@
                     return false;
                 }
             }
+            // Show upload loading overlay
+            showUploadLoader();
             return true;
         }
         // ===== END FILE SIZE VALIDATION =====
+
+        // ===== UPLOAD LOADER =====
+        function showUploadLoader() {
+            document.getElementById('uploadLoader').classList.remove('hidden');
+        }
+        function hideUploadLoader() {
+            document.getElementById('uploadLoader').classList.add('hidden');
+        }
+        // Safety: hide loader if page is restored from bfcache (back button)
+        window.addEventListener('pageshow', hideUploadLoader);
+        // ===== END UPLOAD LOADER =====
 
         // ===== UPLOAD MODAL =====
         function openUploadModal(title, maxFiles) {
@@ -2026,5 +2039,26 @@
             }
         })();
     </script>
+    <!-- ===== UPLOAD LOADER OVERLAY ===== -->
+    <div id="uploadLoader" class="hidden fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black/75">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl px-10 py-8 flex flex-col items-center gap-5 shadow-2xl" style="box-shadow:0 0 40px rgba(34,197,94,0.2)">
+            <!-- Animated spinner -->
+            <div class="relative w-16 h-16">
+                <svg class="w-16 h-16 animate-spin" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="32" cy="32" r="28" stroke="#1e293b" stroke-width="6"/>
+                    <path d="M32 4a28 28 0 0 1 28 28" stroke="#22c55e" stroke-width="6" stroke-linecap="round"/>
+                </svg>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <svg class="w-7 h-7 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                </div>
+            </div>
+            <div class="text-center">
+                <p class="text-green-400 font-bold text-sm tracking-widest">UPLOADING...</p>
+                <p class="text-gray-400 text-xs mt-1">Please wait, do not close this page.</p>
+            </div>
+        </div>
+    </div>
+    <!-- ===== END UPLOAD LOADER OVERLAY ===== -->
+
 </body>
 </html>

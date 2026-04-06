@@ -838,7 +838,7 @@
                                 <div class="flex items-center justify-between gap-4 p-4 hover:bg-slate-700/20 transition-colors">
                                     <div class="min-w-0">
                                         <p class="text-white font-semibold truncate">{{ $student->name ?? 'Unknown Student' }}</p>
-                                        <p class="text-gray-400 text-sm truncate">{{ $student->company ? $student->company->name : '' }}</p>
+                                        <p class="text-gray-400 text-sm truncate">{{ $student?->company?->name ?? '' }}</p>
                                         <p class="text-gray-400 text-xs mt-0.5">{{ $reports->count() }} item(s)</p>
                                     </div>
                                     <button onclick="toggleCabinet('{{ $studentId }}')" class="shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold">Open Cabinet</button>

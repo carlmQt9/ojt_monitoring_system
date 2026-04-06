@@ -63,7 +63,7 @@
 
     function showPixelSuccess(msg, duration) {
         msg = msg || 'SUCCESS!';
-        duration = duration || 1400;
+        duration = duration || 800;
         const el = document.getElementById('pixelSuccess');
         document.getElementById('pixelSuccessMsg').textContent = msg;
         const check = el.querySelector('.pixel-check');

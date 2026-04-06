@@ -881,7 +881,7 @@
                 @csrf
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-2">Reason for Denial <span class="text-red-400">*</span></label>
-                    <textarea name="reason" required rows="4" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-red-500 focus:outline-none" placeholder="Explain why..."></textarea>
+                    <textarea name="feedback" required rows="4" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-red-500 focus:outline-none" placeholder="Explain why..."></textarea>
                 </div>
 
                 <div class="flex gap-3 pt-4">
@@ -1226,13 +1226,48 @@
 
         // Deny Requirement Modal
         function showDenyRequirementModal(requirementId) {
-            document.getElementById('denyRequirementForm').action = `{{ url('/deny-requirement') }}/${requirementId}`;
+            document.getElementById('denyRequirementForm').dataset.requirementId = requirementId;
+            document.getElementById('denyRequirementForm').querySelector('textarea').value = '';
             document.getElementById('denyRequirementModal').classList.remove('hidden');
         }
 
         function closeDenyRequirementModal() {
             document.getElementById('denyRequirementModal').classList.add('hidden');
         }
+
+        document.getElementById('denyRequirementForm')?.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            e.stopImmediatePropagation(); // prevent pixel-loader auto-attach
+            const requirementId = this.dataset.requirementId;
+            const feedback = this.querySelector('textarea[name="feedback"]').value.trim();
+            if (!feedback) return;
+            const btn = this.querySelector('button[type="submit"]');
+            btn.disabled = true; btn.textContent = 'Denying...';
+            if (typeof showPixelLoader === 'function') showPixelLoader('DENYING');
+            const fd = new FormData();
+            fd.append('_token', '{{ csrf_token() }}');
+            fd.append('feedback', feedback);
+            try {
+                const res = await fetch(`{{ url('/reject-requirement') }}/${requirementId}`, { method: 'POST', body: fd });
+                const data = await res.json().catch(() => ({}));
+                if (typeof hidePixelLoader === 'function') hidePixelLoader();
+                if (res.ok && data.success) {
+                    closeDenyRequirementModal();
+                    if (typeof showSuccess === 'function') {
+                        showSuccess('Requirement denied successfully!', null, true);
+                    } else {
+                        location.reload();
+                    }
+                } else {
+                    alert(data.message || 'Failed to deny requirement. Please try again.');
+                    btn.disabled = false; btn.textContent = 'Deny';
+                }
+            } catch(err) {
+                if (typeof hidePixelLoader === 'function') hidePixelLoader();
+                alert('Network error. Please try again.');
+                btn.disabled = false; btn.textContent = 'Deny';
+            }
+        }, true); // capture phase — runs before pixel-loader listener
 
         // Evaluation Modal
         function showEvaluationModal(studentId, studentName, isEvaluated = false) {
