@@ -841,6 +841,9 @@
             $onboardingKeys = ['Internship Application Form','Letter of Acceptance','Parental Consent','School ID','Government ID','Vaccination Card','Medical Report','Insurance'];
             $onboardingReports = $allSubmitted->filter(fn($r) => collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false));
             $dailyReports = $allSubmitted->filter(fn($r) => !collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false));
+            // Build a map of title => latest submission for resubmit check
+            $latestByTitle = $allSubmitted->groupBy(fn($r) => strtolower(trim($r->title)))
+                ->map(fn($group) => $group->sortByDesc('created_at')->first());
         ?>
         <div class="space-y-6">
 
@@ -873,7 +876,12 @@
                         <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" class="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs mt-2">📎 View File</button>
                         @endif
                         @if($req->status === 'denied')
-                        <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" class="inline-flex items-center gap-1 text-orange-400 hover:text-orange-300 text-xs mt-2 ml-2">&#8635; Resubmit</button>
+                            @php $latestForThis = $latestByTitle[strtolower(trim($req->title))] ?? null; @endphp
+                            @if($latestForThis && $latestForThis->id === $req->id)
+                            <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" class="inline-flex items-center gap-1 text-orange-400 hover:text-orange-300 text-xs mt-2 ml-2">&#8635; Resubmit</button>
+                            @else
+                            <span class="inline-flex items-center gap-1 text-gray-500 text-xs mt-2 ml-2 cursor-not-allowed" title="Already resubmitted">&#8635; Resubmitted</span>
+                            @endif
                         @endif
                     </div>
                     @endforeach
@@ -915,7 +923,12 @@
                         <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" class="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs mt-2">📎 View File</button>
                         @endif
                         @if($req->status === 'denied')
-                        <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" class="inline-flex items-center gap-1 text-orange-400 hover:text-orange-300 text-xs mt-2 ml-2">&#8635; Resubmit</button>
+                            @php $latestForThis = $latestByTitle[strtolower(trim($req->title))] ?? null; @endphp
+                            @if($latestForThis && $latestForThis->id === $req->id)
+                            <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" class="inline-flex items-center gap-1 text-orange-400 hover:text-orange-300 text-xs mt-2 ml-2">&#8635; Resubmit</button>
+                            @else
+                            <span class="inline-flex items-center gap-1 text-gray-500 text-xs mt-2 ml-2 cursor-not-allowed" title="Already resubmitted">&#8635; Resubmitted</span>
+                            @endif
                         @endif
                     </div>
                     @endforeach
