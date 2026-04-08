@@ -1079,8 +1079,73 @@ Route::post('/add-company', function () {
 
 Route::delete('/delete-company/{id}', function ($id) {
     \App\Models\Company::findOrFail($id)->delete();
-    return back()->with('success', 'Company removed successfully!');
+    return back()->with('success', 'Company archived successfully!');
 })->name('delete-company');
+
+Route::put('/update-company/{id}', function ($id) {
+    $company = \App\Models\Company::findOrFail($id);
+    $validated = request()->validate([
+        'name'          => 'required|string|max:255|unique:companies,name,' . $id,
+        'industry'      => 'nullable|string|max:255',
+        'location'      => 'nullable|string|max:255',
+        'contact_person'=> 'nullable|string|max:255',
+        'contact_email' => 'nullable|email|max:255',
+        'contact_phone' => 'nullable|string|max:20',
+    ]);
+    $company->update($validated);
+    return back()->with('success', 'Company updated successfully!');
+})->name('update-company');
+
+Route::post('/restore-company/{id}', function ($id) {
+    \App\Models\Company::withTrashed()->findOrFail($id)->restore();
+    return back()->with('success', 'Company restored successfully!');
+})->name('restore-company');
+
+Route::delete('/force-delete-company/{id}', function ($id) {
+    \App\Models\Company::withTrashed()->findOrFail($id)->forceDelete();
+    return back()->with('success', 'Company permanently deleted!');
+})->name('force-delete-company');
+
+// Requirement Template Routes
+Route::post('/requirement-templates', function () {
+    $validated = request()->validate([
+        'name'        => 'required|string|max:255',
+        'category'    => 'required|in:onboarding,daily',
+        'description' => 'nullable|string|max:500',
+        'max_files'   => 'required|integer|min:1|max:20',
+        'sort_order'  => 'nullable|integer|min:0',
+    ]);
+    \App\Models\RequirementTemplate::create($validated);
+    return back()->with('success', 'Requirement added successfully!');
+})->name('requirement-templates.store');
+
+Route::put('/requirement-templates/{id}', function ($id) {
+    $tpl = \App\Models\RequirementTemplate::findOrFail($id);
+    $validated = request()->validate([
+        'name'        => 'required|string|max:255',
+        'category'    => 'required|in:onboarding,daily',
+        'description' => 'nullable|string|max:500',
+        'max_files'   => 'required|integer|min:1|max:20',
+        'sort_order'  => 'nullable|integer|min:0',
+    ]);
+    $tpl->update($validated);
+    return back()->with('success', 'Requirement updated successfully!');
+})->name('requirement-templates.update');
+
+Route::delete('/requirement-templates/{id}', function ($id) {
+    \App\Models\RequirementTemplate::findOrFail($id)->delete();
+    return back()->with('success', 'Requirement archived!');
+})->name('requirement-templates.destroy');
+
+Route::post('/requirement-templates/{id}/restore', function ($id) {
+    \App\Models\RequirementTemplate::withTrashed()->findOrFail($id)->restore();
+    return back()->with('success', 'Requirement restored!');
+})->name('requirement-templates.restore');
+
+Route::delete('/requirement-templates/{id}/force', function ($id) {
+    \App\Models\RequirementTemplate::withTrashed()->findOrFail($id)->forceDelete();
+    return back()->with('success', 'Requirement permanently deleted!');
+})->name('requirement-templates.force-delete');
 
 // Forgot Password
 Route::post('/forgot-password', function () {
@@ -1166,6 +1231,21 @@ Route::delete('/api/school-ids/{id}', function ($id) {
     return response()->json(['success' => true]);
 });
 
+Route::post('/api/school-ids/{id}/restore', function ($id) {
+    \App\Models\StudentSchoolId::withTrashed()->findOrFail($id)->restore();
+    return response()->json(['success' => true]);
+});
+
+Route::delete('/api/school-ids/{id}/force', function ($id) {
+    \App\Models\StudentSchoolId::withTrashed()->findOrFail($id)->forceDelete();
+    return response()->json(['success' => true]);
+});
+
+Route::get('/api/school-ids/archived', function () {
+    $archived = \App\Models\StudentSchoolId::onlyTrashed()->orderBy('deleted_at', 'desc')->get();
+    return response()->json(['school_ids' => $archived]);
+});
+
 Route::put('/api/school-ids/{id}', function ($id) {
     $sid = \App\Models\StudentSchoolId::findOrFail($id);
     $validated = request()->validate([
@@ -1187,6 +1267,11 @@ Route::get('/api/school-years', function () {
     return response()->json(['school_years' => $years]);
 });
 
+Route::get('/api/school-years/archived', function () {
+    $archived = \App\Models\SchoolYear::onlyTrashed()->orderBy('deleted_at', 'desc')->get();
+    return response()->json(['school_years' => $archived]);
+});
+
 Route::post('/api/school-years', function () {
     $validated = request()->validate([
         'label' => 'required|string|regex:/^\d{4}-\d{4}$/|unique:school_years,label',
@@ -1197,6 +1282,16 @@ Route::post('/api/school-years', function () {
 
 Route::delete('/api/school-years/{id}', function ($id) {
     \App\Models\SchoolYear::findOrFail($id)->delete();
+    return response()->json(['success' => true]);
+});
+
+Route::post('/api/school-years/{id}/restore', function ($id) {
+    \App\Models\SchoolYear::withTrashed()->findOrFail($id)->restore();
+    return response()->json(['success' => true]);
+});
+
+Route::delete('/api/school-years/{id}/force', function ($id) {
+    \App\Models\SchoolYear::withTrashed()->findOrFail($id)->forceDelete();
     return response()->json(['success' => true]);
 });
 

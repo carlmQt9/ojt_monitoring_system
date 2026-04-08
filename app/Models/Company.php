@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Schema;
 
 class Company extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -18,6 +20,15 @@ class Company extends Model
         'contact_phone',
         'description',
     ];
+
+    protected static function booted(): void
+    {
+        if (!Schema::hasColumn('companies', 'deleted_at')) {
+            static::addGlobalScope('no_soft_delete', function ($builder) {
+                $builder->withoutGlobalScope(\Illuminate\Database\Eloquent\SoftDeletingScope::class);
+            });
+        }
+    }
 
     public function students()
     {

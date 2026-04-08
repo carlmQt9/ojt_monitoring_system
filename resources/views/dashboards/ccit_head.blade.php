@@ -157,6 +157,9 @@
             <button class="nav-item" onclick="showSection('reports'); closeSidebar();" data-section="reports">
                 <span class="nav-icon">📝</span><span class="nav-label">Reports</span>
             </button>
+            <button class="nav-item" onclick="showSection('manage-requirements'); closeSidebar();" data-section="manage-requirements">
+                <span class="nav-icon">📋</span><span class="nav-label">Manage Requirements</span>
+            </button>
             <button class="nav-item" onclick="showSection('settings'); closeSidebar();" data-section="settings">
                 <span class="nav-icon">⚙️</span><span class="nav-label">Settings</span>
             </button>
@@ -389,9 +392,12 @@
 
         <!-- SECTION: School Years -->
         <section id="section-schoolyears" class="dash-section hidden">
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold text-white mb-1">🗓️ School Years</h2>
-                <p class="text-gray-400 text-sm">Manage school years and assign students per batch</p>
+            <div class="mb-6 flex justify-between items-start">
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-1">🗓️ School Years</h2>
+                    <p class="text-gray-400 text-sm">Manage school years and assign students per batch</p>
+                </div>
+                <button onclick="openArchivedSchoolYearsModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition-colors">🗑 Archive Trash</button>
             </div>
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
                 <div class="flex gap-2 mb-4">
@@ -408,9 +414,12 @@
 
         <!-- SECTION: School IDs -->
         <section id="section-schoolids" class="dash-section hidden">
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold text-white mb-1">🪪 Student School IDs</h2>
-                <p class="text-gray-400 text-sm">Manage approved school ID numbers for student registration</p>
+            <div class="mb-6 flex justify-between items-start">
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-1">🪪 Student School IDs</h2>
+                    <p class="text-gray-400 text-sm">Manage approved school ID numbers for student registration</p>
+                </div>
+                <button onclick="openArchivedSchoolIdsModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition-colors">🗑 Archive Trash</button>
             </div>
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
                 <p class="text-gray-400 text-sm mb-4">Only students with an approved School ID (e.g. <span class="text-red-300 font-mono">23-1-2-0001</span>) can register.</p>
@@ -502,8 +511,290 @@
             </div>
         </section><!-- /section-settings -->
 
+        <!-- SECTION: Manage Requirements -->
+        <section id="section-manage-requirements" class="dash-section hidden">
+        <?php
+            $reqTemplates = \App\Models\RequirementTemplate::orderBy('category')->orderBy('sort_order')->orderBy('name')->get();
+            $archivedTemplates = \App\Models\RequirementTemplate::onlyTrashed()->orderBy('deleted_at','desc')->get();
+        ?>
+        <div class="mb-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-white">Manage Requirements</h2>
+                <div class="flex gap-2">
+                    <button onclick="toggleArchivedTemplates()" id="archivedTemplatesBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition-colors">🗑 Archive Trash</button>
+                    <button onclick="showAddTemplateModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors">+ Add Requirement</button>
+                </div>
+            </div>
+
+            <!-- Onboarding Requirements -->
+            <div class="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+                <h3 class="text-lg font-bold text-white mb-4">📂 Onboarding Requirements</h3>
+                @php $onboardingTpls = $reqTemplates->where('category','onboarding'); @endphp
+                @if($onboardingTpls->isNotEmpty())
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-slate-700">
+                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Name</th>
+                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Description</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Max Files</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Order</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($onboardingTpls as $tpl)
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors">
+                                <td class="py-3 px-3 text-gray-200 font-medium">{{ $tpl->name }}</td>
+                                <td class="py-3 px-3 text-gray-400 text-sm">{{ $tpl->description ?? '-' }}</td>
+                                <td class="py-3 px-3 text-center"><span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-sm">{{ $tpl->max_files }}</span></td>
+                                <td class="py-3 px-3 text-center text-gray-400 text-sm">{{ $tpl->sort_order }}</td>
+                                <td class="py-3 px-3 text-center">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }})" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Edit</button>
+                                        <button onclick="showArchiveTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Archive</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                @else
+                <p class="text-gray-400 text-center py-6">No onboarding requirements yet.</p>
+                @endif
+            </div>
+
+            <!-- Daily Requirements -->
+            <div class="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+                <h3 class="text-lg font-bold text-white mb-4">📋 Daily Submission Requirements</h3>
+                @php $dailyTpls = $reqTemplates->where('category','daily'); @endphp
+                @if($dailyTpls->isNotEmpty())
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-slate-700">
+                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Name</th>
+                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Description</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Max Files</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Order</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($dailyTpls as $tpl)
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors">
+                                <td class="py-3 px-3 text-gray-200 font-medium">{{ $tpl->name }}</td>
+                                <td class="py-3 px-3 text-gray-400 text-sm">{{ $tpl->description ?? '-' }}</td>
+                                <td class="py-3 px-3 text-center"><span class="px-2 py-1 bg-green-500/20 text-green-400 rounded text-sm">{{ $tpl->max_files }}</span></td>
+                                <td class="py-3 px-3 text-center text-gray-400 text-sm">{{ $tpl->sort_order }}</td>
+                                <td class="py-3 px-3 text-center">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }})" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Edit</button>
+                                        <button onclick="showArchiveTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Archive</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                @else
+                <p class="text-gray-400 text-center py-6">No daily requirements yet.</p>
+                @endif
+            </div>
+
+            <!-- Archive Trash -->
+        </div>
+        </section><!-- /section-manage-requirements -->
+
         </div><!-- /max-w-7xl -->
     </div><!-- /main-content -->
+
+    <!-- Archived School Years Modal -->
+    <div id="archivedSchoolYearsModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
+                <h3 class="text-lg font-bold text-yellow-400">🗑 Archived School Years</h3>
+                <button onclick="closeArchivedSchoolYearsModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+            </div>
+            <div class="overflow-auto flex-1 p-4">
+                <div id="archivedSchoolYearsList"><p class="text-gray-400 text-center py-8">Loading...</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Archived School IDs Modal -->
+    <div id="archivedSchoolIdsModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
+                <h3 class="text-lg font-bold text-yellow-400">🗑 Archived School IDs</h3>
+                <button onclick="closeArchivedSchoolIdsModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+            </div>
+            <div class="overflow-auto flex-1 p-4">
+                <div id="archivedSchoolIdsList"><p class="text-gray-400 text-center py-8">Loading...</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Archived Requirements Modal -->
+    <div id="archivedTemplatesModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
+                <h3 class="text-lg font-bold text-yellow-400">🗑 Archived Requirements</h3>
+                <button onclick="closeArchivedTemplatesModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+            </div>
+            <div class="overflow-auto flex-1 p-4">
+                @if($archivedTemplates->isNotEmpty())
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-slate-700">
+                            <th class="text-left py-2 px-3 text-gray-300 font-semibold">Name</th>
+                            <th class="text-left py-2 px-3 text-gray-300 font-semibold">Category</th>
+                            <th class="text-center py-2 px-3 text-gray-300 font-semibold">Archived On</th>
+                            <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($archivedTemplates as $tpl)
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80">
+                            <td class="py-3 px-3 text-gray-400 line-through">{{ $tpl->name }}</td>
+                            <td class="py-3 px-3 text-gray-500 text-sm capitalize">{{ $tpl->category }}</td>
+                            <td class="py-3 px-3 text-center text-gray-500 text-sm">{{ $tpl->deleted_at->format('M d, Y') }}</td>
+                            <td class="py-3 px-3 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <form action="{{ route('requirement-templates.restore', $tpl->id) }}" method="POST" class="inline">
+                                        @csrf
+                                        <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
+                                    </form>
+                                    <button onclick="showForceDeleteTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                @else
+                <p class="text-gray-400 text-center py-10">No archived requirements.</p>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Requirement Template Modal -->
+    <div id="addTemplateModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-xl max-w-md w-full border border-slate-700">
+            <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 rounded-t-xl">
+                <h2 class="text-xl font-bold text-white">Add Requirement</h2>
+            </div>
+            <form action="{{ route('requirement-templates.store') }}" method="POST" class="p-6 space-y-4">
+                @csrf
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Name *</label>
+                    <input type="text" name="name" required class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none" placeholder="e.g. Medical Certificate">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Category *</label>
+                    <select name="category" required class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                        <option value="onboarding">Onboarding</option>
+                        <option value="daily">Daily Submission</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                    <textarea name="description" rows="2" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none" placeholder="Optional description"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Max Files</label>
+                        <input type="number" name="max_files" value="1" min="1" max="20" required class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Sort Order</label>
+                        <input type="number" name="sort_order" value="0" min="0" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeAddTemplateModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold">Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Requirement Template Modal -->
+    <div id="editTemplateModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-xl max-w-md w-full border border-slate-700">
+            <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 rounded-t-xl">
+                <h2 class="text-xl font-bold text-white">Edit Requirement</h2>
+            </div>
+            <form id="editTemplateForm" method="POST" class="p-6 space-y-4">
+                @csrf
+                @method('PUT')
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Name *</label>
+                    <input type="text" name="name" id="edit_tpl_name" required class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Category *</label>
+                    <select name="category" id="edit_tpl_category" required class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                        <option value="onboarding">Onboarding</option>
+                        <option value="daily">Daily Submission</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Description</label>
+                    <textarea name="description" id="edit_tpl_description" rows="2" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Max Files</label>
+                        <input type="number" name="max_files" id="edit_tpl_max_files" min="1" max="20" required class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Sort Order</label>
+                        <input type="number" name="sort_order" id="edit_tpl_sort_order" min="0" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeEditTemplateModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Archive Requirement Template Modal -->
+    <div id="archiveTemplateModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-white mb-4">Archive Requirement</h3>
+            <p class="text-gray-300 mb-6">Archive <span id="archiveTemplateName" class="text-yellow-400 font-semibold"></span>? It will be hidden from students but can be restored.</p>
+            <form id="archiveTemplateForm" method="POST">
+                @csrf
+                @method('DELETE')
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeArchiveTemplateModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Archive</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Force Delete Requirement Template Modal -->
+    <div id="forceDeleteTemplateModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-white mb-4">Permanently Delete Requirement</h3>
+            <p class="text-gray-300 mb-6">This will <span class="text-red-400 font-semibold">permanently delete</span> <span id="forceDeleteTemplateName" class="text-red-400 font-semibold"></span>. Cannot be undone.</p>
+            <form id="forceDeleteTemplateForm" method="POST">
+                @csrf
+                @method('DELETE')
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeForceDeleteTemplateModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-lg font-semibold">Delete Forever</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- School Year Modal -->
     <div id="schoolYearModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
@@ -1981,7 +2272,8 @@
         const sectionTitles = {
             overview: 'Overview', users: 'User Management', analytics: 'Analytics',
             schoolyears: 'School Years', schoolids: 'School IDs',
-            reports: 'Reports', settings: 'Settings'
+            reports: 'Reports', settings: 'Settings',
+            'manage-requirements': '📝 Manage Requirements'
         };
         function showSection(name) {
             document.querySelectorAll('.dash-section').forEach(s => s.classList.add('hidden'));
@@ -2026,6 +2318,138 @@
         // ===== LEAVE PAGE CONFIRMATION =====
         let _allowLeave = true;
         // ===== END LEAVE PAGE CONFIRMATION =====
+
+        // ===== REQUIREMENT TEMPLATES =====
+        function showAddTemplateModal() {
+            document.getElementById('addTemplateModal').classList.remove('hidden');
+        }
+        function closeAddTemplateModal() {
+            document.getElementById('addTemplateModal').classList.add('hidden');
+        }
+        function showEditTemplateModal(id, name, category, description, maxFiles, sortOrder) {
+            document.getElementById('edit_tpl_name').value = name;
+            document.getElementById('edit_tpl_category').value = category;
+            document.getElementById('edit_tpl_description').value = description;
+            document.getElementById('edit_tpl_max_files').value = maxFiles;
+            document.getElementById('edit_tpl_sort_order').value = sortOrder;
+            document.getElementById('editTemplateForm').action = '/requirement-templates/' + id;
+            document.getElementById('editTemplateModal').classList.remove('hidden');
+        }
+        function closeEditTemplateModal() {
+            document.getElementById('editTemplateModal').classList.add('hidden');
+        }
+        function showArchiveTemplateModal(id, name) {
+            document.getElementById('archiveTemplateName').textContent = name;
+            document.getElementById('archiveTemplateForm').action = '/requirement-templates/' + id;
+            document.getElementById('archiveTemplateModal').classList.remove('hidden');
+        }
+        function closeArchiveTemplateModal() {
+            document.getElementById('archiveTemplateModal').classList.add('hidden');
+        }
+        function showForceDeleteTemplateModal(id, name) {
+            document.getElementById('forceDeleteTemplateName').textContent = name;
+            document.getElementById('forceDeleteTemplateForm').action = '/requirement-templates/' + id + '/force';
+            document.getElementById('forceDeleteTemplateModal').classList.remove('hidden');
+        }
+        function closeForceDeleteTemplateModal() {
+            document.getElementById('forceDeleteTemplateModal').classList.add('hidden');
+        }
+        function toggleArchivedTemplates() {
+            document.getElementById('archivedTemplatesModal').classList.remove('hidden');
+        }
+        function closeArchivedTemplatesModal() {
+            document.getElementById('archivedTemplatesModal').classList.add('hidden');
+        }
+
+        // ===== ARCHIVED SCHOOL YEARS =====
+        function openArchivedSchoolYearsModal() {
+            document.getElementById('archivedSchoolYearsModal').classList.remove('hidden');
+            loadArchivedSchoolYears();
+        }
+        function closeArchivedSchoolYearsModal() {
+            document.getElementById('archivedSchoolYearsModal').classList.add('hidden');
+        }
+        function loadArchivedSchoolYears() {
+            fetch('/api/school-years/archived')
+                .then(r => r.json())
+                .then(data => {
+                    const el = document.getElementById('archivedSchoolYearsList');
+                    if (!data.school_years.length) {
+                        el.innerHTML = '<p class="text-gray-400 text-center py-8">No archived school years.</p>';
+                        return;
+                    }
+                    el.innerHTML = `<table class="w-full"><thead><tr class="border-b border-slate-700">
+                        <th class="text-left py-2 px-3 text-gray-300">Label</th>
+                        <th class="text-center py-2 px-3 text-gray-300">Archived On</th>
+                        <th class="text-center py-2 px-3 text-gray-300">Actions</th>
+                    </tr></thead><tbody>${data.school_years.map(sy => `
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80">
+                            <td class="py-3 px-3 text-gray-400 line-through">${sy.label}</td>
+                            <td class="py-3 px-3 text-center text-gray-500 text-sm">${new Date(sy.deleted_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
+                            <td class="py-3 px-3 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <button onclick="restoreSchoolYear(${sy.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
+                                    <button onclick="forceDeleteSchoolYear(${sy.id})" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
+                                </div>
+                            </td>
+                        </tr>`).join('')}</tbody></table>`;
+                });
+        }
+        function restoreSchoolYear(id) {
+            fetch(`/api/school-years/${id}/restore`, { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                .then(r => r.json()).then(d => { if (d.success) { loadArchivedSchoolYears(); loadSchoolYearList(); loadSchoolYearSelector(); } });
+        }
+        function forceDeleteSchoolYear(id) {
+            if (!confirm('Permanently delete this school year? This cannot be undone.')) return;
+            fetch(`/api/school-years/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                .then(r => r.json()).then(d => { if (d.success) loadArchivedSchoolYears(); });
+        }
+
+        // ===== ARCHIVED SCHOOL IDs =====
+        function openArchivedSchoolIdsModal() {
+            document.getElementById('archivedSchoolIdsModal').classList.remove('hidden');
+            loadArchivedSchoolIds();
+        }
+        function closeArchivedSchoolIdsModal() {
+            document.getElementById('archivedSchoolIdsModal').classList.add('hidden');
+        }
+        function loadArchivedSchoolIds() {
+            fetch('/api/school-ids/archived')
+                .then(r => r.json())
+                .then(data => {
+                    const el = document.getElementById('archivedSchoolIdsList');
+                    if (!data.school_ids.length) {
+                        el.innerHTML = '<p class="text-gray-400 text-center py-8">No archived school IDs.</p>';
+                        return;
+                    }
+                    el.innerHTML = `<table class="w-full"><thead><tr class="border-b border-slate-700">
+                        <th class="text-left py-2 px-3 text-gray-300">School ID</th>
+                        <th class="text-left py-2 px-3 text-gray-300">School Year</th>
+                        <th class="text-center py-2 px-3 text-gray-300">Archived On</th>
+                        <th class="text-center py-2 px-3 text-gray-300">Actions</th>
+                    </tr></thead><tbody>${data.school_ids.map(sid => `
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80">
+                            <td class="py-3 px-3 text-gray-400 line-through font-mono">${sid.school_id_number}</td>
+                            <td class="py-3 px-3 text-gray-500 text-sm">${sid.school_year || '-'}</td>
+                            <td class="py-3 px-3 text-center text-gray-500 text-sm">${new Date(sid.deleted_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
+                            <td class="py-3 px-3 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <button onclick="restoreSchoolId(${sid.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
+                                    <button onclick="forceDeleteSchoolId(${sid.id})" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
+                                </div>
+                            </td>
+                        </tr>`).join('')}</tbody></table>`;
+                });
+        }
+        function restoreSchoolId(id) {
+            fetch(`/api/school-ids/${id}/restore`, { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                .then(r => r.json()).then(d => { if (d.success) { loadArchivedSchoolIds(); loadSchoolIdList(); } });
+        }
+        function forceDeleteSchoolId(id) {
+            if (!confirm('Permanently delete this school ID? This cannot be undone.')) return;
+            fetch(`/api/school-ids/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                .then(r => r.json()).then(d => { if (d.success) loadArchivedSchoolIds(); });
+        }
 
         // ── Theme toggle ─────────────────────────────────────────────
         function toggleTheme() {

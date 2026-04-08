@@ -962,17 +962,15 @@
         <?php
             $requirements = \App\Models\StudentRequirement::where('student_id', $user->id)->orderBy('created_at', 'desc')->get();
             $submittedTitles = $requirements->pluck('title')->map(fn($t)=>strtolower($t))->toArray();
-            // key = display name, value = max photos allowed (1 = single file, >1 = multiple)
-            $onboarding = [
-                'Internship Application Form' => 3,
-                'Letter of Acceptance'        => 1,
-                'Parental Consent'            => 1,
-                'School ID'                   => 1,
-                'Government ID'               => 1,
-                'Vaccination Card'            => 1,
-                'Medical Report'              => 5,
-                'Insurance'                   => 3,
-            ];
+            // Load from DB templates; fall back to defaults if none configured yet
+            $tplOnboarding = \App\Models\RequirementTemplate::where('category','onboarding')->orderBy('sort_order')->orderBy('name')->get();
+            $tplDaily      = \App\Models\RequirementTemplate::where('category','daily')->orderBy('sort_order')->orderBy('name')->get();
+            if ($tplOnboarding->isEmpty()) {
+                // legacy fallback
+                $onboarding = ['Internship Application Form'=>3,'Letter of Acceptance'=>1,'Parental Consent'=>1,'School ID'=>1,'Government ID'=>1,'Vaccination Card'=>1,'Medical Report'=>5,'Insurance'=>3];
+            } else {
+                $onboarding = $tplOnboarding->pluck('max_files','name')->toArray();
+            }
         ?>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
@@ -1011,9 +1009,24 @@
                         <h3 class="text-lg font-bold text-white">📋 Daily Submissions</h3>
                         <p class="text-gray-400 text-xs mt-1">Narratives & daily reports</p>
                     </div>
+                    @if($tplDaily->isNotEmpty())
+                    <div class="flex gap-2">
+                        @foreach($tplDaily as $dt)
+                        <button type="button" onclick="openUploadModal('{{ addslashes($dt->name) }}', {{ $dt->max_files }})" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold">+ {{ $dt->name }}</button>
+                        @endforeach
+                    </div>
+                    @else
                     <button type="button" onclick="openUploadModal('Daily Report')" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold">+ Upload</button>
+                    @endif
                 </div>
-                <?php $dailyReqs = $requirements->filter(fn($r)=> stripos($r->title,'narrative')!==false || stripos($r->title,'daily')!==false || stripos($r->title,'report')!==false); ?>
+                <?php
+                    if ($tplDaily->isNotEmpty()) {
+                        $dailyNames = $tplDaily->pluck('name')->toArray();
+                        $dailyReqs = $requirements->filter(fn($r) => collect($dailyNames)->contains(fn($n) => stripos($r->title, $n) !== false));
+                    } else {
+                        $dailyReqs = $requirements->filter(fn($r)=> stripos($r->title,'narrative')!==false || stripos($r->title,'daily')!==false || stripos($r->title,'report')!==false);
+                    }
+                ?>
                 @if($dailyReqs->isNotEmpty())
                 <div class="space-y-3">
                     @foreach($dailyReqs as $daily)
@@ -1051,7 +1064,8 @@
         <section id="section-reports" class="dash-section hidden">
         <?php
             $allSubmitted = \App\Models\StudentRequirement::where('student_id', $user->id)->orderBy('created_at','desc')->get();
-            $onboardingKeys = ['Internship Application Form','Letter of Acceptance','Parental Consent','School ID','Government ID','Vaccination Card','Medical Report','Insurance'];
+            $dbOnboardingKeys = \App\Models\RequirementTemplate::where('category','onboarding')->pluck('name')->toArray();
+            $onboardingKeys = !empty($dbOnboardingKeys) ? $dbOnboardingKeys : ['Internship Application Form','Letter of Acceptance','Parental Consent','School ID','Government ID','Vaccination Card','Medical Report','Insurance'];
             $onboardingReports = $allSubmitted->filter(fn($r) => collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false));
             $dailyReports = $allSubmitted->filter(fn($r) => !collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false));
             // Build a map of title => latest submission for resubmit check

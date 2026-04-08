@@ -419,9 +419,12 @@
         <div class="mb-12">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-white">Company/Organization Statistics</h2>
-                <button onclick="showAddCompanyModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors">
-                    + Add Company
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="toggleArchivedCompanies()" id="archivedTrashBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition-colors">🗑 Archive Trash</button>
+                    <button onclick="showAddCompanyModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors">
+                        + Add Company
+                    </button>
+                </div>
             </div>
 
             <!-- All Companies Overview -->
@@ -484,7 +487,10 @@
                                     @endif
                                 </td>
                                 <td class="py-3 px-3 text-center">
-                                    <button onclick="showDeleteCompanyModal({{ $company->id }}, '{{ addslashes($company->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Archive</button>
+                                    <div class="flex items-center justify-center gap-2">
+                                        <button onclick="showEditCompanyModal({{ $company->id }}, '{{ addslashes($company->name) }}', '{{ addslashes($company->industry ?? '') }}', '{{ addslashes($company->location ?? '') }}', '{{ addslashes($company->contact_person ?? '') }}', '{{ addslashes($company->contact_email ?? '') }}', '{{ addslashes($company->contact_phone ?? '') }}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Edit</button>
+                                        <button onclick="showDeleteCompanyModal({{ $company->id }}, '{{ addslashes($company->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Archive</button>
+                                    </div>
                                 </td>
                             </tr>
                             @endforeach
@@ -495,6 +501,9 @@
                 <p class="text-gray-400 text-center py-8">No companies registered yet</p>
                 @endif
             </div>
+
+            <!-- Archive Trash Section (hidden by default) -->
+            <?php $archivedCompanies = \App\Models\Company::onlyTrashed()->withCount('students')->orderBy('deleted_at', 'desc')->get(); ?>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Most Interns Section -->
@@ -656,7 +665,19 @@
                                                     ? \App\Models\StudentEvaluation::where('student_id', $student->id)->first()
                                                     : null;
                                                 $evalRating = $coordEval ? $coordEval->rating : null;
-                                                $evalMean = $coordEval ? $coordEval->mean_score : null;
+                                                if ($coordEval) {
+                                                    $rMap = ['outstanding'=>5,'exceeds_expectations'=>4,'meets_expectations'=>3,'needs_improvement'=>2,'unsatisfactory'=>1];
+                                                    $wFactors = ['quality_of_work'=>20,'quantity_of_work'=>20,'job_knowledge'=>20,'working_relationships'=>20,'attendance_dependability'=>10,'specific_achievements'=>10];
+                                                    $wTotal = 0; $wFilled = true;
+                                                    foreach ($wFactors as $wf => $ww) {
+                                                        $rv = $coordEval->{$wf.'_rating'} ?? null;
+                                                        if (!$rv || !isset($rMap[$rv])) { $wFilled = false; break; }
+                                                        $wTotal += ($rMap[$rv] / 5) * $ww;
+                                                    }
+                                                    $evalMean = $wFilled ? round($wTotal, 2) : null;
+                                                } else {
+                                                    $evalMean = null;
+                                                }
                                             @endphp
                                             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                                                 <div class="bg-slate-800/50 p-3 rounded">
@@ -672,14 +693,23 @@
                                                     <p class="text-lg font-bold text-yellow-400">{{ $pendingLogs + $pendingTimeIns + $pendingReq }}</p>
                                                 </div>
                                                 <div class="bg-slate-800/50 p-3 rounded">
-                                                    <p class="text-xs text-gray-400">⭐ Evaluation Score</p>
-                                                    @if($coordEval)
-                                                        <p class="text-lg font-bold text-yellow-400">{{ $evalMean }}/5</p>
-                                                        <div class="flex gap-0.5 mt-1">
-                                                            @for($i=1;$i<=5;$i++)
-                                                            <span class="text-sm @if($i <= $evalRating) text-yellow-400 @else text-gray-600 @endif">★</span>
-                                                            @endfor
-                                                        </div>
+                                                    <p class="text-xs text-gray-400">Evaluation Rating</p>
+                                                    @if($displayCompleted < $required)
+                                                        <p class="text-sm text-slate-500">🔒 Locked</p>
+                                                        <p class="text-xs text-gray-600">{{ number_format($displayCompleted,1) }}/{{ $required }} hrs</p>
+                                                    @elseif($coordEval && $evalMean !== null)
+                                                        <p class="text-lg font-bold text-blue-400">{{ $evalMean }}%</p>
+                                                        <p class="text-xs text-gray-400">
+                                                            @if($evalMean >= 96) Outstanding
+                                                            @elseif($evalMean >= 86) Very Satisfactory
+                                                            @elseif($evalMean >= 76) Satisfactory
+                                                            @elseif($evalMean >= 66) Fair
+                                                            @elseif($evalMean > 0) Poor
+                                                            @endif
+                                                        </p>
+                                                    @elseif($coordEval)
+                                                        <p class="text-sm text-yellow-400">Submitted</p>
+                                                        <p class="text-xs text-gray-500">Old format</p>
                                                     @else
                                                         <p class="text-sm text-gray-500">Not evaluated</p>
                                                     @endif
@@ -689,7 +719,11 @@
                                             <div class="mt-4 flex gap-2 flex-wrap">
                                                 <button onclick="showLogsModal({{ $student->id }}, '{{ $student->name }}')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">View Logs</button>
                                                 <button onclick="openDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm">View DTR</button>
-                                                <button onclick="showEvalModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm">⭐ Evaluation Score</button>
+                                                @if($displayCompleted >= $required)
+                                                    <button onclick="showEvalModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm">Evaluation Rating</button>
+                                                @else
+                                                    <button disabled title="Student must complete {{ $required }} hours before evaluation ({{ number_format($displayCompleted,2) }}/{{ $required }} hrs)" class="px-3 py-2 bg-slate-600 text-slate-400 rounded text-sm cursor-not-allowed opacity-60">🔒 Evaluation Rating</button>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>
@@ -768,7 +802,11 @@
                                 <button onclick="toggleStudentDetails({{ $student->id }})" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold">View Details</button>
                                 <button onclick="showLogsModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold">Logs</button>
                                 <button onclick="openDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-semibold">DTR</button>
-                                <button onclick="showEvalModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-semibold">⭐ Evaluation Score</button>
+                                @if($displayCompleted2 >= $required2)
+                                    <button onclick="showEvalModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-semibold">Evaluation Rating</button>
+                                @else
+                                    <button disabled title="Student must complete {{ $required2 }} hours first" class="px-3 py-2 bg-slate-600 text-slate-400 rounded text-xs font-semibold cursor-not-allowed opacity-60">🔒 Evaluation Rating</button>
+                                @endif
                             </div>
                             <!-- Expandable details -->
                             <div id="details-{{ $student->id }}-mobile" class="hidden mt-3 pt-3 border-t border-slate-600">
@@ -791,9 +829,23 @@
                                         <p class="text-sm font-bold text-yellow-400">{{ $pendingTotal2 }}</p>
                                     </div>
                                     <div class="bg-slate-800/50 p-2 rounded">
-                                        <p class="text-xs text-gray-400">⭐ Eval. Score</p>
+                                        <p class="text-xs text-gray-400">Eval. Score</p>
                                         @if($mobileEval)
-                                            <p class="text-sm font-bold text-yellow-400">{{ $mobileEval->mean_score }}/5</p>
+                                            @php
+                                                $mRMap = ['outstanding'=>5,'exceeds_expectations'=>4,'meets_expectations'=>3,'needs_improvement'=>2,'unsatisfactory'=>1];
+                                                $mWFactors = ['quality_of_work'=>20,'quantity_of_work'=>20,'job_knowledge'=>20,'working_relationships'=>20,'attendance_dependability'=>10,'specific_achievements'=>10];
+                                                $mTotal = 0; $mFilled = true;
+                                                foreach ($mWFactors as $mf => $mw) {
+                                                    $mrv = $mobileEval->{$mf.'_rating'} ?? null;
+                                                    if (!$mrv || !isset($mRMap[$mrv])) { $mFilled = false; break; }
+                                                    $mTotal += ($mRMap[$mrv] / 5) * $mw;
+                                                }
+                                            @endphp
+                                            @if($mFilled)
+                                                <p class="text-sm font-bold text-blue-400">{{ round($mTotal, 1) }}%</p>
+                                            @else
+                                                <p class="text-xs text-yellow-400">Submitted</p>
+                                            @endif
                                         @else
                                             <p class="text-xs text-gray-500">None</p>
                                         @endif
@@ -1098,7 +1150,7 @@
     <div id="deleteCompanyModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
             <h3 class="text-xl font-bold text-white mb-4">Archive Company</h3>
-            <p class="text-gray-300 mb-6">Are you sure you want to archive <span id="deleteCompanyName" class="text-red-400 font-semibold"></span>? This cannot be undone.</p>
+            <p class="text-gray-300 mb-6">Are you sure you want to archive <span id="deleteCompanyName" class="text-red-400 font-semibold"></span>? The company will be moved to the archive trash.</p>
             <form id="deleteCompanyForm" method="POST">
                 @csrf
                 @method('DELETE')
@@ -1107,6 +1159,115 @@
                     <button type="submit" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Archive</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Edit Company Modal -->
+    <div id="editCompanyModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 rounded-xl max-w-md w-full border border-slate-700">
+            <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 rounded-t-xl">
+                <h2 class="text-xl font-bold text-white">Edit Company</h2>
+            </div>
+            <form id="editCompanyForm" method="POST" class="p-6 space-y-4">
+                @csrf
+                @method('PUT')
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Company Name *</label>
+                    <input type="text" name="name" id="edit_company_name" required
+                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Industry</label>
+                    <input type="text" name="industry" id="edit_industry"
+                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Location</label>
+                    <input type="text" name="location" id="edit_location"
+                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Contact Person</label>
+                    <input type="text" name="contact_person" id="edit_contact_person"
+                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Contact Email</label>
+                    <input type="email" name="contact_email" id="edit_contact_email"
+                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Contact Phone</label>
+                    <input type="tel" name="contact_phone" id="edit_contact_phone"
+                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeEditCompanyModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-semibold">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Force Delete Company Modal -->
+    <div id="forceDeleteCompanyModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-white mb-4">Permanently Delete Company</h3>
+            <p class="text-gray-300 mb-6">This will <span class="text-red-400 font-semibold">permanently delete</span> <span id="forceDeleteCompanyName" class="text-red-400 font-semibold"></span>. This action cannot be undone.</p>
+            <form id="forceDeleteCompanyForm" method="POST">
+                @csrf
+                @method('DELETE')
+                <div class="flex gap-3">
+                    <button type="button" onclick="closeForceDeleteModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-lg font-semibold">Delete Forever</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Archived Companies Modal -->
+    <div id="archivedCompaniesModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
+                <h3 class="text-lg font-bold text-yellow-400">🗑 Archived Companies</h3>
+                <button onclick="closeArchivedCompaniesModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+            </div>
+            <div class="overflow-auto flex-1 p-4">
+                @if($archivedCompanies->isNotEmpty())
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-slate-700">
+                            <th class="text-left py-2 px-3 text-gray-300 font-semibold">Company Name</th>
+                            <th class="text-left py-2 px-3 text-gray-300 font-semibold">Industry</th>
+                            <th class="text-left py-2 px-3 text-gray-300 font-semibold">Location</th>
+                            <th class="text-center py-2 px-3 text-gray-300 font-semibold">Archived On</th>
+                            <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($archivedCompanies as $archived)
+                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors opacity-80">
+                            <td class="py-3 px-3 text-gray-400 line-through">{{ $archived->name }}</td>
+                            <td class="py-3 px-3 text-gray-500 text-sm">{{ $archived->industry ?? '-' }}</td>
+                            <td class="py-3 px-3 text-gray-500 text-sm">{{ $archived->location ?? '-' }}</td>
+                            <td class="py-3 px-3 text-center text-gray-500 text-sm">{{ $archived->deleted_at->format('M d, Y') }}</td>
+                            <td class="py-3 px-3 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <form action="{{ route('restore-company', $archived->id) }}" method="POST" class="inline">
+                                        @csrf
+                                        <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
+                                    </form>
+                                    <button onclick="showForceDeleteModal({{ $archived->id }}, '{{ addslashes($archived->name) }}')" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
+                                </div>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                @else
+                <p class="text-gray-400 text-center py-10">No archived companies.</p>
+                @endif
+            </div>
         </div>
     </div>
 
@@ -1641,6 +1802,38 @@
             document.getElementById('deleteCompanyModal').classList.add('hidden');
         }
 
+        function showEditCompanyModal(id, name, industry, location, contactPerson, contactEmail, contactPhone) {
+            document.getElementById('edit_company_name').value = name;
+            document.getElementById('edit_industry').value = industry;
+            document.getElementById('edit_location').value = location;
+            document.getElementById('edit_contact_person').value = contactPerson;
+            document.getElementById('edit_contact_email').value = contactEmail;
+            document.getElementById('edit_contact_phone').value = contactPhone;
+            document.getElementById('editCompanyForm').action = '/update-company/' + id;
+            document.getElementById('editCompanyModal').classList.remove('hidden');
+        }
+
+        function closeEditCompanyModal() {
+            document.getElementById('editCompanyModal').classList.add('hidden');
+        }
+
+        function showForceDeleteModal(id, name) {
+            document.getElementById('forceDeleteCompanyName').textContent = name;
+            document.getElementById('forceDeleteCompanyForm').action = '/force-delete-company/' + id;
+            document.getElementById('forceDeleteCompanyModal').classList.remove('hidden');
+        }
+
+        function closeForceDeleteModal() {
+            document.getElementById('forceDeleteCompanyModal').classList.add('hidden');
+        }
+
+        function toggleArchivedCompanies() {
+            document.getElementById('archivedCompaniesModal').classList.remove('hidden');
+        }
+        function closeArchivedCompaniesModal() {
+            document.getElementById('archivedCompaniesModal').classList.add('hidden');
+        }
+
         // ============ FILE VIEWER MODAL ============
         let fvReportId = null;
 
@@ -1800,31 +1993,104 @@
             const body = document.getElementById('evalModalBody');
             const ev = _evalData[studentId];
             if (!ev) {
-                body.innerHTML = '<div class="text-center py-8"><p class="text-4xl mb-3">⭐</p><p class="text-gray-400">No evaluation submitted yet for this student.</p></div>';
-            } else {
-                const labels = {
-                    attendance:'📅 Attendance',communication:'💬 Communication',
-                    collaboration:'🤝 Collaboration',problem_solving:'🧠 Problem-Solving',
-                    work_ethics:'💼 Work Ethics',time_management:'⏱️ Time Management',
-                    job_skills:'🛠️ Job Skills',employability:'🎯 Employability'
-                };
-                const scores = Object.keys(labels).map(f => ev[f]||0);
-                const mean = (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(2);
-                const overallLabels=['','Poor','Below Average','Average','Good','Excellent'];
-                let html = `<div class="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-4 text-center">
-                    <p class="text-xs text-gray-400 mb-1">Overall Rating</p>
-                    <div class="flex justify-center gap-1 mb-1">${[1,2,3,4,5].map(i=>`<span class="text-2xl ${i<=ev.rating?'text-yellow-400':'text-gray-600'}">★</span>`).join('')}</div>
-                    <p class="text-yellow-400 font-semibold">${overallLabels[ev.rating]||''}</p>
-                    <p class="text-gray-400 text-xs mt-1">Mean Score: <span class="text-white font-bold">${mean}/5</span></p>
-                </div><div class="space-y-2">`;
-                Object.entries(labels).forEach(([f,label])=>{
-                    const s=ev[f]||0, pct=(s/5)*100;
-                    html+=`<div class="bg-slate-800/50 rounded-lg p-3"><div class="flex justify-between mb-1"><span class="text-sm text-gray-300">${label}</span><span class="text-sm font-bold text-yellow-400">${s}/5</span></div><div class="w-full bg-slate-700 rounded-full h-2"><div class="h-2 rounded-full bg-gradient-to-r from-yellow-500 to-orange-400" style="width:${pct}%"></div></div></div>`;
-                });
-                html += '</div>';
-                if (ev.feedback) html += `<div class="mt-4 bg-slate-800/50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-1">📝 Feedback</p><p class="text-sm text-gray-300">${ev.feedback}</p></div>`;
-                body.innerHTML = html;
+                body.innerHTML = '<div class="text-center py-8"><p class="text-gray-400">No evaluation submitted yet for this student.</p></div>';
+                document.getElementById('evalModal').classList.remove('hidden');
+                return;
             }
+
+            const ratingMap   = { outstanding:5, exceeds_expectations:4, meets_expectations:3, needs_improvement:2, unsatisfactory:1 };
+            const ratingLabel = { outstanding:'Outstanding', exceeds_expectations:'Very Satisfactory', meets_expectations:'Satisfactory', needs_improvement:'Fair', unsatisfactory:'Poor' };
+            const ratingColor = { outstanding:'text-green-400', exceeds_expectations:'text-blue-400', meets_expectations:'text-yellow-400', needs_improvement:'text-orange-400', unsatisfactory:'text-red-400' };
+            const factors = [
+                { key:'quality_of_work',          label:'1. Quality of Work',            weight:20 },
+                { key:'quantity_of_work',         label:'2. Quantity of Work',           weight:20 },
+                { key:'job_knowledge',            label:'3. Job Knowledge',              weight:20 },
+                { key:'working_relationships',    label:'4. Working Relationships',      weight:20 },
+                { key:'attendance_dependability', label:'5. Attendance & Dependability', weight:10 },
+                { key:'specific_achievements',    label:'6. Specific Achievements',      weight:10 },
+            ];
+
+            let totalWeighted = 0, allRated = true;
+            const rows = factors.map(f => {
+                const rKey     = ev[f.key + '_rating'];
+                const num      = ratingMap[rKey] || 0;
+                const comment  = ev[f.key + '_comment'] || '';
+                if (!num) allRated = false;
+                const weighted = num ? ((num / 5) * f.weight).toFixed(2) : '—';
+                if (num) totalWeighted += (num / 5) * f.weight;
+                const col = ratingColor[rKey] || 'text-gray-500';
+                return `<tr class="border-b border-slate-700/40">
+                    <td class="py-2 px-3 text-gray-300 text-xs leading-tight">
+                        ${f.label}
+                        ${comment ? `<div class="text-gray-500 text-[10px] italic mt-0.5">${comment}</div>` : ''}
+                    </td>
+                    <td class="py-2 px-3 text-center">
+                        <span class="font-bold text-sm ${col}">${num || '—'}</span>
+                        <div class="text-[10px] text-gray-500">${ratingLabel[rKey] || ''}</div>
+                    </td>
+                    <td class="py-2 px-3 text-center text-gray-400 text-xs">${f.weight}%</td>
+                    <td class="py-2 px-3 text-center font-bold text-blue-400 text-sm">${weighted}</td>
+                </tr>`;
+            }).join('');
+
+            // Overall rating
+            let overallNum = 0, overallKey = '', overallPct = '—';
+            if (allRated) {
+                overallPct = totalWeighted.toFixed(2) + '%';
+                if      (totalWeighted >= 96) { overallNum = 5; overallKey = 'outstanding'; }
+                else if (totalWeighted >= 86) { overallNum = 4; overallKey = 'exceeds_expectations'; }
+                else if (totalWeighted >= 76) { overallNum = 3; overallKey = 'meets_expectations'; }
+                else if (totalWeighted >= 66) { overallNum = 2; overallKey = 'needs_improvement'; }
+                else                          { overallNum = 1; overallKey = 'unsatisfactory'; }
+            }
+            const overallCol   = ratingColor[overallKey]  || 'text-gray-400';
+            const overallLbl   = ratingLabel[overallKey]  || '—';
+
+            // Header info row
+            let infoHtml = '';
+            if (ev.job_title || ev.evaluation_date || ev.period_from) {
+                const infoCells = [
+                    ev.job_title       ? `<div><p class="text-gray-500 text-[10px]">Position</p><p class="text-gray-200 font-semibold text-xs">${ev.job_title}</p></div>` : '',
+                    ev.evaluation_date ? `<div><p class="text-gray-500 text-[10px]">Eval. Date</p><p class="text-gray-200 font-semibold text-xs">${ev.evaluation_date}</p></div>` : '',
+                    ev.period_from     ? `<div><p class="text-gray-500 text-[10px]">Period</p><p class="text-gray-200 font-semibold text-xs">${ev.period_from} → ${ev.period_to || '?'}</p></div>` : '',
+                ].filter(Boolean).join('');
+                infoHtml = `<div class="flex gap-4 flex-wrap bg-slate-800/50 rounded-xl px-4 py-3 mb-3">${infoCells}</div>`;
+            }
+
+            body.innerHTML = `
+                ${infoHtml}
+                <div class="rounded-xl overflow-hidden border border-slate-700 mb-3">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-700/80">
+                            <tr>
+                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Factor</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Rating</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Weight</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Weighted</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                        <tfoot class="bg-slate-800/80 border-t-2 border-slate-600">
+                            <tr>
+                                <td colspan="2" class="py-2 px-3 font-bold text-gray-200 text-xs">Total Weighted Score</td>
+                                <td class="py-2 px-3 text-center text-gray-400 text-xs font-bold">100%</td>
+                                <td class="py-2 px-3 text-center font-bold text-blue-400 text-sm">${overallPct}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div class="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-400 mb-0.5">Overall Rating</p>
+                        <p class="font-bold text-lg ${overallCol}">${overallNum ? overallNum + ' — ' + overallLbl : '—'}</p>
+                        <p class="text-xs text-gray-500">${overallPct}</p>
+                    </div>
+                    <div class="flex gap-1">
+                        ${[1,2,3,4,5].map(i => `<span class="text-2xl ${i <= overallNum ? overallCol : 'text-gray-700'}">★</span>`).join('')}
+                    </div>
+                </div>
+                ${ev.feedback ? `<div class="mt-3 bg-slate-800/50 rounded-xl px-4 py-3"><p class="text-xs text-gray-400 mb-1">Overall Comments</p><p class="text-sm text-gray-300">${ev.feedback}</p></div>` : ''}
+            `;
             document.getElementById('evalModal').classList.remove('hidden');
         }
         function closeEvalModal() { document.getElementById('evalModal').classList.add('hidden'); }
@@ -1851,14 +2117,14 @@
         </div>
     </div>
 
-    <!-- Evaluation Score Modal -->
+    <!-- Evaluation Rating Modal -->
     <div id="evalModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
-            <div class="flex justify-between items-center px-5 py-4 border-b border-slate-700 shrink-0">
-                <h3 class="text-base font-bold text-white">⭐ Evaluation Score — <span id="evalModalName"></span></h3>
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl">
+            <div class="flex justify-between items-center px-5 py-4 border-b border-slate-700">
+                <h3 class="text-base font-bold text-white">Evaluation Rating — <span id="evalModalName"></span></h3>
                 <button onclick="closeEvalModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white">✕</button>
             </div>
-            <div id="evalModalBody" class="flex-1 overflow-y-auto px-5 py-4">
+            <div id="evalModalBody" class="px-5 py-4">
                 <p class="text-gray-400 text-sm text-center py-6">Loading...</p>
             </div>
         </div>
