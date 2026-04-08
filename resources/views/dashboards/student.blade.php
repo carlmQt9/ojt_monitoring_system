@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -174,6 +174,10 @@
             ->whereNotNull('time_out')->where('status', 'approved')->get()
             ->sum(fn($r) => max(0, \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out))) / 60);
         $_completed = $_sh ? $_sh->hours_completed : round($_allRecordsTotal, 2);
+        // Pending hours = timed out but not yet approved (awaiting supervisor)
+        $_pendingHours = round(\App\Models\TimeInRecord::where('student_id', $user->id)
+            ->whereNotNull('time_out')->where('status', 'pending')->get()
+            ->sum(fn($r) => max(0, floatval($r->regular_hours ?? 0))), 2);
         $_progress = $_required > 0 ? min(100, round(($_completed / $_required) * 100, 1)) : 0;
     ?>
 
@@ -547,10 +551,44 @@
                                     </div>
                                 </div>
                             </div>
+                            @php
+                                // Check OT status from today's records
+                                $_otRecord = $todayRecords->where('ot_hours', '>', 0)->first();
+                            @endphp
+                            @if($_otRecord)
+                                @if($_otRecord->ot_status === 'pending')
+                                <div class="bg-yellow-500/10 border border-yellow-500/50 rounded-lg p-3 mt-2">
+                                    <p class="text-yellow-300 text-xs font-semibold">⏳ OT Hours Pending</p>
+                                    <p class="text-yellow-200 text-xs mt-1">You have <strong>{{ number_format($_otRecord->ot_hours, 2) }} OT hrs</strong> that will only be credited after you submit and get an <strong>OT Letter</strong> approved. Go to <strong>Requirements</strong> and upload your OT Letter.</p>
+                                </div>
+                                @elseif($_otRecord->ot_status === 'approved')
+                                <div class="bg-green-500/10 border border-green-500/50 rounded-lg p-3 mt-2">
+                                    <p class="text-green-300 text-xs font-semibold">✓ OT Hours Approved</p>
+                                    <p class="text-green-200 text-xs mt-1">Your <strong>{{ number_format($_otRecord->ot_hours, 2) }} OT hrs</strong> have been credited.</p>
+                                </div>
+                                @endif
                             @endif
-
-                            {{-- Active Time-Out Button --}}
+                            @endif
+                            {{-- Active Time-Out Button / OT Gate --}}
                             @if($activeRecord && !$activeRecord->time_out)
+                            @php
+                                // Minutes from all completed sessions today (excluding active)
+                                $_prevMins = $todayRecords->whereNotNull('time_out')->where('id','!=',$activeRecord->id)
+                                    ->sum(fn($r) => max(0, \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out))));
+                                // Elapsed minutes in the current active session (server now - time_in)
+                                $_activeElapsed = max(0, \Carbon\Carbon::createFromTimeString($activeRecord->time_in)->diffInMinutes(\Carbon\Carbon::now()));
+                                // Total minutes logged today = completed + currently elapsed
+                                $_totalDayMinsNow = $_prevMins + $_activeElapsed;
+                                // Has student hit 8 hours (480 mins) based on actual time data?
+                                $_hit8Hours = $_totalDayMinsNow >= 480;
+                                // Has student already submitted an OT letter today?
+                                $_otLetterToday = \App\Models\StudentRequirement::where('student_id', $user->id)
+                                    ->whereDate('created_at', $today)
+                                    ->where(function($q){ $q->where('title','like','%OT%')->orWhere('title','like','%overtime%')->orWhere('title','like','%over time%'); })
+                                    ->orderByDesc('created_at')->first();
+                                // For JS live check: pass prevMins and timeIn so JS can compute elapsed
+                                $_prevHours = round($_prevMins / 60, 4);
+                            @endphp
                             <form method="POST" action="{{ route('time-out') }}" id="timeOutForm">
                                 @csrf
                                 <input type="hidden" name="student_id" value="{{ $user->id }}">
@@ -558,11 +596,175 @@
                                 <input type="hidden" name="session" value="{{ $activeRecord->session }}">
                                 <input type="hidden" name="photo_base64" id="timeOutPhotoBase64">
                                 <input type="hidden" name="time_out" id="timeOut" required>
-                                <button type="button" id="timeOutBtn" onclick="openTimeoutOptionsModal(); return false;"
-                                    class="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors">
-                                    🕐 Time Out ({{ ucfirst($activeRecord->session) }} Session)
-                                </button>
                             </form>
+
+                            {{-- OT Gate wrapper: JS will swap between timeout btn and OT prompt --}}
+                            <div id="otGateWrapper">
+
+                                {{-- Normal Time Out button (shown when < 8 hrs) --}}
+                                <div id="normalTimeoutBtn">
+                                    <button type="button" id="timeOutBtn" onclick="openTimeoutOptionsModal(); return false;"
+                                        class="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors">
+                                        🕐 Time Out ({{ ucfirst($activeRecord->session) }} Session)
+                                    </button>
+                                </div>
+
+                                {{-- OT Gate: shown when 8 hrs reached --}}
+                                <div id="otGatePrompt" class="hidden">
+                                    <div class="bg-yellow-500/10 border border-yellow-500 rounded-xl p-4">
+                                        <p class="text-yellow-300 font-bold text-sm mb-1">⏰ You have reached 8 hours today!</p>
+                                        <p class="text-yellow-200 text-xs mb-3">Your regular hours are complete. Do you want to continue working overtime? Submit an OT Letter to proceed, or time out now with only 8 hours recorded.</p>
+                                        <div class="flex flex-col gap-2">
+                                            @if(!$_otLetterToday)
+                                            {{-- No OT letter yet: show upload form --}}
+                                            <button type="button" onclick="openOtLetterForm()" id="showOtLetterBtn"
+                                                class="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm">
+                                                📄 Submit OT Letter to Continue OT
+                                            </button>
+                                            @elseif($_otLetterToday->status === 'pending')
+                                            {{-- OT letter submitted, waiting --}}
+                                            <div class="bg-blue-500/10 border border-blue-400 rounded-lg p-3">
+                                                <p class="text-blue-300 text-xs font-semibold">📋 OT Letter submitted — waiting for supervisor/coordinator approval.</p>
+                                                <p class="text-blue-200 text-xs mt-1">You may continue working. Your OT time is being tracked. Time out when done.</p>
+                                            </div>
+                                            <button type="button" id="timeOutBtn" onclick="openTimeoutOptionsModal(); return false;"
+                                                class="w-full px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold text-sm">
+                                                🕐 Time Out (OT in progress)
+                                            </button>
+                                            @elseif($_otLetterToday->status === 'approved')
+                                            {{-- OT letter approved --}}
+                                            <div class="bg-green-500/10 border border-green-500 rounded-lg p-3">
+                                                <p class="text-green-300 text-xs font-semibold">✅ OT Letter approved! Your overtime hours will be credited.</p>
+                                            </div>
+                                            <button type="button" id="timeOutBtn" onclick="openTimeoutOptionsModal(); return false;"
+                                                class="w-full px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold text-sm">
+                                                🕐 Time Out (OT approved)
+                                            </button>
+                                            @elseif($_otLetterToday->status === 'denied')
+                                            {{-- OT letter denied --}}
+                                            <div class="bg-red-500/10 border border-red-500 rounded-lg p-3">
+                                                <p class="text-red-300 text-xs font-semibold">❌ OT Letter denied. Only your 8 regular hours will be recorded.</p>
+                                            </div>
+                                            <button type="button" id="timeOutBtn" onclick="openTimeoutOptionsModal(); return false;"
+                                                class="w-full px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold text-sm">
+                                                🕐 Time Out (8 hrs only)
+                                            </button>
+                                            @endif
+
+                                            {{-- Always show: time out with 8 hrs only --}}
+                                            @if(!$_otLetterToday || $_otLetterToday->status === 'denied')
+                                            <button type="button" onclick="openTimeoutOptionsModal(); return false;"
+                                                class="w-full px-4 py-2.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold text-sm">
+                                                🕐 Time Out Now (8 hrs only)
+                                            </button>
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    {{-- Inline OT Letter Upload Form (hidden by default) --}}
+                                    <div id="otLetterForm" class="hidden mt-3 bg-slate-700/50 border border-slate-600 rounded-xl p-4">
+                                        <h4 class="text-sm font-bold text-white mb-3">📄 Upload OT Letter</h4>
+                                        <form method="POST" action="{{ route('upload-requirement') }}" enctype="multipart/form-data"
+                                            onsubmit="return validateOtLetterForm(this)" id="otLetterUploadForm">
+                                            @csrf
+                                            <input type="hidden" name="student_id" value="{{ $user->id }}">
+                                            <input type="hidden" name="title" value="OT Letter - {{ now()->format('M d, Y') }}">
+                                            <div class="mb-3">
+                                                <label class="block text-xs text-gray-300 mb-1">Description (optional)</label>
+                                                <textarea name="description" rows="2" maxlength="1000"
+                                                    class="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white rounded-lg text-xs focus:border-blue-500 focus:outline-none"
+                                                    placeholder="Reason for overtime..."></textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="block text-xs text-gray-300 mb-1">OT Letter File *</label>
+                                                <input type="file" name="file[]" id="otLetterFile" required
+                                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                                    class="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white rounded-lg text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white cursor-pointer">
+                                                <p class="text-gray-400 text-xs mt-1">PDF, Word, or Image — Max 5 MB</p>
+                                                <p id="otLetterFileError" class="text-red-400 text-xs mt-1 hidden"></p>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <button type="button" onclick="closeOtLetterForm()"
+                                                    class="flex-1 px-3 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-xs font-semibold">Cancel</button>
+                                                <button type="submit"
+                                                    class="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">Submit OT Letter</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+
+                            </div>{{-- end otGateWrapper --}}
+
+                            <script>
+                            (function() {
+                                // prevMins = total minutes already logged in completed sessions today
+                                var prevMins       = {{ $_prevMins }};
+                                var timeInStr      = '{{ $activeRecord->time_in }}';
+                                var otLetterStatus = '{{ $_otLetterToday ? $_otLetterToday->status : "none" }}';
+
+                                function parseHHMM(str) {
+                                    var p = str.split(':');
+                                    return parseInt(p[0]) * 60 + parseInt(p[1]);
+                                }
+
+                                function checkOtGate() {
+                                    var now = new Date();
+                                    var nowTotalMins = now.getHours() * 60 + now.getMinutes();
+                                    var timeInMins   = parseHHMM(timeInStr);
+                                    // elapsed minutes in this active session
+                                    var elapsed = nowTotalMins - timeInMins;
+                                    if (elapsed < 0) elapsed += 1440; // handle midnight wrap
+                                    // total day minutes = previous completed sessions + current elapsed
+                                    var totalDayMins = prevMins + elapsed;
+
+                                    var normalBtn = document.getElementById('normalTimeoutBtn');
+                                    var otPrompt  = document.getElementById('otGatePrompt');
+                                    if (!normalBtn || !otPrompt) return;
+
+                                    // Show OT gate only when student has actually accumulated 8 hrs (480 mins)
+                                    // and OT letter is not already approved or pending
+                                    if (totalDayMins >= 480 && otLetterStatus !== 'approved' && otLetterStatus !== 'pending') {
+                                        normalBtn.classList.add('hidden');
+                                        otPrompt.classList.remove('hidden');
+                                    } else {
+                                        normalBtn.classList.remove('hidden');
+                                        otPrompt.classList.add('hidden');
+                                    }
+                                }
+
+                                // Run immediately and every 30 seconds
+                                checkOtGate();
+                                setInterval(checkOtGate, 30000);
+                            })();
+
+                            function openOtLetterForm() {
+                                var f = document.getElementById('otLetterForm');
+                                var b = document.getElementById('showOtLetterBtn');
+                                if (f) f.classList.remove('hidden');
+                                if (b) b.classList.add('hidden');
+                            }
+                            function closeOtLetterForm() {
+                                var f = document.getElementById('otLetterForm');
+                                var b = document.getElementById('showOtLetterBtn');
+                                if (f) f.classList.add('hidden');
+                                if (b) b.classList.remove('hidden');
+                            }
+                            function validateOtLetterForm(form) {
+                                var fileInput = form.querySelector('input[type="file"]');
+                                var errEl = document.getElementById('otLetterFileError');
+                                if (!fileInput.files || !fileInput.files.length) {
+                                    if (errEl) { errEl.textContent = 'Please select a file.'; errEl.classList.remove('hidden'); }
+                                    return false;
+                                }
+                                var sizeMB = fileInput.files[0].size / (1024 * 1024);
+                                if (sizeMB > 5) {
+                                    if (errEl) { errEl.textContent = 'File exceeds 5 MB.'; errEl.classList.remove('hidden'); }
+                                    return false;
+                                }
+                                showUploadLoader();
+                                return true;
+                            }
+                            </script>
                             @endif
 
                             {{-- Afternoon Time-In Button (lunch break flow) --}}
@@ -659,6 +861,10 @@
                     $required = $studentHours->total_hours_required;
                     $displayCompleted = $studentHours->hours_completed;
                     $progressPercentage = $required > 0 ? ($displayCompleted / $required) * 100 : 0;
+                    // Pending hours = timed out but awaiting approval
+                    $pendingHoursDisplay = round(\App\Models\TimeInRecord::where('student_id', $user->id)
+                        ->whereNotNull('time_out')->where('status', 'pending')->get()
+                        ->sum(fn($r) => max(0, floatval($r->regular_hours ?? 0))), 2);
                     ?>
 
                     <div class="space-y-4">
@@ -685,6 +891,13 @@
                                     <span class="text-gray-400">Progress</span>
                                     <span id="progressPercent" class="text-orange-400 font-semibold">{{ number_format($progressPercentage, 2) }}%</span>
                                 </div>
+                                @if($pendingHoursDisplay > 0)
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-yellow-400">⏳ Pending Approval</span>
+                                    <span class="text-yellow-400 font-semibold">+{{ number_format($pendingHoursDisplay, 2) }} hrs</span>
+                                </div>
+                                <p class="text-xs text-gray-500">Pending hours will be added once your supervisor approves your time-in.</p>
+                                @endif
                             </div>
                         </div>
                     </div>

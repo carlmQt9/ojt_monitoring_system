@@ -549,12 +549,14 @@
                                     <p class="text-base font-bold text-yellow-400">{{ $pendingTimeEdits + $pendingRequirements }}</p>
                                 </div>
                                 <div class="bg-slate-700/30 rounded-lg p-2.5 col-span-2 sm:col-span-1">
-                                    <p class="text-gray-400 text-xs mb-1">⭐ Rating</p>
-                                    <div class="flex gap-0.5">
-                                        @for($i = 1; $i <= 5; $i++)
-                                            <span class="text-lg @if($i <= $studentRating) text-yellow-400 @else text-gray-600 @endif">★</span>
-                                        @endfor
-                                    </div>
+                                    <p class="text-gray-400 text-xs mb-1">📋 Evaluation</p>
+                                    @php $hasNewEval = $evaluation && !empty($evaluation->quality_of_work_rating); @endphp
+                                    <p class="text-sm font-bold @if($hasNewEval) text-green-400 @elseif($evaluation) text-yellow-400 @else text-gray-500 @endif">
+                                        @if($hasNewEval) ✅ Done
+                                        @elseif($evaluation) ⚠️ Needs Update
+                                        @else Not yet
+                                        @endif
+                                    </p>
                                 </div>
                             </div>
 
@@ -583,8 +585,15 @@
                                 </button>
                                 @if($canEvaluate)
                                     @if($evaluation)
-                                    <button onclick="showEvaluationModal({{ $student->id }}, '{{ $student->name }}', true)" class="px-3 py-2 bg-green-700 hover:bg-green-800 text-white rounded text-sm transition-colors text-center">
-                                        ✅ Already Evaluated
+                                    @php $hasNewEval = !empty($evaluation->quality_of_work_rating); @endphp
+                                    <button
+                                        data-student-id="{{ $student->id }}"
+                                        data-student-name="{{ addslashes($student->name) }}"
+                                        data-is-evaluated="{{ $hasNewEval ? '1' : '0' }}"
+                                        data-eval='{!! json_encode(['evaluation_date'=>$evaluation->evaluation_date,'period_from'=>$evaluation->period_from,'period_to'=>$evaluation->period_to,'job_title'=>$evaluation->job_title,'quality_of_work_rating'=>$evaluation->quality_of_work_rating,'quality_of_work_comment'=>$evaluation->quality_of_work_comment,'quantity_of_work_rating'=>$evaluation->quantity_of_work_rating,'quantity_of_work_comment'=>$evaluation->quantity_of_work_comment,'job_knowledge_rating'=>$evaluation->job_knowledge_rating,'job_knowledge_comment'=>$evaluation->job_knowledge_comment,'working_relationships_rating'=>$evaluation->working_relationships_rating,'working_relationships_comment'=>$evaluation->working_relationships_comment,'attendance_dependability_rating'=>$evaluation->attendance_dependability_rating,'attendance_dependability_comment'=>$evaluation->attendance_dependability_comment,'specific_achievements_rating'=>$evaluation->specific_achievements_rating,'specific_achievements_comment'=>$evaluation->specific_achievements_comment]) !!}'
+                                        onclick="openEvalFromBtn(this)"
+                                        class="px-3 py-2 bg-green-700 hover:bg-green-800 text-white rounded text-sm transition-colors text-center">
+                                        ✅ View Evaluation
                                     </button>
                                     @else
                                     <button onclick="showEvaluationModal({{ $student->id }}, '{{ $student->name }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm transition-colors text-center">
@@ -596,7 +605,7 @@
                                     ⭐ Evaluate Student
                                 </button>
                                 @endif                                <button onclick="openSupDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="col-span-2 sm:col-span-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors text-center">
-                                    📄 Final DTR Report
+                                    📄DTR Report
                                 </button>
                             </div>
 
@@ -651,26 +660,52 @@
                             <!-- Time Edits Tab -->
                             <div id="time-records-{{ $student->id }}" class="tab-content hidden">
                                 @if($timeInRecords->isNotEmpty())
+                                @php
+                                    $_pendingTimedOut = $timeInRecords->filter(fn($r) => $r->status === 'pending' && $r->time_out && !\App\Models\TimeInRecord::where('student_id',$student->id)->whereDate('date',$r->date)->whereNull('time_out')->exists());
+                                @endphp
+                                @if($_pendingTimedOut->count() >= 2)
+                                <div class="flex gap-2 mb-3">
+                                    <form method="POST" action="{{ url('/approve-all-time-in/'.$student->id) }}" style="display:inline;">
+                                        @csrf
+                                        <button type="submit" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded font-semibold">✅ Approve All ({{ $_pendingTimedOut->count() }})</button>
+                                    </form>
+                                    <button onclick="showDenyAllTimeEditModal({{ $student->id }})" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold">❌ Deny All ({{ $_pendingTimedOut->count() }})</button>
+                                </div>
+                                @endif
                                 <div class="space-y-3">
                                     @foreach($timeInRecords as $record)
+                                    @php
+                                        $_hasActiveSession = \App\Models\TimeInRecord::where('student_id', $student->id)
+                                            ->whereDate('date', $record->date)
+                                            ->whereNull('time_out')->exists();
+                                    @endphp
                                     <div class="bg-slate-700/30 p-4 rounded-lg">
                                         <div class="flex justify-between items-start mb-2">
                                             <div>
-                                                <p class="text-gray-200 font-semibold">{{ $record->date->format('M d, Y') }}</p>
-                                                <p class="text-gray-400 text-sm">{{ $record->time_in }} @if($record->time_out) - {{ $record->time_out }} @endif</p>
+                                                <p class="text-gray-200 font-semibold">{{ $record->date->format('M d, Y') }} <span class="text-xs text-gray-400">({{ ucfirst($record->session ?? '') }})</span></p>
+                                                <p class="text-gray-400 text-sm">{{ \Carbon\Carbon::parse($record->time_in)->format('h:i A') }} @if($record->time_out) - {{ \Carbon\Carbon::parse($record->time_out)->format('h:i A') }} @endif</p>
+                                                @if(floatval($record->ot_hours ?? 0) > 0)
+                                                <p class="text-yellow-400 text-xs mt-1">⏰ Regular: {{ number_format($record->regular_hours ?? 0, 2) }}h | OT: {{ number_format($record->ot_hours, 2) }}h</p>
+                                                @endif
                                             </div>
                                             <span class="px-2 py-1 text-xs rounded-full @if($record->status === 'approved') bg-green-500/20 text-green-300 @elseif($record->status === 'denied') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
                                                 {{ ucfirst($record->status) }}
                                             </span>
                                         </div>
                                         @if($record->status === 'pending')
-                                        <div class="flex gap-2 mt-3">
-                                            <form method="POST" action="{{ route('approve-time-in', $record->id) }}" style="display:inline;">
-                                                @csrf
-                                                <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">Approve</button>
-                                            </form>
-                                            <button onclick="showDenyTimeEditModal({{ $record->id }})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Deny</button>
-                                        </div>
+                                            @if(!$record->time_out || $_hasActiveSession)
+                                            <div class="mt-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                                                <p class="text-blue-300 text-xs font-semibold">⏳ In Progress — student has not timed out yet</p>
+                                            </div>
+                                            @else
+                                            <div class="flex gap-2 mt-3">
+                                                <form method="POST" action="{{ route('approve-time-in', $record->id) }}" style="display:inline;">
+                                                    @csrf
+                                                    <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">Approve</button>
+                                                </form>
+                                                <button onclick="showDenyTimeEditModal({{ $record->id }})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Deny</button>
+                                            </div>
+                                            @endif
                                         @endif
                                     </div>
                                     @endforeach
@@ -712,8 +747,26 @@
                             <!-- Requirements Tab -->
                             <div id="requirements-{{ $student->id }}" class="tab-content hidden">
                                 @if($requirements->isNotEmpty())
+                                @php
+                                    $_pendingReqs = $requirements->filter(fn($r) => $r->status === 'pending' && !(stripos($r->title,'OT')!==false || stripos($r->title,'overtime')!==false || stripos($r->title,'over time')!==false) || ($r->status === 'pending' && !\App\Models\TimeInRecord::where('student_id',$student->id)->whereDate('date',today())->whereNull('time_out')->exists()));
+                                    $_pendingReqsCount = $requirements->where('status','pending')->count();
+                                @endphp
+                                @if($_pendingReqsCount >= 2)
+                                <div class="flex gap-2 mb-3">
+                                    <button onclick="showApproveAllRequirementsModal({{ $student->id }}, '{{ $student->email }}')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded font-semibold">✅ Approve All ({{ $_pendingReqsCount }})</button>
+                                    <button onclick="showDenyAllRequirementsModal({{ $student->id }})" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold">❌ Deny All ({{ $_pendingReqsCount }})</button>
+                                </div>
+                                @endif
                                 <div class="space-y-3">
                                     @foreach($requirements as $req)
+                                    @php
+                                        $_isOtLetter = stripos($req->title, 'OT') !== false
+                                            || stripos($req->title, 'overtime') !== false
+                                            || stripos($req->title, 'over time') !== false;
+                                        $_studentStillActive = \App\Models\TimeInRecord::where('student_id', $student->id)
+                                            ->whereDate('date', today())
+                                            ->whereNull('time_out')->exists();
+                                    @endphp
                                     <div class="bg-slate-700/30 p-4 rounded-lg">
                                         <div class="flex justify-between items-start mb-2">
                                             <div>
@@ -728,10 +781,16 @@
                                         <button type="button" onclick="openMediaPopup('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" class="text-blue-400 text-xs hover:underline">📎 View File</button>
                                         @endif
                                         @if($req->status === 'pending')
-                                        <div class="flex gap-2 mt-3">
-                                            <button onclick="showApproveRequirementModal({{ $req->id }}, '{{ $student->email }}')" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">Approve</button>
-                                            <button onclick="showDenyRequirementModal({{ $req->id }})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Deny</button>
-                                        </div>
+                                            @if($_isOtLetter && $_studentStillActive)
+                                            <div class="mt-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                                                <p class="text-blue-300 text-xs font-semibold">⏳ In Progress — student is still on OT. Actions will appear after time out.</p>
+                                            </div>
+                                            @else
+                                            <div class="flex gap-2 mt-3">
+                                                <button onclick="showApproveRequirementModal({{ $req->id }}, '{{ $student->email }}')" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">Approve</button>
+                                                <button onclick="showDenyRequirementModal({{ $req->id }})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Deny</button>
+                                            </div>
+                                            @endif
                                         @endif
                                     </div>
                                     @endforeach
@@ -751,49 +810,39 @@
                                 </div>
                                 @elseif($evaluation)
                                 <div class="bg-slate-700/30 p-4 rounded-lg space-y-3">
-                                    <div class="grid grid-cols-2 gap-2 text-xs">
-                                        @php
-                                        $evalFields = [
-                                            'attendance' => '📅 Attendance',
-                                            'communication' => '💬 Communication',
-                                            'collaboration' => '🤝 Collaboration',
-                                            'problem_solving' => '🧠 Problem-Solving',
-                                            'work_ethics' => '💼 Work Ethics',
-                                            'time_management' => '⏱️ Time Management',
-                                            'job_skills' => '🛠️ Job Skills',
-                                            'employability' => '🎯 Employability',
-                                        ];
-                                        @endphp
-                                        @foreach($evalFields as $field => $label)
+                                    <p class="text-green-400 text-sm font-semibold">✅ Evaluation submitted on {{ $evaluation->created_at->format('M d, Y') }}</p>
+                                    @php
+                                    $ratingLabels = [
+                                        'outstanding'=>'Outstanding','exceeds_expectations'=>'Exceeds Expectations',
+                                        'meets_expectations'=>'Meets Expectations','needs_improvement'=>'Needs Improvement',
+                                        'unsatisfactory'=>'Unsatisfactory'
+                                    ];
+                                    $evalFactors = [
+                                        'quality_of_work'=>'Quality of Work','quantity_of_work'=>'Quantity of Work',
+                                        'job_knowledge'=>'Job Knowledge','working_relationships'=>'Working Relationships',
+                                        'attendance_dependability'=>'Attendance/Dependability','specific_achievements'=>'Specific Achievements',
+                                    ];
+                                    @endphp
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                        @foreach($evalFactors as $fKey => $fLabel)
                                         <div class="bg-slate-800/50 p-2 rounded">
-                                            <p class="text-gray-400">{{ $label }}</p>
-                                            <div class="flex gap-0.5 mt-1">
-                                                @for($i=1;$i<=5;$i++)
-                                                <span class="text-sm @if($i <= ($evaluation->$field ?? 0)) text-yellow-400 @else text-gray-600 @endif">★</span>
-                                                @endfor
-                                            </div>
+                                            <p class="text-gray-400">{{ $fLabel }}</p>
+                                            <p class="text-white font-semibold mt-0.5">{{ $ratingLabels[$evaluation->{$fKey.'_rating'}] ?? '—' }}</p>
                                         </div>
                                         @endforeach
                                     </div>
-                                    <div class="border-t border-slate-600 pt-3">
-                                        <p class="text-gray-400 text-xs mb-1">Overall Rating</p>
-                                        <div class="flex gap-1">
-                                            @for($i=1;$i<=5;$i++)
-                                            <span class="text-xl @if($i <= $studentRating) text-yellow-400 @else text-gray-600 @endif">★</span>
-                                            @endfor
-                                        </div>
-                                    </div>
-                                    @if($studentFeedback)
-                                    <div>
-                                        <p class="text-gray-400 text-xs mb-1">Feedback:</p>
-                                        <p class="text-gray-300 text-sm bg-slate-600/50 p-3 rounded">{{ $studentFeedback }}</p>
-                                    </div>
-                                    @endif
-                                    <button onclick="showEvaluationModal({{ $student->id }}, '{{ $student->name }}')" class="w-full mt-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm transition-colors">Update Evaluation</button>
+                                    <button
+                                        data-student-id="{{ $student->id }}"
+                                        data-student-name="{{ addslashes($student->name) }}"
+                                        data-is-evaluated="0"
+                                        data-eval='{!! json_encode(['evaluation_date'=>$evaluation->evaluation_date,'period_from'=>$evaluation->period_from,'period_to'=>$evaluation->period_to,'job_title'=>$evaluation->job_title,'quality_of_work_rating'=>$evaluation->quality_of_work_rating,'quality_of_work_comment'=>$evaluation->quality_of_work_comment,'quantity_of_work_rating'=>$evaluation->quantity_of_work_rating,'quantity_of_work_comment'=>$evaluation->quantity_of_work_comment,'job_knowledge_rating'=>$evaluation->job_knowledge_rating,'job_knowledge_comment'=>$evaluation->job_knowledge_comment,'working_relationships_rating'=>$evaluation->working_relationships_rating,'working_relationships_comment'=>$evaluation->working_relationships_comment,'attendance_dependability_rating'=>$evaluation->attendance_dependability_rating,'attendance_dependability_comment'=>$evaluation->attendance_dependability_comment,'specific_achievements_rating'=>$evaluation->specific_achievements_rating,'specific_achievements_comment'=>$evaluation->specific_achievements_comment]) !!}'
+                                        onclick="openEvalFromBtn(this)"
+                                        class="w-full mt-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded text-sm transition-colors">Update Evaluation
+                                    </button>
                                 </div>
                                 @else
                                 <p class="text-gray-400 text-sm mb-4">No evaluation yet</p>
-                                <button onclick="showEvaluationModal({{ $student->id }}, '{{ $student->name }}')" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm transition-colors">Add Evaluation</button>
+                                <button onclick="showEvaluationModal({{ $student->id }}, '{{ $student->name }}')" class="px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded text-sm transition-colors">Add Evaluation</button>
                                 @endif
                             </div>
                         </div>
@@ -826,17 +875,69 @@
     <div id="denyTimeEditModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
             <h3 class="text-2xl font-bold text-white mb-6">Deny Time Edit</h3>
-            
             <form id="denyTimeEditForm" method="POST" class="space-y-4">
                 @csrf
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-2">Reason for Denial</label>
                     <textarea name="reason" required rows="4" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-red-500 focus:outline-none" placeholder="Explain why you're denying this..."></textarea>
                 </div>
-
                 <div class="flex gap-3 pt-4">
                     <button type="button" onclick="closeDenyTimeEditModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">Cancel</button>
                     <button type="submit" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold">Deny</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Deny All Time Edits Modal -->
+    <div id="denyAllTimeEditModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
+            <h3 class="text-2xl font-bold text-white mb-6">❌ Deny All Time Edits</h3>
+            <form id="denyAllTimeEditForm" method="POST" class="space-y-4">
+                @csrf
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Reason for Denial</label>
+                    <textarea name="reason" required rows="4" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-red-500 focus:outline-none" placeholder="Explain why you're denying all..."></textarea>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeDenyAllTimeEditModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold">Deny All</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Approve All Requirements Modal -->
+    <div id="approveAllRequirementsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
+            <h3 class="text-2xl font-bold text-white mb-6">✅ Approve All Requirements</h3>
+            <form id="approveAllRequirementsForm" method="POST" class="space-y-4">
+                @csrf
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Feedback <span class="text-red-400">*</span></label>
+                    <textarea name="feedback" required rows="3" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-green-500 focus:outline-none" placeholder="Feedback for all requirements..."></textarea>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeApproveAllRequirementsModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-semibold">Approve All</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Deny All Requirements Modal -->
+    <div id="denyAllRequirementsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
+            <h3 class="text-2xl font-bold text-white mb-6">❌ Deny All Requirements</h3>
+            <form id="denyAllRequirementsForm" method="POST" class="space-y-4">
+                @csrf
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Reason for Denial <span class="text-red-400">*</span></label>
+                    <textarea name="feedback" required rows="4" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-red-500 focus:outline-none" placeholder="Explain why you're denying all..."></textarea>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="button" onclick="closeDenyAllRequirementsModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-semibold">Deny All</button>
                 </div>
             </form>
         </div>
@@ -892,77 +993,117 @@
         </div>
     </div>
 
-    <!-- Evaluation Modal -->
-    <div id="evaluationModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop p-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-2xl mx-auto max-h-[90vh] flex flex-col">
-            <div class="flex justify-between items-center px-6 py-4 border-b border-slate-700 shrink-0">
-                <h3 class="text-xl font-bold text-white">⭐ Evaluate <span id="evalStudentName"></span></h3>
-                <button onclick="closeEvaluationModal()" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+    <!-- Evaluation Modal (PRMSU Student Performance Evaluation) -->
+    <div id="evaluationModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 modal-backdrop p-0 sm:p-4">
+        <div class="bg-white w-full sm:rounded-xl sm:max-w-2xl mx-auto max-h-screen sm:max-h-[95vh] flex flex-col shadow-2xl">
+            <div class="flex justify-between items-center px-4 py-3 border-b border-gray-200 shrink-0 bg-blue-700 sm:rounded-t-xl">
+                <div class="min-w-0">
+                    <p class="text-xs text-blue-200 font-medium">Student Performance Evaluation</p>
+                    <p class="text-sm font-bold text-white truncate">PRMSU &mdash; <span id="evalStudentName"></span></p>
+                </div>
+                <button onclick="closeEvaluationModal()" class="w-8 h-8 shrink-0 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white text-lg font-bold ml-2">&times;</button>
             </div>
-            <div class="flex-1 overflow-y-auto px-6 py-4">
-            <form id="evaluationForm" method="POST" class="space-y-5">
+            <div class="flex-1 overflow-y-auto">
+            <form id="evaluationForm" method="POST">
                 @csrf
                 <input type="hidden" name="supervisor_id" value="{{ $user->id }}">
-
-                <!-- Competency Ratings -->
-                <div>
-                    <p class="text-sm font-semibold text-yellow-400 mb-3">Performance Competency Ratings <span class="text-gray-400 font-normal">(1 = Poor, 5 = Excellent)</span></p>
-                    <div class="space-y-3">
-                        @php
-                        $competencies = [
-                            'attendance'      => ['label' => 'Attendance & Punctuality',    'icon' => '📅', 'desc' => 'Regularity and timeliness in reporting to work'],
-                            'communication'   => ['label' => 'Communication Skills',         'icon' => '💬', 'desc' => 'Ability to express ideas clearly verbally and in writing'],
-                            'collaboration'   => ['label' => 'Collaboration & Teamwork',     'icon' => '🤝', 'desc' => 'Works effectively with colleagues and supervisors'],
-                            'problem_solving' => ['label' => 'Problem-Solving',              'icon' => '🧠', 'desc' => 'Ability to analyze and resolve work-related challenges'],
-                            'work_ethics'     => ['label' => 'Work Ethics & Professionalism','icon' => '💼', 'desc' => 'Demonstrates integrity, responsibility, and professional conduct'],
-                            'time_management' => ['label' => 'Time Management',              'icon' => '⏱️', 'desc' => 'Efficiently manages tasks and meets deadlines'],
-                            'job_skills'      => ['label' => 'Job Skills & Competence',      'icon' => '🛠️', 'desc' => 'Technical skills and ability to perform assigned tasks'],
-                            'employability'   => ['label' => 'Employability Potential',      'icon' => '🎯', 'desc' => 'Readiness and potential for future employment'],
-                        ];
-                        @endphp
-                        @foreach($competencies as $field => $info)
-                        <div class="bg-slate-700/30 rounded-lg p-3">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <p class="text-white text-sm font-semibold">{{ $info['icon'] }} {{ $info['label'] }}</p>
-                                    <p class="text-gray-400 text-xs mt-0.5">{{ $info['desc'] }}</p>
-                                </div>
-                                <div class="flex gap-1 shrink-0" id="stars_{{ $field }}">
-                                    @for($i = 1; $i <= 5; $i++)
-                                    <span class="competency-star text-2xl cursor-pointer text-gray-600 hover:text-yellow-400 transition-colors"
-                                          data-field="{{ $field }}" data-value="{{ $i }}">★</span>
-                                    @endfor
-                                </div>
-                            </div>
-                            <input type="hidden" name="{{ $field }}" id="input_{{ $field }}" value="0">
+                <input type="hidden" name="rating" id="ratingInput" value="0">
+                <!-- Info Fields -->
+                <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 space-y-2 text-sm">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-gray-500 font-semibold mb-0.5">Evaluation Date</label>
+                            <input type="date" name="evaluation_date" id="eval_evaluation_date" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-gray-800 text-xs focus:outline-none focus:border-blue-500">
                         </div>
-                        @endforeach
+                        <div>
+                            <label class="block text-xs text-gray-500 font-semibold mb-0.5">Job Title</label>
+                            <input type="text" name="job_title" id="eval_job_title" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-gray-800 text-xs focus:outline-none focus:border-blue-500" placeholder="e.g. IT Intern">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-gray-500 font-semibold mb-0.5">Period From</label>
+                            <input type="date" name="period_from" id="eval_period_from" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-gray-800 text-xs focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 font-semibold mb-0.5">Period To</label>
+                            <input type="date" name="period_to" id="eval_period_to" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-gray-800 text-xs focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-gray-500 font-semibold mb-0.5">Student</label>
+                            <input type="text" id="eval_student_name_field" readonly class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 text-xs bg-gray-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 font-semibold mb-0.5">Supervisor</label>
+                            <input type="text" value="{{ $user->name }}" readonly class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 text-xs bg-gray-100">
+                        </div>
                     </div>
                 </div>
-
-                <!-- Overall Rating -->
-                <div class="bg-slate-700/40 rounded-lg p-4">
-                    <p class="text-sm font-semibold text-white mb-3">⭐ Overall Performance Rating</p>
-                    <div class="flex gap-2" id="overallStars">
-                        @for($i = 1; $i <= 5; $i++)
-                        <span class="overall-star text-3xl cursor-pointer text-gray-600 hover:text-yellow-400 transition-colors" data-value="{{ $i }}">★</span>
-                        @endfor
+                <!-- Performance Factors stacked cards -->
+                <div class="px-4 py-3 space-y-3">
+                    <p class="text-xs font-bold text-gray-600 uppercase tracking-wide">Performance Factors</p>
+                    @php
+                    $perfFactors = [
+                        'quality_of_work'          => ['label'=>'1. Quality of Work',          'desc'=>'Competence, accuracy, neatness, thoroughness.'],
+                        'quantity_of_work'         => ['label'=>'2. Quantity of Work',         'desc'=>'Use of time, volume of work, ability to meet schedules.'],
+                        'job_knowledge'            => ['label'=>'3. Job Knowledge',            'desc'=>'Technical knowledge, understanding of job procedures.'],
+                        'working_relationships'    => ['label'=>'4. Working Relationships',    'desc'=>'Cooperation and ability to work with others.'],
+                        'attendance_dependability' => ['label'=>'5. Attendance/Dependability', 'desc'=>'Reports as scheduled, seldom absent or tardy.'],
+                        'specific_achievements'    => ['label'=>'6. Specific Achievements',    'desc'=>''],
+                    ];
+                    $ratingOptions = [
+                        'outstanding'          => 'Outstanding',
+                        'exceeds_expectations' => 'Exceeds Expectations',
+                        'meets_expectations'   => 'Meets Expectations',
+                        'needs_improvement'    => 'Needs Improvement',
+                        'unsatisfactory'       => 'Unsatisfactory',
+                    ];
+                    @endphp
+                    @foreach($perfFactors as $key => $factor)
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-3">
+                        <p class="text-sm font-bold text-gray-800">{{ $factor['label'] }}</p>
+                        @if($factor['desc'])<p class="text-xs text-gray-500 mt-0.5 mb-2">{{ $factor['desc'] }}</p>@else<div class="mb-2"></div>@endif
+                        <div class="grid grid-cols-2 gap-1 mb-2">
+                            @foreach($ratingOptions as $val => $rLabel)
+                            <label class="flex items-center gap-2 cursor-pointer bg-white border border-gray-200 rounded-lg px-2 py-1.5 hover:border-blue-400 transition-colors has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
+                                <input type="radio" name="{{ $key }}_rating" value="{{ $val }}" class="w-4 h-4 accent-blue-600 prmsu-radio shrink-0">
+                                <span class="text-xs text-gray-700 leading-tight">{{ $rLabel }}</span>
+                            </label>
+                            @endforeach
+                        </div>
+                        <textarea name="{{ $key }}_comment" rows="2" class="w-full text-xs text-gray-800 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400 resize-none" placeholder="Comments (optional)..."></textarea>
                     </div>
-                    <input type="hidden" name="rating" id="ratingInput" value="0">
-                    <p class="text-xs text-gray-400 mt-2" id="overallRatingLabel">Select overall rating</p>
+                    @endforeach
                 </div>
-
-                <!-- Feedback -->
-                <div>
-                    <label class="block text-sm font-semibold text-gray-300 mb-2">📝 Supervisor Feedback / Comments</label>
-                    <textarea name="feedback" rows="3"
-                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-yellow-500 focus:outline-none text-sm"
-                        placeholder="Provide detailed feedback on the student's overall OJT performance, strengths, and areas for improvement..."></textarea>
+                <!-- Definitions collapsible -->
+                <div class="px-4 pb-3">
+                    <details class="bg-gray-50 border border-gray-200 rounded-xl">
+                        <summary class="px-3 py-2 text-xs font-bold text-gray-600 uppercase tracking-wide cursor-pointer select-none">Rating Definitions</summary>
+                        <div class="px-3 pb-3 space-y-1.5 text-xs">
+                            @foreach(['Outstanding'=>'Exceeded all performance expectations and made many significant contributions.','Exceeds Expectations'=>'Regularly works beyond majority of expectations and made significant contributions.','Meets Expectations'=>'Met performance expectations and contributed to the organization.','Needs Improvement'=>'Failed to meet one or more significant performance expectations.','Unsatisfactory'=>'Failed to meet the performance expectations for this factor.'] as $term => $def)
+                            <div class="flex gap-2"><span class="font-bold text-gray-700 whitespace-nowrap">{{ $term }} &mdash;</span><span class="text-gray-600">{{ $def }}</span></div>
+                            @endforeach
+                        </div>
+                    </details>
                 </div>
-
-                <div class="flex gap-3 pt-2">
-                    <button type="button" onclick="closeEvaluationModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">Cancel</button>
-                    <button type="submit" class="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors font-semibold">Submit Evaluation</button>
+                <!-- Signature -->
+                <div class="px-4 pb-4 flex justify-between items-end gap-4 border-t border-gray-100 pt-3">
+                    <div class="flex-1">
+                        <p class="text-xs text-gray-500 mb-1">Supervisor's Signature</p>
+                        <div class="border-b border-gray-400 h-5"></div>
+                        <p class="text-xs text-gray-500 mt-1">{{ $user->name }}</p>
+                    </div>
+                    <div class="w-32">
+                        <p class="text-xs text-gray-500 mb-1">Date:</p>
+                        <div class="border-b border-gray-400 h-5"></div>
+                    </div>
+                </div>
+                <!-- Buttons -->
+                <div class="flex gap-3 px-4 pb-5">
+                    <button type="button" onclick="closeEvaluationModal()" class="flex-1 px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl transition-colors font-semibold text-sm">Cancel</button>
+                    <button type="submit" id="evalSubmitBtn" class="flex-1 px-4 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl transition-colors font-semibold text-sm">Submit Evaluation</button>
                 </div>
             </form>
             </div>
@@ -1209,9 +1350,35 @@
             document.getElementById('denyTimeEditForm').action = `{{ url('/deny-time-in') }}/${recordId}`;
             document.getElementById('denyTimeEditModal').classList.remove('hidden');
         }
-
         function closeDenyTimeEditModal() {
             document.getElementById('denyTimeEditModal').classList.add('hidden');
+        }
+
+        // Deny All Time Edits Modal
+        function showDenyAllTimeEditModal(studentId) {
+            document.getElementById('denyAllTimeEditForm').action = `{{ url('/deny-all-time-in') }}/${studentId}`;
+            document.getElementById('denyAllTimeEditModal').classList.remove('hidden');
+        }
+        function closeDenyAllTimeEditModal() {
+            document.getElementById('denyAllTimeEditModal').classList.add('hidden');
+        }
+
+        // Approve All Requirements Modal
+        function showApproveAllRequirementsModal(studentId, studentEmail) {
+            document.getElementById('approveAllRequirementsForm').action = `{{ url('/approve-all-requirements') }}/${studentId}`;
+            document.getElementById('approveAllRequirementsModal').classList.remove('hidden');
+        }
+        function closeApproveAllRequirementsModal() {
+            document.getElementById('approveAllRequirementsModal').classList.add('hidden');
+        }
+
+        // Deny All Requirements Modal
+        function showDenyAllRequirementsModal(studentId) {
+            document.getElementById('denyAllRequirementsForm').action = `{{ url('/deny-all-requirements') }}/${studentId}`;
+            document.getElementById('denyAllRequirementsModal').classList.remove('hidden');
+        }
+        function closeDenyAllRequirementsModal() {
+            document.getElementById('denyAllRequirementsModal').classList.add('hidden');
         }
 
         // Approve Requirement Modal
@@ -1269,78 +1436,59 @@
             }
         }, true); // capture phase — runs before pixel-loader listener
 
-        // Evaluation Modal
-        function showEvaluationModal(studentId, studentName, isEvaluated = false) {
-            const student = document.querySelector(`.student-card[data-student-id="${studentId}"]`);
-            if (student && !student.classList.contains('expanded')) student.classList.add('expanded');
+        function openEvalFromBtn(btn) {
+            const studentId   = btn.dataset.studentId;
+            const studentName = btn.dataset.studentName;
+            const isEvaluated = btn.dataset.isEvaluated === '1';
+            const evalData    = JSON.parse(btn.dataset.eval || 'null');
+            showEvaluationModal(studentId, studentName, isEvaluated, evalData);
+        }
+
+        // Evaluation Modal (PRMSU)
+        function showEvaluationModal(studentId, studentName, isEvaluated = false, existingData = null) {
             document.getElementById('evalStudentName').textContent = studentName;
+            document.getElementById('eval_student_name_field').value = studentName;
             const form = document.getElementById('evaluationForm');
             form.action = `{{ url('/save-evaluation') }}/${studentId}`;
-            // Reset all stars
-            document.querySelectorAll('.competency-star').forEach(s => {
-                s.classList.remove('text-yellow-400'); s.classList.add('text-gray-600');
-            });
-            document.querySelectorAll('.overall-star').forEach(s => {
-                s.classList.remove('text-yellow-400'); s.classList.add('text-gray-600');
-            });
-            ['attendance','communication','collaboration','problem_solving','work_ethics','time_management','job_skills','employability'].forEach(f => {
-                const el = document.getElementById('input_' + f);
-                if (el) el.value = 0;
-            });
+            // 1. Reset
+            form.querySelectorAll('.prmsu-radio').forEach(r => { r.checked = false; r.style.pointerEvents = ''; r.disabled = false; });
+            form.querySelectorAll('textarea').forEach(t => { t.value = ''; t.readOnly = false; t.style.pointerEvents = ''; });
+            form.querySelectorAll('input[type="date"],input[type="text"]').forEach(el => { if (!el.hasAttribute('readonly')) { el.value = ''; el.disabled = false; } });
             document.getElementById('ratingInput').value = 0;
-            document.getElementById('overallRatingLabel').textContent = 'Select overall rating';
-
-            // Disable form if already evaluated
-            const submitBtn = form.querySelector('button[type="submit"]');
-            const allStars = form.querySelectorAll('.competency-star, .overall-star');
-            const feedbackArea = form.querySelector('textarea[name="feedback"]');
-            if (isEvaluated) {
-                if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '✅ Already Submitted'; submitBtn.className = submitBtn.className.replace('bg-yellow-600 hover:bg-yellow-700', 'bg-slate-600 cursor-not-allowed'); }
-                allStars.forEach(s => s.style.pointerEvents = 'none');
-                if (feedbackArea) feedbackArea.disabled = true;
-            } else {
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Submit Evaluation'; submitBtn.className = submitBtn.className.replace('bg-slate-600 cursor-not-allowed', 'bg-yellow-600 hover:bg-yellow-700'); }
-                allStars.forEach(s => s.style.pointerEvents = '');
-                if (feedbackArea) feedbackArea.disabled = false;
+            // 2. Populate before disabling
+            if (existingData) {
+                if (existingData.evaluation_date) document.getElementById('eval_evaluation_date').value = existingData.evaluation_date;
+                if (existingData.period_from)     document.getElementById('eval_period_from').value    = existingData.period_from;
+                if (existingData.period_to)       document.getElementById('eval_period_to').value      = existingData.period_to;
+                if (existingData.job_title)       document.getElementById('eval_job_title').value      = existingData.job_title;
+                ['quality_of_work','quantity_of_work','job_knowledge','working_relationships','attendance_dependability','specific_achievements'].forEach(f => {
+                    const rVal = existingData[f + '_rating'];
+                    if (rVal) { const r = form.querySelector(`input[name="${f}_rating"][value="${rVal}"]`); if (r) r.checked = true; }
+                    const cVal = existingData[f + '_comment'];
+                    const ta = form.querySelector(`textarea[name="${f}_comment"]`);
+                    if (ta && cVal) ta.value = cVal;
+                });
             }
-
+            // 3. Lock if already evaluated
+            const submitBtn = document.getElementById('evalSubmitBtn');
+            if (isEvaluated) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = '✅ Already Submitted';
+                submitBtn.className = submitBtn.className.replace('bg-blue-700 hover:bg-blue-800','bg-gray-400 cursor-not-allowed');
+                form.querySelectorAll('.prmsu-radio').forEach(r => r.style.pointerEvents = 'none');
+                form.querySelectorAll('textarea').forEach(t => { t.readOnly = true; t.style.pointerEvents = 'none'; });
+                form.querySelectorAll('input[type="date"],input[type="text"]').forEach(el => { if (!el.hasAttribute('readonly')) el.disabled = true; });
+            } else {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Evaluation';
+                submitBtn.className = submitBtn.className.replace('bg-gray-400 cursor-not-allowed','bg-blue-700 hover:bg-blue-800');
+            }
             document.getElementById('evaluationModal').classList.remove('hidden');
         }
 
         function closeEvaluationModal() {
             document.getElementById('evaluationModal').classList.add('hidden');
         }
-
-        // Competency star ratings
-        const overallLabels = ['', 'Poor', 'Below Average', 'Average', 'Good', 'Excellent'];
-        const competencyFields = ['attendance','communication','collaboration','problem_solving','work_ethics','time_management','job_skills','employability'];
-
-        function recalcOverallRating() {
-            const scores = competencyFields.map(f => parseInt(document.getElementById('input_' + f).value) || 0);
-            const filled = scores.filter(s => s > 0);
-            if (filled.length === 0) return;
-            const avg = Math.round(filled.reduce((a,b) => a+b, 0) / filled.length);
-            // Set overall rating
-            document.getElementById('ratingInput').value = avg;
-            document.getElementById('overallRatingLabel').textContent = overallLabels[avg] || '';
-            document.querySelectorAll('.overall-star').forEach((s, idx) => {
-                s.classList.toggle('text-yellow-400', idx < avg);
-                s.classList.toggle('text-gray-600', idx >= avg);
-            });
-        }
-
-        document.querySelectorAll('.competency-star').forEach(star => {
-            star.addEventListener('click', function() {
-                const field = this.getAttribute('data-field');
-                const value = parseInt(this.getAttribute('data-value'));
-                document.getElementById('input_' + field).value = value;
-                document.querySelectorAll(`.competency-star[data-field="${field}"]`).forEach((s, idx) => {
-                    s.classList.toggle('text-yellow-400', idx < value);
-                    s.classList.toggle('text-gray-600', idx >= value);
-                });
-                recalcOverallRating();
-            });
-        });
 
         // Task Logs Modal
         function showTaskLogsModal(studentId, studentName) {
@@ -1373,39 +1521,36 @@
         // Evaluation form — submit via AJAX
         document.getElementById('evaluationForm')?.addEventListener('submit', function(e) {
             e.preventDefault();
-            e.stopImmediatePropagation(); // prevent pixel-loader from firing
+            e.stopImmediatePropagation();
             const form = this;
-            const rating = parseInt(document.getElementById('ratingInput').value);
-            if (rating < 1) {
-                alert('Please select an overall rating.');
-                return;
-            }
-            const fields = ['attendance','communication','collaboration','problem_solving','work_ethics','time_management','job_skills','employability'];
-            for (const f of fields) {
-                if (parseInt(document.getElementById('input_' + f).value) < 1) {
-                    alert('Please rate all competency areas.');
+            const factors = ['quality_of_work','quantity_of_work','job_knowledge','working_relationships','attendance_dependability','specific_achievements'];
+            for (const f of factors) {
+                if (!form.querySelector(`input[name="${f}_rating"]:checked`)) {
+                    alert(`Please select a rating for all performance factors.`);
                     return;
                 }
             }
-            const submitBtn = form.querySelector('button[type="submit"]');
+            // Derive overall rating from radio selections (map to 1-5)
+            const ratingMap = {outstanding:5,exceeds_expectations:4,meets_expectations:3,needs_improvement:2,unsatisfactory:1};
+            const scores = factors.map(f => ratingMap[form.querySelector(`input[name="${f}_rating"]:checked`)?.value] || 0);
+            const avg = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+            document.getElementById('ratingInput').value = avg;
+
+            const submitBtn = document.getElementById('evalSubmitBtn');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
             if (typeof showPixelLoader === 'function') showPixelLoader('SAVING');
 
-            const fd = new FormData(form);
             fetch(form.action, {
                 method: 'POST',
-                body: fd,
+                body: new FormData(form),
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
                 }
             })
-            .then(r => {
-                if (!r.ok) throw new Error('Server error ' + r.status);
-                return r.json();
-            })
+            .then(r => { if (!r.ok) throw new Error('Server error ' + r.status); return r.json(); })
             .then(data => {
                 if (typeof hidePixelLoader === 'function') hidePixelLoader();
                 if (data.success) {
@@ -1414,18 +1559,15 @@
                     setTimeout(() => { _allowLeave = true; window.location.reload(); }, 3500);
                 } else {
                     alert('Failed to submit. Please try again.');
+                    submitBtn.disabled = false; submitBtn.textContent = 'Submit Evaluation';
                 }
             })
             .catch(err => {
                 if (typeof hidePixelLoader === 'function') hidePixelLoader();
-                console.error('Evaluation error:', err);
                 alert('Submission failed: ' + err.message);
-            })
-            .finally(() => {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Evaluation';
+                submitBtn.disabled = false; submitBtn.textContent = 'Submit Evaluation';
             });
-        }, true); // capture phase — runs before pixel-loader listener
+        }, true);
 
         // Close modals when clicking outside
         document.querySelectorAll('[id$="Modal"]').forEach(modal => {

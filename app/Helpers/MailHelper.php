@@ -190,6 +190,66 @@ class MailHelper
         $mail->send();
     }
 
+    public static function sendTimeInApproved(string $toEmail, string $toName, string $date, float $hours): void
+    {
+        if (!self::isEnabled()) return;
+        $mail = self::mailer();
+        $mail->addAddress($toEmail, $toName);
+        $mail->Subject = 'Time-In Approved - PRMSU OJT Monitoring System';
+        $mail->Body    = "
+            <div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;'>
+                <div style='background:#1e3a5f;padding:24px;border-radius:8px 8px 0 0;text-align:center;'>
+                    <h2 style='color:#fff;margin:0;'>PRMSU OJT Monitoring System</h2>
+                </div>
+                <div style='background:#f9fafb;padding:32px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;'>
+                    <h3 style='color:#1e3a5f;'>Hi {$toName},</h3>
+                    <div style='background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:16px;margin:16px 0;'>
+                        <p style='color:#166534;margin:0;font-weight:bold;'>&#10003; Your time-in record has been <strong>Approved</strong>!</p>
+                    </div>
+                    <p style='color:#374151;'>Your attendance record for <strong>{$date}</strong> has been approved.</p>
+                    <div style='background:#f0fdf4;border-left:4px solid #16a34a;padding:12px 16px;margin:16px 0;border-radius:4px;'>
+                        <p style='color:#374151;margin:0;'><strong>Hours Credited:</strong> {$hours} hrs</p>
+                    </div>
+                    <div style='text-align:center;margin:24px 0;'>
+                        <a href='" . config('app.url') . "/login' style='background:#16a34a;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;'>View Dashboard</a>
+                    </div>
+                    <p style='color:#374151;'>Best regards,<br><strong>PRMSU OJT Team</strong></p>
+                </div>
+            </div>
+        ";
+        $mail->send();
+    }
+
+    public static function sendTimeInDenied(string $toEmail, string $toName, string $date, string $reason): void
+    {
+        if (!self::isEnabled()) return;
+        $mail = self::mailer();
+        $mail->addAddress($toEmail, $toName);
+        $mail->Subject = 'Time-In Denied - PRMSU OJT Monitoring System';
+        $mail->Body    = "
+            <div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;'>
+                <div style='background:#1e3a5f;padding:24px;border-radius:8px 8px 0 0;text-align:center;'>
+                    <h2 style='color:#fff;margin:0;'>PRMSU OJT Monitoring System</h2>
+                </div>
+                <div style='background:#f9fafb;padding:32px;border-radius:0 0 8px 8px;border:1px solid #e5e7eb;'>
+                    <h3 style='color:#1e3a5f;'>Hi {$toName},</h3>
+                    <div style='background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:16px;margin:16px 0;'>
+                        <p style='color:#991b1b;margin:0;font-weight:bold;'>&#10007; Your time-in record has been <strong>Denied</strong>.</p>
+                    </div>
+                    <p style='color:#374151;'>Your attendance record for <strong>{$date}</strong> was reviewed and denied. Only your regular hours (up to 8 hrs) have been recorded.</p>
+                    <div style='background:#fff7ed;border-left:4px solid #ea580c;padding:12px 16px;margin:16px 0;border-radius:4px;'>
+                        <p style='color:#374151;margin:0;'><strong>Reason:</strong> {$reason}</p>
+                    </div>
+                    <div style='text-align:center;margin:24px 0;'>
+                        <a href='" . config('app.url') . "/login' style='background:#ea580c;color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;'>View Dashboard</a>
+                    </div>
+                    <p style='color:#374151;'>Best regards,<br><strong>PRMSU OJT Team</strong></p>
+                </div>
+            </div>
+        ";
+        $mail->send();
+    }
+
     public static function sendPasswordReset(string $toEmail, string $toName, string $resetUrl): void
     {
         if (!self::isEnabled()) return;

@@ -11,6 +11,13 @@ class StudentEvaluation extends Model
         'attendance', 'communication', 'collaboration',
         'problem_solving', 'work_ethics', 'time_management',
         'job_skills', 'employability', 'feedback',
+        'evaluation_date', 'period_from', 'period_to', 'job_title',
+        'quality_of_work_rating', 'quality_of_work_comment',
+        'quantity_of_work_rating', 'quantity_of_work_comment',
+        'job_knowledge_rating', 'job_knowledge_comment',
+        'working_relationships_rating', 'working_relationships_comment',
+        'attendance_dependability_rating', 'attendance_dependability_comment',
+        'specific_achievements_rating', 'specific_achievements_comment',
     ];
 
     public function student()

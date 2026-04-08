@@ -24,6 +24,9 @@ class TimeInRecord extends Model
         'denial_reason',
         'approved_by',
         'approved_at',
+        'regular_hours',
+        'ot_hours',
+        'ot_status',
     ];
 
     // Returns total minutes worked for this record
