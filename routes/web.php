@@ -845,7 +845,7 @@ Route::post('/upload-requirement', function () {
         'title'       => 'required|string|max:255',
         'description' => 'nullable|string|max:1000',
         'file'        => 'nullable',
-        'file.*'      => 'file|mimes:pdf,doc,docx,jpg,jpeg,png,gif,webp|max:5120',
+        'file.*'      => 'file|mimes:pdf,doc,docx,jpg,jpeg,png,gif,webp|max:15360',
     ]);
 
     $files = request()->file('file');

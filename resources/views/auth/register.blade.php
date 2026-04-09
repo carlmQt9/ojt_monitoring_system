@@ -484,7 +484,22 @@
         document.getElementById('termsModal')?.addEventListener('click', function(e) {
             if (e.target === this) closeTermsModal();
         });
+
+        // Show loader on register submit
+        document.querySelector('form[action*="register"]').addEventListener('submit', function() {
+            document.getElementById('pageLoader').classList.remove('hidden');
+        });
     </script>
+
+    <!-- Page loader overlay -->
+    <div id="pageLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5"
+         style="background:rgba(5,13,46,0.92);backdrop-filter:blur(6px);">
+        <svg class="animate-spin" style="width:52px;height:52px;" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="rgba(59,130,246,0.25)" stroke-width="4"/>
+            <path d="M4 12a8 8 0 018-8" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+        <p style="color:#93c5fd;font-size:15px;font-weight:600;font-family:sans-serif;letter-spacing:.03em;">Creating your account, please wait…</p>
+    </div>
 
 </body>
 </html>

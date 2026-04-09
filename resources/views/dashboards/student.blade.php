@@ -552,8 +552,59 @@
 
             </div>
             @else
-            <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-6 text-center">
-                <p class="text-gray-400 text-sm">Time-in is no longer required. Please coordinate with your supervisor for final evaluation and certificate issuance.</p>
+            {{-- ── No certificate yet — show layout with empty fields + reminder ── --}}
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                {{-- Left: placeholder image area --}}
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl overflow-hidden flex flex-col">
+                    <div class="flex-1 flex flex-col items-center justify-center p-10 text-center min-h-[240px] bg-slate-900/30">
+                        <div class="w-20 h-20 rounded-2xl bg-slate-700/50 border-2 border-dashed border-slate-600 flex items-center justify-center mb-4">
+                            <span class="text-4xl opacity-30">📄</span>
+                        </div>
+                        <p class="text-gray-500 text-sm font-semibold">Certificate not yet issued</p>
+                        <p class="text-gray-600 text-xs mt-1">Your supervisor will upload it here once ready.</p>
+                    </div>
+                    {{-- Disabled action buttons --}}
+                    <div class="flex gap-3 p-4 border-t border-slate-700/40">
+                        <button disabled class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-700/40 text-slate-500 text-sm font-semibold rounded-xl cursor-not-allowed">👁 View</button>
+                        <button disabled class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-700/40 text-slate-500 text-sm font-semibold rounded-xl cursor-not-allowed">🖨️ Print</button>
+                        <button disabled class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-700/40 text-slate-500 text-sm font-semibold rounded-xl cursor-not-allowed">⬇️ Download</button>
+                    </div>
+                </div>
+
+                {{-- Right: empty info card + reminder --}}
+                <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-5">
+                            <div class="w-12 h-12 bg-slate-700/50 border border-slate-600 rounded-xl flex items-center justify-center text-2xl shrink-0 opacity-50">🏅</div>
+                            <div>
+                                <p class="text-gray-400 font-bold text-lg leading-tight">Certificate of Completion</p>
+                                <p class="text-gray-600 text-xs">OJT Monitoring System</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            @foreach(['Recipient','Company','Hours Rendered','Awarded by','Date Awarded','School Year'] as $label)
+                            <div class="flex items-center gap-3 p-3 bg-slate-700/20 rounded-xl">
+                                <span class="text-gray-600 text-xs w-24 shrink-0">{{ $label }}</span>
+                                <div class="flex-1 h-3 bg-slate-700/50 rounded-full"></div>
+                            </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- Reminder --}}
+                    <div class="mt-5 pt-4 border-t border-slate-700/40">
+                        <div class="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl">
+                            <span class="text-yellow-400 text-lg shrink-0 mt-0.5">⏳</span>
+                            <div>
+                                <p class="text-yellow-300 text-sm font-semibold">Awaiting Certificate</p>
+                                <p class="text-gray-400 text-xs mt-0.5">Please coordinate with your supervisor for your final evaluation and certificate issuance.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
             @endif
         </div>
@@ -781,7 +832,7 @@
                                                 <input type="file" name="file[]" id="otLetterFile" required
                                                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                                                     class="w-full px-3 py-2 bg-slate-800 border border-slate-600 text-white rounded-lg text-xs file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white cursor-pointer">
-                                                <p class="text-gray-400 text-xs mt-1">PDF, Word, or Image — Max 5 MB</p>
+                                                <p class="text-gray-400 text-xs mt-1">PDF, Word, or Image — Max 15 MB</p>
                                                 <p id="otLetterFileError" class="text-red-400 text-xs mt-1 hidden"></p>
                                             </div>
                                             <div class="flex gap-2">
@@ -858,8 +909,8 @@
                                     return false;
                                 }
                                 var sizeMB = fileInput.files[0].size / (1024 * 1024);
-                                if (sizeMB > 5) {
-                                    if (errEl) { errEl.textContent = 'File exceeds 5 MB.'; errEl.classList.remove('hidden'); }
+                                if (sizeMB > 15) {
+                                    if (errEl) { errEl.textContent = 'File exceeds 15 MB.'; errEl.classList.remove('hidden'); }
                                     return false;
                                 }
                                 showUploadLoader();
@@ -1363,9 +1414,9 @@
                     <label class="block text-sm font-medium text-gray-300 mb-1">File *</label>
                     <input type="file" name="file[]" id="modal_req_file"
                         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp"
-                        onchange="handleFileSelect(this, 5)"
+                        onchange="handleFileSelect(this, 15)"
                         class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-green-500 focus:outline-none file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700 cursor-pointer">
-                    <small id="modal_file_hint" class="text-gray-400 block mt-1">PDF, Word, Images/Files &mdash; Max <strong>5 MB</strong> each</small>
+                    <small id="modal_file_hint" class="text-gray-400 block mt-1">PDF, Word, Images/Files &mdash; Max <strong>15 MB</strong> each</small>
                     <!-- Selected files preview -->
                     <div id="modal_file_preview" class="hidden mt-2 space-y-1"></div>
                     <p id="modal_file_error" class="text-red-400 text-xs mt-1 hidden"></p>
@@ -2166,12 +2217,12 @@
             // close mobile sidebar
             closeSidebar();
             // persist
-            localStorage.setItem('activeSection', name);
+            sessionStorage.setItem('activeSection', name);
         }
 
         // restore on load
         (function() {
-            const saved = localStorage.getItem('activeSection') || 'overview';
+            const saved = sessionStorage.getItem('activeSection') || 'overview';
             showSection(saved);
             // restore collapse state
             if (localStorage.getItem('sidebarCollapsed') === '1' && window.innerWidth >= 1024) {
@@ -2299,8 +2350,8 @@
             }
             for (let i = 0; i < fileInput.files.length; i++) {
                 const sizeMB = fileInput.files[i].size / (1024 * 1024);
-                if (sizeMB > 5) {
-                    if (errEl) { errEl.textContent = '"' + fileInput.files[i].name + '" exceeds 5 MB.'; errEl.classList.remove('hidden'); }
+                if (sizeMB > 15) {
+                    if (errEl) { errEl.textContent = '"' + fileInput.files[i].name + '" exceeds 15 MB.'; errEl.classList.remove('hidden'); }
                     return false;
                 }
             }
@@ -2344,12 +2395,12 @@
             if (maxFiles > 1) {
                 fileInput.setAttribute('multiple', 'multiple');
                 document.getElementById('modal_file_hint').innerHTML =
-                    'Images only &mdash; Max <strong>' + maxFiles + ' photos</strong>, 5 MB each. You can select files one by one.';
+                    'Images only &mdash; Max <strong>' + maxFiles + ' photos</strong>, 15 MB each. You can select files one by one.';
                 fileInput.setAttribute('accept', '.jpg,.jpeg,.png,.gif,.webp');
             } else {
                 fileInput.removeAttribute('multiple');
                 document.getElementById('modal_file_hint').innerHTML =
-                    'PDF, Word, Images/Files &mdash; Max <strong>5 MB</strong>';
+                    'PDF, Word, Images/Files &mdash; Max <strong>15 MB</strong>';
                 fileInput.setAttribute('accept', '.pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp');
             }
             fileInput.value = '';
@@ -2427,7 +2478,7 @@
                 btn.textContent = 'Yes, Logout';
                 btn.className = 'flex-1 px-4 py-2.5 text-center text-white rounded-xl font-semibold transition-all bg-green-600 hover:bg-green-700';
                 btn.href = '/logout';
-                btn.onclick = function() { _allowLeave = true; };
+                btn.onclick = function() { _allowLeave = true; sessionStorage.clear(); showPageLoader('Signing out…'); };
             } else {
                 icon.textContent = '🏠';
                 title.textContent = 'Go to Home?';
@@ -2497,6 +2548,10 @@
         // ===== END LEAVE PAGE CONFIRMATION =====
 
         // Theme toggle (global scope so onclick attribute works)
+        function showPageLoader(msg) {
+            const el = document.getElementById('pageLoader');
+            if (el) { document.getElementById('pageLoaderMsg').textContent = msg || 'Please wait…'; el.classList.remove('hidden'); }
+        }
         function toggleTheme() {
             const isLight = document.body.classList.toggle('light');
             localStorage.setItem('theme', isLight ? 'light' : 'dark');
@@ -2584,6 +2639,16 @@
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
     </script>
+
+    <!-- Page loader overlay -->
+    <div id="pageLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5"
+         style="background:rgba(5,13,46,0.92);backdrop-filter:blur(6px);">
+        <svg class="animate-spin" style="width:52px;height:52px;" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="rgba(34,197,94,0.25)" stroke-width="4"/>
+            <path d="M4 12a8 8 0 018-8" stroke="#4ade80" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+        <p id="pageLoaderMsg" style="color:#86efac;font-size:15px;font-weight:600;font-family:sans-serif;letter-spacing:.03em;">Please wait…</p>
+    </div>
 
 </body>
 </html>

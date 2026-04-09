@@ -1487,11 +1487,11 @@
             const titleEl = document.getElementById('header-section-title');
             if (titleEl) titleEl.textContent = sectionTitles[name] || name;
             closeSidebar();
-            localStorage.setItem('coordinator_activeSection', name);
+            sessionStorage.setItem('coordinator_activeSection', name);
         }
 
         (function() {
-            showSection(localStorage.getItem('coordinator_activeSection') || 'overview');
+            showSection(sessionStorage.getItem('coordinator_activeSection') || 'overview');
             if (localStorage.getItem('sidebarCollapsed') === '1' && window.innerWidth >= 1024) {
                 sidebarCollapsed = true;
                 sidebar.classList.add('collapsed');
@@ -1945,7 +1945,7 @@
                 msg.textContent = 'You will be signed out of your account.';
                 btn.textContent = 'Yes, Logout'; btn.href = '/logout';
                 btn.className = 'flex-1 px-4 py-2.5 text-center text-white rounded-xl font-semibold transition-all bg-orange-600 hover:bg-orange-700';
-                btn.onclick = function() { _allowLeave = true; };
+                btn.onclick = function() { _allowLeave = true; sessionStorage.clear(); showPageLoader('Signing out…'); };
             } else {
                 icon.textContent = '🏠'; title.textContent = 'Go to Home?';
                 msg.textContent = 'You will leave the dashboard and go to the landing page.';
@@ -1963,6 +1963,10 @@
         // ===== END LEAVE PAGE CONFIRMATION =====
 
 // Theme toggle
+        function showPageLoader(msg) {
+            const el = document.getElementById('pageLoader');
+            if (el) { document.getElementById('pageLoaderMsg').textContent = msg || 'Please wait…'; el.classList.remove('hidden'); }
+        }
         function toggleTheme() {
             const isLight = document.body.classList.toggle('light');
             localStorage.setItem('theme', isLight ? 'light' : 'dark');
@@ -2129,6 +2133,15 @@
                 <p class="text-gray-400 text-sm text-center py-6">Loading...</p>
             </div>
         </div>
+    </div>
+    <!-- Page loader overlay -->
+    <div id="pageLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5"
+         style="background:rgba(5,13,46,0.92);backdrop-filter:blur(6px);">
+        <svg class="animate-spin" style="width:52px;height:52px;" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="rgba(249,115,22,0.25)" stroke-width="4"/>
+            <path d="M4 12a8 8 0 018-8" stroke="#fb923c" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+        <p id="pageLoaderMsg" style="color:#fdba74;font-size:15px;font-weight:600;font-family:sans-serif;letter-spacing:.03em;">Please wait…</p>
     </div>
 
 </body>

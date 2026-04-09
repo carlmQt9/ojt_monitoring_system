@@ -1456,11 +1456,11 @@
             const titleEl = document.getElementById('header-section-title');
             if (titleEl) titleEl.textContent = sectionTitles[name] || name;
             closeSidebar();
-            localStorage.setItem('supervisor_activeSection', name);
+            sessionStorage.setItem('supervisor_activeSection', name);
         }
 
         (function() {
-            showSection(localStorage.getItem('supervisor_activeSection') || 'overview');
+            showSection(sessionStorage.getItem('supervisor_activeSection') || 'overview');
             if (localStorage.getItem('sidebarCollapsed') === '1' && window.innerWidth >= 1024) {
                 sidebarCollapsed = true;
                 sidebar.classList.add('collapsed');
@@ -1773,7 +1773,7 @@
                 msg.textContent = 'You will be signed out of your account.';
                 btn.textContent = 'Yes, Logout'; btn.href = '/logout';
                 btn.className = 'flex-1 px-4 py-2.5 text-center text-white rounded-xl font-semibold transition-all bg-purple-600 hover:bg-purple-700';
-                btn.onclick = function() { _allowLeave = true; };
+                btn.onclick = function() { _allowLeave = true; sessionStorage.clear(); showPageLoader('Signing out…'); };
             } else {
                 icon.textContent = '🏠'; title.textContent = 'Go to Home?';
                 msg.textContent = 'You will leave the dashboard and go to the landing page.';
@@ -1791,6 +1791,10 @@
         // ===== END LEAVE PAGE CONFIRMATION =====
 
         // Theme toggle
+        function showPageLoader(msg) {
+            const el = document.getElementById('pageLoader');
+            if (el) { document.getElementById('pageLoaderMsg').textContent = msg || 'Please wait…'; el.classList.remove('hidden'); }
+        }
         function toggleTheme() {
             const isLight = document.body.classList.toggle('light');
             localStorage.setItem('theme', isLight ? 'light' : 'dark');
@@ -1837,14 +1841,18 @@
             .then(r => r.json())
             .then(data => {
                 closeCertConfirm();
-                if (data.success) { location.reload(); }
-                else {
+                if (data.success) {
+                    showToast('🏅 Certificate Awarded!', data.message || 'Certificate successfully issued.', 'green');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
                     btn.disabled = false;
                     btn.textContent = 'Confirm';
+                    showToast('Error', data.message || 'Failed to award certificate.', 'red');
                 }
             })
             .catch(() => {
                 closeCertConfirm();
+                showToast('Network Error', 'Please try again.', 'red');
             });
         }
         function openSupDtrModal(studentId, studentName) {
@@ -1938,17 +1946,54 @@
         const file = input.files[0];
         if (!file) return;
         const progress = document.getElementById('cert-progress-' + studentId);
-        if (progress) progress.classList.remove('hidden');
+
+        // Show uploading overlay
+        showUploadingOverlay('Uploading certificate…');
+
         const fd = new FormData();
         fd.append('certificate_image', file);
         fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
         fetch('/upload-certificate/' + studentId, { method: 'POST', body: fd })
             .then(r => r.json())
             .then(data => {
-                if (data.success) location.reload();
-                else { if (progress) progress.classList.add('hidden'); alert(data.message || 'Upload failed'); }
+                hideUploadingOverlay();
+                if (data.success) {
+                    showToast('✅ Certificate Uploaded!', 'The certificate is now visible to the student.', 'green');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    if (progress) progress.classList.add('hidden');
+                    showToast('Upload Failed', data.message || 'Please try again.', 'red');
+                }
             })
-            .catch(() => { if (progress) progress.classList.add('hidden'); alert('Network error'); });
+            .catch(() => {
+                hideUploadingOverlay();
+                if (progress) progress.classList.add('hidden');
+                showToast('Network Error', 'Please try again.', 'red');
+            });
+    }
+
+    // Uploading overlay helpers
+    function showUploadingOverlay(msg) {
+        let el = document.getElementById('_uploadOverlay');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = '_uploadOverlay';
+            el.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+            el.innerHTML = `
+                <svg class="animate-spin" style="width:48px;height:48px;color:#fbbf24;" fill="none" viewBox="0 0 24 24">
+                    <circle style="opacity:.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path style="opacity:.75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                </svg>
+                <p id="_uploadOverlayMsg" style="color:#fff;font-size:15px;font-weight:600;font-family:sans-serif;"></p>
+            `;
+            document.body.appendChild(el);
+        }
+        document.getElementById('_uploadOverlayMsg').textContent = msg || 'Uploading…';
+        el.style.display = 'flex';
+    }
+    function hideUploadingOverlay() {
+        const el = document.getElementById('_uploadOverlay');
+        if (el) el.style.display = 'none';
     }
     function handleCertDrop(event, studentId) {
         event.preventDefault();
@@ -1957,7 +2002,34 @@
         const fakeInput = { files: [file] };
         uploadCertificate(studentId, fakeInput);
     }
+
+    function showToast(title, message, color) {
+        const colors = {
+            green: 'linear-gradient(135deg,#16a34a,#15803d)',
+            red:   'linear-gradient(135deg,#dc2626,#b91c1c)',
+            blue:  'linear-gradient(135deg,#2563eb,#1d4ed8)'
+        };
+        const n = document.createElement('div');
+        n.className = 'fixed bottom-6 right-6 z-[300] flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl text-white text-sm font-medium';
+        n.style.cssText = `background:${colors[color]||colors.green};border:1px solid rgba(255,255,255,0.2);animation:slideInRight .3s ease`;
+        n.innerHTML = `
+            <div><div class="font-semibold">${title}</div><div class="text-xs opacity-80">${message}</div></div>
+            <button onclick="this.parentElement.remove()" class="ml-2 opacity-70 hover:opacity-100 text-lg leading-none">&times;</button>
+        `;
+        document.body.appendChild(n);
+        setTimeout(() => { n.style.animation='slideOutRight .3s ease forwards'; setTimeout(()=>n.remove(),300); }, 4000);
+    }
     </script>
+
+    <!-- Page loader overlay -->
+    <div id="pageLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5"
+         style="background:rgba(5,13,46,0.92);backdrop-filter:blur(6px);">
+        <svg class="animate-spin" style="width:52px;height:52px;" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="rgba(139,92,246,0.25)" stroke-width="4"/>
+            <path d="M4 12a8 8 0 018-8" stroke="#a78bfa" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+        <p id="pageLoaderMsg" style="color:#c4b5fd;font-size:15px;font-weight:600;font-family:sans-serif;letter-spacing:.03em;">Please wait…</p>
+    </div>
 
 </body>
 </html>

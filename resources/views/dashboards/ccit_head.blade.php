@@ -2246,7 +2246,7 @@
                 msg.textContent = 'You will be signed out of your account.';
                 btn.textContent = 'Yes, Logout'; btn.href = '/logout';
                 btn.className = 'flex-1 px-4 py-2.5 text-center text-white rounded-xl font-semibold transition-all bg-red-600 hover:bg-red-700';
-                btn.onclick = function() { _allowLeave = true; };
+                btn.onclick = function() { _allowLeave = true; sessionStorage.clear(); showPageLoader('Signing out…'); };
             } else {
                 icon.textContent = '🏠'; title.textContent = 'Go to Home?';
                 msg.textContent = 'You will leave the dashboard and go to the landing page.';
@@ -2295,7 +2295,7 @@
             });
             const ht = document.getElementById('headerTitle');
             if (ht) ht.textContent = sectionTitles[name] || name;
-            localStorage.setItem('ccitSection', name);
+            sessionStorage.setItem('ccitSection', name);
             closeSidebar();
             /* load data for section */
             if (name === 'users') loadUsers();
@@ -2321,8 +2321,8 @@
                 const th = document.getElementById('top-header');
                 if (th) th.style.left = '4rem';
             }
-            /* restore last section */
-            const saved = localStorage.getItem('ccitSection') || 'overview';
+            /* restore section — sessionStorage clears on logout/new session */
+            const saved = sessionStorage.getItem('ccitSection') || 'overview';
             if (saved) showSection(saved);
         });
 
@@ -2525,6 +2525,10 @@
         }
 
         // ── Theme toggle ─────────────────────────────────────────────
+        function showPageLoader(msg) {
+            const el = document.getElementById('pageLoader');
+            if (el) { document.getElementById('pageLoaderMsg').textContent = msg || 'Please wait…'; el.classList.remove('hidden'); }
+        }
         function toggleTheme() {
             const isLight = document.body.classList.toggle('light');
             localStorage.setItem('theme', isLight ? 'light' : 'dark');
@@ -2605,6 +2609,15 @@
                 <button onclick="confirmDeleteUser()" class="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-semibold transition-all">Yes, Archive</button>
             </div>
         </div>
+    </div>
+    <!-- Page loader overlay -->
+    <div id="pageLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5"
+         style="background:rgba(5,13,46,0.92);backdrop-filter:blur(6px);">
+        <svg class="animate-spin" style="width:52px;height:52px;" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="rgba(239,68,68,0.25)" stroke-width="4"/>
+            <path d="M4 12a8 8 0 018-8" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>
+        </svg>
+        <p id="pageLoaderMsg" style="color:#fca5a5;font-size:15px;font-weight:600;font-family:sans-serif;letter-spacing:.03em;">Please wait…</p>
     </div>
 
 </body>
