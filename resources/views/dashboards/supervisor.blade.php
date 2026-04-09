@@ -219,6 +219,11 @@
                 <span class="nav-icon text-lg shrink-0">👥</span>
                 <span class="nav-label">Interns</span>
             </button>
+            <button onclick="showSection('certificates')" data-section="certificates"
+                class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
+                <span class="nav-icon text-lg shrink-0">🏅</span>
+                <span class="nav-label">Certificates</span>
+            </button>
         </nav>
 
         <!-- Sidebar Footer -->
@@ -263,6 +268,24 @@
             <div class="flex gap-3 mt-5">
                 <button onclick="closeConfirm()" class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">Cancel</button>
                 <a id="confirmBtn" href="#" class="flex-1 px-4 py-2.5 text-center text-white rounded-xl font-semibold transition-all bg-purple-600 hover:bg-purple-700">Confirm</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Certificate Confirmation Modal -->
+    <div id="certConfirmModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
+        <div class="bg-slate-800 border border-yellow-500/40 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <div class="text-center mb-5">
+                <div class="text-5xl mb-3" id="certConfirmIcon">🏅</div>
+                <h3 id="certConfirmTitle" class="text-lg font-bold text-white mb-2">Award Certificate?</h3>
+                <p id="certConfirmMsg" class="text-gray-400 text-sm leading-relaxed"></p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="closeCertConfirm()" class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">Cancel</button>
+                <button id="certConfirmBtn" onclick="executeCertAward()"
+                    class="flex-1 px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-semibold transition-all">
+                    Confirm
+                </button>
             </div>
         </div>
     </div>
@@ -397,7 +420,7 @@
             for($i=6;$i>=0;$i--) {
                 $d=\Carbon\Carbon::now()->subDays($i);
                 $_tiLabels[]=$d->format('D');
-                $q=\App\Models\TimeInRecord::whereDate('date',$d->toDateString());
+                $q=\App\Models\TimeInRecord::whereDate('date',$d->toDateString())->whereHas('student');
                 if($_compId) $q->whereHas('student',fn($sq)=>$sq->where('company_id',$_compId));
                 $_tiCounts[]=$q->count();
             }
@@ -623,34 +646,43 @@
                             <!-- Daily Logs Tab -->
                             <div id="daily-logs-{{ $student->id }}" class="tab-content">
                                 @if($dailyLogs->isNotEmpty())
-                                <div class="space-y-3">
-                                    @foreach($dailyLogs as $log)
-                                    <div class="bg-slate-700/30 p-4 rounded-lg">
-                                        <div class="flex justify-between items-start mb-2">
-                                            <div>
-                                                <p class="text-gray-200 font-semibold">{{ $log->log_date->format('M d, Y') }}</p>
-                                            </div>
-                                            <span class="px-2 py-1 text-xs rounded-full @if($log->status === 'approved') bg-green-500/20 text-green-300 @elseif($log->status === 'denied') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
-                                                {{ ucfirst($log->status) }}
-                                            </span>
-                                        </div>
-                                        <div class="flex justify-between items-center">
-                                            @php $supHours = number_format($log->hours_logged, 2); @endphp
-                                            <span class="text-purple-400 font-semibold">
-                                                @if($log->hours_logged > 0)
-                                                    +{{ $supHours }} hours
-                                                @elseif($log->hours_logged < 0)
-                                                    {{ $supHours }} hours
+                                <div class="overflow-y-auto rounded-lg border border-slate-700/50" style="max-height:260px">
+                                    <table class="w-full text-sm">
+                                        <thead class="sticky top-0 bg-slate-800 z-10">
+                                            <tr class="text-xs text-gray-400 border-b border-slate-700/50">
+                                                <th class="py-2 px-3 text-left font-semibold">Date</th>
+                                                <th class="py-2 px-2 text-left font-semibold">Hours</th>
+                                                <th class="py-2 px-2 text-center font-semibold">Type</th>
+                                                <th class="py-2 px-2 text-center font-semibold">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-700/30">
+                                        @foreach($dailyLogs as $log)
+                                        <tr class="hover:bg-slate-700/20 transition-colors">
+                                            <td class="py-2 px-3 text-gray-200 text-xs whitespace-nowrap">{{ $log->log_date->format('M d, Y') }}</td>
+                                            <td class="py-2 px-2 text-purple-400 font-semibold text-xs whitespace-nowrap">
+                                                @php $supHours = number_format($log->hours_logged, 2); @endphp
+                                                {{ $log->hours_logged >= 0 ? '+' : '' }}{{ $supHours }}h
+                                            </td>
+                                            <td class="py-2 px-2 text-center">
+                                                @if($log->is_overtime)
+                                                <span class="px-2 py-0.5 bg-red-500/20 text-red-300 text-xs rounded-full">OT</span>
                                                 @else
-                                                    0.00 hours
+                                                <span class="text-gray-500 text-xs">—</span>
                                                 @endif
-                                            </span>
-                                            @if($log->is_overtime)
-                                            <span class="px-2 py-1 bg-red-500/20 text-red-300 text-xs rounded">Overtime</span>
-                                            @endif
-                                        </div>
-                                    </div>
-                                    @endforeach
+                                            </td>
+                                            <td class="py-2 px-2 text-center">
+                                                <span class="px-2 py-0.5 text-xs rounded-full
+                                                    @if($log->status === 'approved') bg-green-500/20 text-green-300
+                                                    @elseif($log->status === 'denied') bg-red-500/20 text-red-300
+                                                    @else bg-yellow-500/20 text-yellow-300 @endif">
+                                                    {{ ucfirst($log->status) }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        @endforeach
+                                        </tbody>
+                                    </table>
                                 </div>
                                 @else
                                 <p class="text-gray-400 text-sm">No daily logs yet</p>
@@ -672,43 +704,63 @@
                                     <button onclick="showDenyAllTimeEditModal({{ $student->id }})" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold">❌ Deny All ({{ $_pendingTimedOut->count() }})</button>
                                 </div>
                                 @endif
-                                <div class="space-y-3">
-                                    @foreach($timeInRecords as $record)
-                                    @php
-                                        $_hasActiveSession = \App\Models\TimeInRecord::where('student_id', $student->id)
-                                            ->whereDate('date', $record->date)
-                                            ->whereNull('time_out')->exists();
-                                    @endphp
-                                    <div class="bg-slate-700/30 p-4 rounded-lg">
-                                        <div class="flex justify-between items-start mb-2">
-                                            <div>
-                                                <p class="text-gray-200 font-semibold">{{ $record->date->format('M d, Y') }} <span class="text-xs text-gray-400">({{ ucfirst($record->session ?? '') }})</span></p>
-                                                <p class="text-gray-400 text-sm">{{ \Carbon\Carbon::parse($record->time_in)->format('h:i A') }} @if($record->time_out) - {{ \Carbon\Carbon::parse($record->time_out)->format('h:i A') }} @endif</p>
-                                                @if(floatval($record->ot_hours ?? 0) > 0)
-                                                <p class="text-yellow-400 text-xs mt-1">⏰ Regular: {{ number_format($record->regular_hours ?? 0, 2) }}h | OT: {{ number_format($record->ot_hours, 2) }}h</p>
+                                <div class="overflow-y-auto rounded-lg border border-slate-700/50" style="max-height:260px">
+                                    <table class="w-full text-sm">
+                                        <thead class="sticky top-0 bg-slate-800 z-10">
+                                            <tr class="text-xs text-gray-400 border-b border-slate-700/50">
+                                                <th class="py-2 px-3 text-left font-semibold">Date / Session</th>
+                                                <th class="py-2 px-2 text-left font-semibold hidden sm:table-cell">Time</th>
+                                                <th class="py-2 px-2 text-center font-semibold">Status</th>
+                                                <th class="py-2 px-2 text-right font-semibold">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-700/30">
+                                        @foreach($timeInRecords as $record)
+                                        @php
+                                            $_hasActiveSession = \App\Models\TimeInRecord::where('student_id', $student->id)
+                                                ->whereDate('date', $record->date)->whereNull('time_out')->exists();
+                                        @endphp
+                                        <tr class="hover:bg-slate-700/20 transition-colors">
+                                            <td class="py-2 px-3">
+                                                <p class="text-gray-200 text-xs font-medium whitespace-nowrap">{{ $record->date->format('M d, Y') }}</p>
+                                                @if($record->session)
+                                                <p class="text-gray-500 text-xs">{{ ucfirst($record->session) }}</p>
                                                 @endif
-                                            </div>
-                                            <span class="px-2 py-1 text-xs rounded-full @if($record->status === 'approved') bg-green-500/20 text-green-300 @elseif($record->status === 'denied') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
-                                                {{ ucfirst($record->status) }}
-                                            </span>
-                                        </div>
-                                        @if($record->status === 'pending')
-                                            @if(!$record->time_out || $_hasActiveSession)
-                                            <div class="mt-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                                                <p class="text-blue-300 text-xs font-semibold">⏳ In Progress — student has not timed out yet</p>
-                                            </div>
-                                            @else
-                                            <div class="flex gap-2 mt-3">
-                                                <form method="POST" action="{{ route('approve-time-in', $record->id) }}" style="display:inline;">
-                                                    @csrf
-                                                    <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">Approve</button>
-                                                </form>
-                                                <button onclick="showDenyTimeEditModal({{ $record->id }})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Deny</button>
-                                            </div>
-                                            @endif
-                                        @endif
-                                    </div>
-                                    @endforeach
+                                                @if(floatval($record->ot_hours ?? 0) > 0)
+                                                <p class="text-yellow-400 text-xs">⏰ {{ number_format($record->regular_hours ?? 0,2) }}h + {{ number_format($record->ot_hours,2) }}h OT</p>
+                                                @endif
+                                            </td>
+                                            <td class="py-2 px-2 text-gray-400 text-xs whitespace-nowrap hidden sm:table-cell">
+                                                {{ \Carbon\Carbon::parse($record->time_in)->format('h:i A') }}
+                                                @if($record->time_out) – {{ \Carbon\Carbon::parse($record->time_out)->format('h:i A') }} @endif
+                                            </td>
+                                            <td class="py-2 px-2 text-center">
+                                                <span class="px-2 py-0.5 text-xs rounded-full whitespace-nowrap
+                                                    @if($record->status === 'approved') bg-green-500/20 text-green-300
+                                                    @elseif($record->status === 'denied') bg-red-500/20 text-red-300
+                                                    @else bg-yellow-500/20 text-yellow-300 @endif">
+                                                    {{ ucfirst($record->status) }}
+                                                </span>
+                                            </td>
+                                            <td class="py-2 px-2 text-right">
+                                                @if($record->status === 'pending')
+                                                    @if(!$record->time_out || $_hasActiveSession)
+                                                    <span class="text-blue-300 text-xs">⏳</span>
+                                                    @else
+                                                    <div class="flex items-center justify-end gap-1">
+                                                        <form method="POST" action="{{ route('approve-time-in', $record->id) }}" style="display:inline;">
+                                                            @csrf
+                                                            <button type="submit" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">✓</button>
+                                                        </form>
+                                                        <button onclick="showDenyTimeEditModal({{ $record->id }})" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">✕</button>
+                                                    </div>
+                                                    @endif
+                                                @endif
+                                            </td>
+                                        </tr>
+                                        @endforeach
+                                        </tbody>
+                                    </table>
                                 </div>
                                 @else
                                 <p class="text-gray-400 text-sm">No time-in records yet</p>
@@ -718,26 +770,27 @@
                             <!-- Task Logs Tab -->
                             <div id="task-logs-{{ $student->id }}" class="tab-content hidden">
                                 @if($taskLogs->isNotEmpty())
-                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    @foreach($taskLogs as $record)
-                                    <div class="bg-slate-700/30 rounded-lg overflow-hidden">
-                                        <button type="button" onclick="openMediaPopup('{{ asset('storage/' . $record->photo_path) }}','{{ $record->date->format('M d, Y') }}')" class="relative group block w-full">
-                                            <img src="{{ asset('storage/' . $record->photo_path) }}" alt="Time-in photo"
-                                                class="w-full h-32 object-cover hover:opacity-80 transition-opacity rounded-t-lg">
-                                            <span class="absolute inset-0 flex items-center justify-center bg-black/40 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white font-semibold">View</span>
-                                        </button>
-                                        <div class="p-2">
-                                            <p class="text-gray-200 text-xs font-semibold">{{ $record->date->format('M d, Y') }}</p>
-                                            <p class="text-gray-400 text-xs">In: {{ $record->time_in }}{{ $record->time_out ? ' · Out: '.$record->time_out : '' }}</p>
-                                            <span class="inline-block mt-1 px-2 py-0.5 text-xs rounded-full
-                                                @if($record->status === 'approved') bg-green-500/20 text-green-300
-                                                @elseif($record->status === 'denied') bg-red-500/20 text-red-300
-                                                @else bg-yellow-500/20 text-yellow-300 @endif">
-                                                {{ ucfirst($record->status ?? 'pending') }}
-                                            </span>
+                                <div class="overflow-y-auto rounded-lg" style="max-height:260px">
+                                    <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                        @foreach($taskLogs as $record)
+                                        <div class="bg-slate-700/30 rounded-lg overflow-hidden">
+                                            <button type="button" onclick="openMediaPopup('{{ asset('storage/' . $record->photo_path) }}','{{ $record->date->format('M d, Y') }}')" class="relative group block w-full">
+                                                <img src="{{ asset('storage/' . $record->photo_path) }}" alt="Time-in photo"
+                                                    class="w-full h-20 object-cover hover:opacity-80 transition-opacity rounded-t-lg">
+                                                <span class="absolute inset-0 flex items-center justify-center bg-black/40 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white font-semibold">View</span>
+                                            </button>
+                                            <div class="p-1.5">
+                                                <p class="text-gray-200 text-xs font-semibold truncate">{{ $record->date->format('M d') }}</p>
+                                                <span class="inline-block mt-0.5 px-1.5 py-0.5 text-xs rounded-full
+                                                    @if($record->status === 'approved') bg-green-500/20 text-green-300
+                                                    @elseif($record->status === 'denied') bg-red-500/20 text-red-300
+                                                    @else bg-yellow-500/20 text-yellow-300 @endif">
+                                                    {{ ucfirst($record->status ?? 'pending') }}
+                                                </span>
+                                            </div>
                                         </div>
+                                        @endforeach
                                     </div>
-                                    @endforeach
                                 </div>
                                 @else
                                 <p class="text-gray-400 text-sm">No time-in photos yet</p>
@@ -748,7 +801,6 @@
                             <div id="requirements-{{ $student->id }}" class="tab-content hidden">
                                 @if($requirements->isNotEmpty())
                                 @php
-                                    $_pendingReqs = $requirements->filter(fn($r) => $r->status === 'pending' && !(stripos($r->title,'OT')!==false || stripos($r->title,'overtime')!==false || stripos($r->title,'over time')!==false) || ($r->status === 'pending' && !\App\Models\TimeInRecord::where('student_id',$student->id)->whereDate('date',today())->whereNull('time_out')->exists()));
                                     $_pendingReqsCount = $requirements->where('status','pending')->count();
                                 @endphp
                                 @if($_pendingReqsCount >= 2)
@@ -757,43 +809,68 @@
                                     <button onclick="showDenyAllRequirementsModal({{ $student->id }})" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold">❌ Deny All ({{ $_pendingReqsCount }})</button>
                                 </div>
                                 @endif
-                                <div class="space-y-3">
-                                    @foreach($requirements as $req)
-                                    @php
-                                        $_isOtLetter = stripos($req->title, 'OT') !== false
-                                            || stripos($req->title, 'overtime') !== false
-                                            || stripos($req->title, 'over time') !== false;
-                                        $_studentStillActive = \App\Models\TimeInRecord::where('student_id', $student->id)
-                                            ->whereDate('date', today())
-                                            ->whereNull('time_out')->exists();
-                                    @endphp
-                                    <div class="bg-slate-700/30 p-4 rounded-lg">
-                                        <div class="flex justify-between items-start mb-2">
-                                            <div>
-                                                <p class="text-gray-200 font-semibold">{{ $req->title }}</p>
-                                                <p class="text-gray-400 text-sm">{{ $req->description }}</p>
-                                            </div>
-                                            <span class="px-2 py-1 text-xs rounded-full @if($req->status === 'approved') bg-green-500/20 text-green-300 @elseif($req->status === 'denied') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
-                                                {{ ucfirst($req->status) }}
-                                            </span>
-                                        </div>
-                                        @if($req->file_path)
-                                        <button type="button" onclick="openMediaPopup('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" class="text-blue-400 text-xs hover:underline">📎 View File</button>
-                                        @endif
-                                        @if($req->status === 'pending')
-                                            @if($_isOtLetter && $_studentStillActive)
-                                            <div class="mt-2 px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                                                <p class="text-blue-300 text-xs font-semibold">⏳ In Progress — student is still on OT. Actions will appear after time out.</p>
-                                            </div>
-                                            @else
-                                            <div class="flex gap-2 mt-3">
-                                                <button onclick="showApproveRequirementModal({{ $req->id }}, '{{ $student->email }}')" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">Approve</button>
-                                                <button onclick="showDenyRequirementModal({{ $req->id }})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Deny</button>
-                                            </div>
-                                            @endif
-                                        @endif
-                                    </div>
-                                    @endforeach
+                                @php
+                                    $_studentStillActive = \App\Models\TimeInRecord::where('student_id', $student->id)
+                                        ->whereDate('date', today())->whereNull('time_out')->exists();
+                                @endphp
+                                <!-- Scrollable compact table -->
+                                <div class="overflow-y-auto rounded-lg border border-slate-700/50" style="max-height:260px">
+                                    <table class="w-full text-sm">
+                                        <thead class="sticky top-0 bg-slate-800 z-10">
+                                            <tr class="text-xs text-gray-400 border-b border-slate-700/50">
+                                                <th class="py-2 px-3 text-left font-semibold">Title</th>
+                                                <th class="py-2 px-2 text-left font-semibold hidden sm:table-cell">Date</th>
+                                                <th class="py-2 px-2 text-center font-semibold">Status</th>
+                                                <th class="py-2 px-2 text-right font-semibold">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-700/30">
+                                        @foreach($requirements as $req)
+                                        @php
+                                            $_isOtLetter = stripos($req->title, 'OT') !== false
+                                                || stripos($req->title, 'overtime') !== false
+                                                || stripos($req->title, 'over time') !== false;
+                                        @endphp
+                                        <tr class="hover:bg-slate-700/20 transition-colors">
+                                            <td class="py-2 px-3">
+                                                <p class="text-gray-200 font-medium leading-tight">{{ $req->title }}</p>
+                                                @if($req->description)
+                                                <p class="text-gray-500 text-xs mt-0.5 truncate max-w-[160px]" title="{{ $req->description }}">{{ $req->description }}</p>
+                                                @endif
+                                            </td>
+                                            <td class="py-2 px-2 text-gray-500 text-xs whitespace-nowrap hidden sm:table-cell">
+                                                {{ $req->created_at->format('M d, Y') }}
+                                            </td>
+                                            <td class="py-2 px-2 text-center">
+                                                <span class="px-2 py-0.5 text-xs rounded-full whitespace-nowrap
+                                                    @if($req->status === 'approved') bg-green-500/20 text-green-300
+                                                    @elseif($req->status === 'denied') bg-red-500/20 text-red-300
+                                                    @else bg-yellow-500/20 text-yellow-300 @endif">
+                                                    {{ ucfirst($req->status) }}
+                                                </span>
+                                            </td>
+                                            <td class="py-2 px-2">
+                                                <div class="flex items-center justify-end gap-1 flex-wrap">
+                                                    @if($req->file_path)
+                                                    <button type="button" onclick="openMediaPopup('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')"
+                                                        class="px-2 py-1 bg-blue-600/80 hover:bg-blue-600 text-white text-xs rounded whitespace-nowrap">📎 View</button>
+                                                    @endif
+                                                    @if($req->status === 'pending')
+                                                        @if($_isOtLetter && $_studentStillActive)
+                                                        <span class="text-blue-300 text-xs">⏳ Active</span>
+                                                        @else
+                                                        <button onclick="showApproveRequirementModal({{ $req->id }}, '{{ $student->email }}')"
+                                                            class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">✓</button>
+                                                        <button onclick="showDenyRequirementModal({{ $req->id }})"
+                                                            class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">✕</button>
+                                                        @endif
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        @endforeach
+                                        </tbody>
+                                    </table>
                                 </div>
                                 @else
                                 <p class="text-gray-400 text-sm">No requirements yet</p>
@@ -853,6 +930,114 @@
         </div>
         </section><!-- end interns -->
 
+        <!-- Certificates Section -->
+        <section id="section-certificates" class="dash-section hidden">
+        <div class="mb-12">
+            <h2 class="text-2xl font-bold text-white mb-2">🏅 OJT Completion Certificates</h2>
+            <p class="text-gray-400 text-sm mb-6">Upload each intern's physical certificate image. Students can then view, print, and download it from their dashboard.</p>
+
+            @php
+                $certStudents = $supervisorStudents->map(function($s) {
+                    $sh = \App\Models\StudentHours::where('student_id', $s->id)->first();
+                    $actual = \App\Models\TimeInRecord::where('student_id', $s->id)->whereNotNull('time_out')->get()
+                        ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
+                    $s->_hours    = round(max($sh->hours_completed ?? 0, $actual), 2);
+                    $s->_required = $sh->total_hours_required ?? 600;
+                    $s->_done     = $s->_hours >= $s->_required;
+                    return $s;
+                });
+                $completedCert = $certStudents->filter(fn($s) => $s->_done);
+                $notDone       = $certStudents->filter(fn($s) => !$s->_done);
+            @endphp
+
+            @if($completedCert->isEmpty() && $notDone->isEmpty())
+                <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-8 text-center">
+                    <p class="text-gray-400">No interns assigned yet.</p>
+                </div>
+            @else
+                @if($completedCert->isNotEmpty())
+                <h3 class="text-sm font-semibold text-green-400 uppercase tracking-wider mb-3">✅ Completed — Ready for Certificate</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+                    @foreach($completedCert as $s)
+                    <div class="bg-slate-800/50 border border-green-500/40 rounded-xl p-5">
+                        <!-- Student info row -->
+                        <div class="flex items-start justify-between gap-3 mb-4">
+                            <div class="min-w-0">
+                                <p class="text-white font-semibold truncate">{{ $s->name }}</p>
+                                <p class="text-gray-400 text-xs truncate">{{ $s->company->name ?? '' }}</p>
+                                <p class="text-green-400 text-xs mt-1 font-semibold">{{ number_format($s->_hours, 2) }} / {{ $s->_required }} hrs</p>
+                            </div>
+                            @if($s->certificate_awarded_at)
+                            <span class="shrink-0 px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded-full whitespace-nowrap">
+                                🏅 {{ $s->certificate_awarded_at->format('M d, Y') }}
+                            </span>
+                            @endif
+                        </div>
+
+                        @if($s->certificate_image_path)
+                        <!-- Thumbnail preview -->
+                        <div class="mb-3 rounded-lg overflow-hidden border border-slate-600 bg-slate-900/50 flex items-center justify-center cursor-pointer"
+                             style="height:130px;"
+                             onclick="openCertImageModal('{{ asset('storage/' . $s->certificate_image_path) }}', '{{ addslashes($s->name) }}')">
+                            <img src="{{ asset('storage/' . $s->certificate_image_path) }}"
+                                 alt="Certificate preview"
+                                 class="max-h-full max-w-full object-contain hover:opacity-80 transition-opacity">
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="openCertImageModal('{{ asset('storage/' . $s->certificate_image_path) }}', '{{ addslashes($s->name) }}')"
+                                class="flex-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg font-semibold">👁 View</button>
+                            <label class="flex-1 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs rounded-lg font-semibold text-center cursor-pointer">
+                                🔄 Replace
+                                <input type="file" class="hidden" accept="image/*,application/pdf"
+                                       onchange="uploadCertificate({{ $s->id }}, this)">
+                            </label>
+                        </div>
+                        @else
+                        <!-- Drop / upload zone -->
+                        <label class="block w-full border-2 border-dashed border-slate-600 hover:border-yellow-500/70 rounded-xl p-6 text-center cursor-pointer transition-colors"
+                               ondragover="event.preventDefault();this.classList.add('!border-yellow-500')"
+                               ondragleave="this.classList.remove('!border-yellow-500')"
+                               ondrop="handleCertDrop(event,{{ $s->id }})">
+                            <div class="text-3xl mb-2">📄</div>
+                            <p class="text-gray-300 text-sm font-semibold">Click or drag to upload</p>
+                            <p class="text-gray-500 text-xs mt-1">JPG, PNG or PDF · max 10 MB</p>
+                            <input type="file" class="hidden" accept="image/*,application/pdf"
+                                   onchange="uploadCertificate({{ $s->id }}, this)">
+                        </label>
+                        <div id="cert-progress-{{ $s->id }}" class="hidden mt-2 flex items-center gap-2 text-xs text-gray-400">
+                            <svg class="animate-spin w-4 h-4 text-yellow-400 shrink-0" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                            </svg>
+                            Uploading…
+                        </div>
+                        @endif
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+
+                @if($notDone->isNotEmpty())
+                <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">⏳ In Progress</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    @foreach($notDone as $s)
+                    <div class="bg-slate-800/30 border border-slate-700 rounded-xl p-5 flex items-center justify-between gap-4 opacity-60">
+                        <div class="min-w-0">
+                            <p class="text-white font-semibold truncate">{{ $s->name }}</p>
+                            <p class="text-gray-400 text-xs truncate">{{ $s->company->name ?? '' }}</p>
+                            <div class="mt-2 w-full bg-slate-700 rounded-full h-1.5">
+                                <div class="bg-purple-500 h-1.5 rounded-full" style="width:{{ min(100, round(($s->_hours/$s->_required)*100)) }}%"></div>
+                            </div>
+                            <p class="text-gray-500 text-xs mt-1">{{ number_format($s->_hours, 2) }} / {{ $s->_required }} hrs ({{ round(($s->_hours/$s->_required)*100) }}%)</p>
+                        </div>
+                        <span class="shrink-0 px-3 py-1 bg-slate-700 text-gray-400 text-xs rounded-full">Not yet eligible</span>
+                    </div>
+                    @endforeach
+                </div>
+                @endif
+            @endif
+        </div>
+        </section><!-- end certificates -->
     </div><!-- end inner px wrapper -->
     </div><!-- end main-content -->
 
@@ -1257,7 +1442,8 @@
 
         const sectionTitles = {
             overview: '🏠 Overview',
-            interns: '👥 Interns'
+            interns: '👥 Interns',
+            certificates: '🏅 Certificates'
         };
 
         function showSection(name) {
@@ -1618,6 +1804,49 @@
                 document.getElementById('iconSun').classList.remove('hidden');
             }
         })();
+
+        // ── Certificate ──────────────────────────────────────────────────
+        let _certStudentId = null;
+
+        function awardCertificate(studentId, studentName, isUpdate = false) {
+            _certStudentId = studentId;
+            const modal = document.getElementById('certConfirmModal');
+            document.getElementById('certConfirmIcon').textContent = isUpdate ? '🔄' : '🏅';
+            document.getElementById('certConfirmTitle').textContent = isUpdate ? 'Re-issue Certificate?' : 'Award Certificate?';
+            document.getElementById('certConfirmMsg').textContent = isUpdate
+                ? `Re-issue the OJT Completion Certificate for ${studentName}? The award date will be updated to today.`
+                : `Award the OJT Completion Certificate to ${studentName}? This will be visible on their dashboard.`;
+            document.getElementById('certConfirmBtn').textContent = isUpdate ? '🔄 Re-issue' : '🏅 Award';
+            modal.classList.remove('hidden');
+        }
+
+        function closeCertConfirm() {
+            document.getElementById('certConfirmModal').classList.add('hidden');
+            _certStudentId = null;
+        }
+
+        function executeCertAward() {
+            if (!_certStudentId) return;
+            const btn = document.getElementById('certConfirmBtn');
+            btn.disabled = true;
+            btn.textContent = 'Processing…';
+            fetch(`/award-certificate/${_certStudentId}`, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                closeCertConfirm();
+                if (data.success) { location.reload(); }
+                else {
+                    btn.disabled = false;
+                    btn.textContent = 'Confirm';
+                }
+            })
+            .catch(() => {
+                closeCertConfirm();
+            });
+        }
         function openSupDtrModal(studentId, studentName) {
             const url = `/generate-dtr/${studentId}`;
             document.getElementById('supDtrModalTitle').textContent = studentName + ' — DTR Record';
@@ -1646,6 +1875,89 @@
         </div>
     </div>
     <!-- End DTR Viewer Modal -->
+
+    <!-- ===== CERTIFICATE IMAGE MODAL ===== -->
+    <div id="certImageModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4"
+         onclick="if(event.target===this)closeCertImageModal()">
+        <div class="bg-slate-900 border border-yellow-500/30 rounded-2xl shadow-2xl flex flex-col"
+             style="max-width:960px;width:100%;max-height:92vh;">
+            <div class="flex justify-between items-center px-5 py-3 border-b border-slate-700 shrink-0">
+                <span id="certImageModalTitle" class="text-sm font-semibold text-yellow-300">🏅 OJT Certificate of Completion</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="printCertImage()"
+                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">🖨️ Print</button>
+                    <button onclick="downloadCertImage()"
+                        class="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs font-semibold">⬇️ Download</button>
+                    <button onclick="closeCertImageModal()"
+                        class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-lg">✕</button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-auto flex items-center justify-center p-4 bg-slate-950/50 rounded-b-2xl">
+                <img id="certImageEl" src="" alt="Certificate"
+                     class="max-w-full max-h-full object-contain rounded-lg shadow-xl">
+            </div>
+        </div>
+    </div>
+    <!-- ===== END CERTIFICATE IMAGE MODAL ===== -->
+
+    <script>
+    let _certImageUrl = '', _certImageName = '';
+
+    function openCertImageModal(url, name) {
+        _certImageUrl = url;
+        _certImageName = name;
+        document.getElementById('certImageEl').src = url;
+        document.getElementById('certImageModalTitle').textContent = '🏅 ' + name + ' — Certificate';
+        document.getElementById('certImageModal').classList.remove('hidden');
+    }
+    function closeCertImageModal() {
+        document.getElementById('certImageModal').classList.add('hidden');
+        document.getElementById('certImageEl').src = '';
+    }
+    function printCertImage() {
+        const win = window.open('', '_blank');
+        win.document.write(`<!DOCTYPE html><html><head><style>
+            *{margin:0;padding:0;box-sizing:border-box;}
+            body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff;}
+            img{max-width:100%;max-height:100vh;object-fit:contain;}
+            @page{size:landscape;margin:5mm;}
+        </style></head><body><img src="${_certImageUrl}" onload="window.print();window.close()"></body></html>`);
+        win.document.close();
+    }
+    function downloadCertImage() {
+        const a = document.createElement('a');
+        a.href = _certImageUrl;
+        a.download = 'OJT_Certificate_' + _certImageName.replace(/\s+/g,'_') + '.' + _certImageUrl.split('.').pop();
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    // Upload certificate image via AJAX
+    function uploadCertificate(studentId, input) {
+        const file = input.files[0];
+        if (!file) return;
+        const progress = document.getElementById('cert-progress-' + studentId);
+        if (progress) progress.classList.remove('hidden');
+        const fd = new FormData();
+        fd.append('certificate_image', file);
+        fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
+        fetch('/upload-certificate/' + studentId, { method: 'POST', body: fd })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) location.reload();
+                else { if (progress) progress.classList.add('hidden'); alert(data.message || 'Upload failed'); }
+            })
+            .catch(() => { if (progress) progress.classList.add('hidden'); alert('Network error'); });
+    }
+    function handleCertDrop(event, studentId) {
+        event.preventDefault();
+        const file = event.dataTransfer.files[0];
+        if (!file) return;
+        const fakeInput = { files: [file] };
+        uploadCertificate(studentId, fakeInput);
+    }
+    </script>
 
 </body>
 </html>

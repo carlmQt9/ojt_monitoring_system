@@ -297,8 +297,13 @@
         <!-- SECTION: Users -->
         <section id="section-users" class="dash-section hidden">
             <div class="mb-6">
-                <h2 class="text-2xl font-bold text-white mb-1">👥 User Management</h2>
-                <p class="text-gray-400 text-sm">Manage all students, supervisors, and coordinators</p>
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white mb-1">👥 User Management</h2>
+                        <p class="text-gray-400 text-sm">Manage all students, supervisors, and coordinators</p>
+                    </div>
+                    <button onclick="openArchivedUsersModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition-colors">🗑 Archive Trash</button>
+                </div>
             </div>
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
                 <div class="mb-4 grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
@@ -1382,14 +1387,14 @@
         function confirmDeleteSchoolYear() {
             const id = document.getElementById('deleteSchoolYearModal').dataset.syId;
             closeDeleteSchoolYearModal();
-            pixelAction('DELETING', () =>
+            pixelAction('ARCHIVING', () =>
                 fetch(`/api/school-years/${id}`, {
                     method: 'DELETE',
                     headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
                 }).then(r => r.json()).then(data => {
                     if (data.success) { loadSchoolYearList(); loadSchoolYearSelector(); }
                 })
-            , 'SCHOOL YEAR REMOVED!');
+            , 'SCHOOL YEAR ARCHIVED!');
         }
 
         function openAnalyticsModal() {
@@ -1676,17 +1681,17 @@
         function confirmDeleteUser() {
             const userId = document.getElementById('deleteUserModal').dataset.userId;
             closeDeleteUserModal();
-            pixelAction('DELETING', () =>
+            pixelAction('ARCHIVING', () =>
                 fetch(`/api/users/${userId}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }
                     }).then(async response => {
-                        if (response.status === 419) { alert('Session expired. Please reload.'); return; }
+                        if (response.status === 419) { showToast('Session Expired', 'Please reload.', 'red'); return; }
                         const data = await response.json().catch(()=>({}));
                         if (response.ok) return loadUsers();
-                        else alert(data.message || 'Failed to remove user');
+                        else showToast('Error', data.message || 'Failed to archive user', 'red');
                     })
-                , 'USER REMOVED!');
+                , 'USER ARCHIVED!');
         }
 
         function renderAnalytics(items) {
@@ -1916,7 +1921,7 @@
                                     <td class="px-4 py-2 text-gray-400 text-xs">${sid.created_at ? new Date(sid.created_at).toLocaleDateString() : '—'}</td>
                                     <td class="px-4 py-2"><div class="flex gap-1">
                                             <button onclick="editSchoolId(${sid.id}, '${sid.school_id_number}', '${sid.school_year || ''}')" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">Edit</button>
-                                            <button onclick="deleteSchoolId(${sid.id})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">Delete</button>
+                                            <button onclick="deleteSchoolId(${sid.id})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">Archive</button>
                                           </div></td>
                                 </tr>`).join('')}
                             </tbody>
@@ -1937,7 +1942,7 @@
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
                                     <button onclick="editSchoolId(${sid.id}, '${sid.school_id_number}', '${sid.school_year || ''}')" class="py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold">Edit</button>
-                                    <button onclick="deleteSchoolId(${sid.id})" class="py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Delete</button>
+                                    <button onclick="deleteSchoolId(${sid.id})" class="py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Archive</button>
                                 </div>
                             </div>`).join('')}
                         </div>
@@ -1988,12 +1993,12 @@
             document.body.appendChild(modal);
             modal.querySelector('#confirmDeleteSidBtn').addEventListener('click', function () {
                 modal.remove();
-                pixelAction('DELETING', () =>
+                pixelAction('ARCHIVING', () =>
                     fetch(`/api/school-ids/${id}`, {
                         method: 'DELETE',
                         headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
                     }).then(r => r.json()).then(data => { if (data.success) loadSchoolIdList(); })
-                , 'SCHOOL ID DELETED!');
+                , 'SCHOOL ID ARCHIVED!');
             });
         }
 
@@ -2060,9 +2065,15 @@
             const nameVal = form.name.value.trim();
             const emailVal = form.email.value.trim();
             const roleVal = form.role.value;
-            if (!nameVal) { alert('Name is required'); form.name.focus(); return; }
-            if (!emailVal) { alert('Email is required'); form.email.focus(); return; }
-            if (!roleVal) { alert('Role is required'); form.role.focus(); return; }
+            if (!nameVal) { showToast('Validation Error', 'Name is required.', 'red'); form.name.focus(); return; }
+            if (!emailVal) { showToast('Validation Error', 'Email is required.', 'red'); form.email.focus(); return; }
+            if (!roleVal) { showToast('Validation Error', 'Role is required.', 'red'); form.role.focus(); return; }
+
+            // School ID required and must exist for students (client-side pre-check)
+            if (roleVal === 'student' && !editingUserId) {
+                const sidVal = (form.school_id_number?.value || '').trim();
+                if (!sidVal) { showToast('Validation Error', 'School ID number is required for students.', 'red'); form.school_id_number?.focus(); return; }
+            }
 
             const formData = new FormData(form);
 
@@ -2106,21 +2117,21 @@
                 }
             }).then(async response => {
                 hidePixelLoader();
-                if (response.status === 419) { alert('Session expired; please reload and try again.'); return; }
+                if (response.status === 419) { showToast('Session Expired', 'Please reload and try again.', 'red'); return; }
                 const text = await response.text();
                 let data = {};
-                try { data = JSON.parse(text); } catch(e) { alert('Server error: ' + text.substring(0, 300)); return; }
+                try { data = JSON.parse(text); } catch(e) { showToast('Server Error', text.substring(0, 100), 'red'); return; }
                 if (response.ok && data.success) {
                     showPixelSuccess(successMsg);
                     closeAddUserModal(); loadUsers(); form.reset();
                     editingUserId = null;
                 } else if (response.status === 422 && data.errors) {
-                    const msgs = Object.values(data.errors).flat().join('\n');
-                    alert(msgs);
+                    const msgs = Object.values(data.errors).flat().join(' ');
+                    showToast('Validation Error', msgs, 'red');
                 } else {
-                    alert(data.message || `Error (${response.status}): Please check all fields and try again.`);
+                    showToast('Error', data.message || `Error (${response.status}): Please check all fields and try again.`, 'red');
                 }
-            }).catch(err => { hidePixelLoader(); alert('Network error: ' + err.message); });
+            }).catch(err => { hidePixelLoader(); showToast('Network Error', err.message, 'red'); });
         });
 
         document.getElementById('settingsForm')?.addEventListener('submit', function(e) {
@@ -2136,15 +2147,15 @@
                     body: data,
                     headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' }
                 }).then(async response => {
-                    if (response.status === 419) { alert('Session expired; please reload and try again.'); return; }
+                    if (response.status === 419) { showToast('Session Expired', 'Please reload and try again.', 'red'); return; }
                     const json = await response.json().catch(() => ({}));
                     if (response.ok && json.success) {
                         refreshDashboardStats();
                     } else {
                         if (json.errors) {
-                            alert(Object.values(json.errors).flat().join('\n'));
+                            showToast('Validation Error', Object.values(json.errors).flat().join(' '), 'red');
                         } else {
-                            alert(json.message || 'Failed to save settings');
+                            showToast('Error', json.message || 'Failed to save settings', 'red');
                         }
                     }
                 })
@@ -2396,8 +2407,10 @@
                 });
         }
         function restoreSchoolYear(id) {
-            fetch(`/api/school-years/${id}/restore`, { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
-                .then(r => r.json()).then(d => { if (d.success) { loadArchivedSchoolYears(); loadSchoolYearList(); loadSchoolYearSelector(); } });
+            pixelAction('RESTORING', () =>
+                fetch(`/api/school-years/${id}/restore`, { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                    .then(r => r.json()).then(d => { if (d.success) { loadArchivedSchoolYears(); loadSchoolYearList(); loadSchoolYearSelector(); } })
+            , 'SCHOOL YEAR RESTORED!');
         }
         function forceDeleteSchoolYear(id) {
             if (!confirm('Permanently delete this school year? This cannot be undone.')) return;
@@ -2442,8 +2455,68 @@
                 });
         }
         function restoreSchoolId(id) {
-            fetch(`/api/school-ids/${id}/restore`, { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
-                .then(r => r.json()).then(d => { if (d.success) { loadArchivedSchoolIds(); loadSchoolIdList(); } });
+            pixelAction('RESTORING', () =>
+                fetch(`/api/school-ids/${id}/restore`, { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                    .then(r => r.json()).then(d => { if (d.success) { loadArchivedSchoolIds(); loadSchoolIdList(); } })
+            , 'SCHOOL ID RESTORED!');
+        }
+
+        // ===== ARCHIVED USERS =====
+        function openArchivedUsersModal() {
+            document.getElementById('archivedUsersModal').classList.remove('hidden');
+            loadArchivedUsers();
+        }
+        function closeArchivedUsersModal() {
+            document.getElementById('archivedUsersModal').classList.add('hidden');
+        }
+        function loadArchivedUsers() {
+            fetch('/api/users/archived')
+                .then(r => r.json())
+                .then(data => {
+                    const el = document.getElementById('archivedUsersList');
+                    if (!data.users.length) {
+                        el.innerHTML = '<p class="text-gray-400 text-center py-8">No archived users.</p>';
+                        return;
+                    }
+                    el.innerHTML = `<table class="w-full text-xs">
+                        <thead><tr class="border-b border-slate-700">
+                            <th class="text-left py-2 px-3 text-gray-300">Name</th>
+                            <th class="text-left py-2 px-3 text-gray-300">Email</th>
+                            <th class="text-left py-2 px-3 text-gray-300">Role</th>
+                            <th class="text-left py-2 px-3 text-gray-300">School ID</th>
+                            <th class="text-center py-2 px-3 text-gray-300">Archived On</th>
+                            <th class="text-center py-2 px-3 text-gray-300">Actions</th>
+                        </tr></thead>
+                        <tbody>${data.users.map(u => `
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80">
+                                <td class="py-2 px-3 text-gray-400 line-through">${u.name}</td>
+                                <td class="py-2 px-3 text-gray-500">${u.email}</td>
+                                <td class="py-2 px-3 text-gray-500 capitalize">${u.role}</td>
+                                <td class="py-2 px-3 text-gray-500 font-mono">${u.school_id_number || '—'}</td>
+                                <td class="py-2 px-3 text-center text-gray-500">${u.deleted_at}</td>
+                                <td class="py-2 px-3 text-center">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <button onclick="restoreUser(${u.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs">Restore</button>
+                                        <button onclick="forceDeleteUser(${u.id}, '${u.name.replace(/'/g,"\\'")}')  " class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-xs">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>`;
+                });
+        }
+        function restoreUser(id) {
+            pixelAction('RESTORING', () =>
+                fetch(`/api/users/${id}/restore`, { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                    .then(r => r.json()).then(d => { if (d.success) { loadArchivedUsers(); loadUsers(); } })
+            , 'USER RESTORED!');
+        }
+        function forceDeleteUser(id, name) {
+            if (!confirm(`Permanently delete "${name}"? This cannot be undone.`)) return;
+            pixelAction('DELETING', () =>
+                fetch(`/api/users/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                    .then(r => r.json()).then(d => { if (d.success) loadArchivedUsers(); })
+            , 'USER DELETED!');
         }
         function forceDeleteSchoolId(id) {
             if (!confirm('Permanently delete this school ID? This cannot be undone.')) return;
@@ -2502,6 +2575,19 @@
         </div>
     </div>
 
+    <!-- Archived Users Modal -->
+    <div id="archivedUsersModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[110] p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
+                <h3 class="text-lg font-bold text-yellow-400">🗑 Archived Users</h3>
+                <button onclick="closeArchivedUsersModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+            </div>
+            <div class="overflow-auto flex-1 p-4">
+                <div id="archivedUsersList"><p class="text-gray-400 text-center py-8">Loading...</p></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Delete User Confirmation Modal -->
     <div id="deleteUserModal" class="hidden fixed inset-0 z-[110] flex items-center justify-center bg-black/70 p-4">
         <div class="bg-slate-800 border border-red-500/50 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -2509,9 +2595,9 @@
                 <div class="text-5xl mb-3">⚠️</div>
                 <h3 class="text-lg font-bold text-white mb-2">Archive User?</h3>
                 <p class="text-gray-300 text-sm">You are about to archive <span id="deleteUserName" class="text-red-400 font-semibold"></span>.</p>
-                <div class="mt-3 bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
-                    <p class="text-red-400 text-xs font-semibold">⚠️ This action cannot be undone.</p>
-                    <p class="text-gray-400 text-xs mt-1">All records associated with this user will be permanently removed from the system.</p>
+                <div class="mt-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-4 py-3">
+                    <p class="text-yellow-400 text-xs font-semibold">ℹ️ Records are preserved.</p>
+                    <p class="text-gray-400 text-xs mt-1">The user and their records will be hidden but not deleted. You can restore them from Archive Trash.</p>
                 </div>
             </div>
             <div class="flex gap-3 mt-5">

@@ -111,7 +111,13 @@ Route::get('/dashboard', function () {
         return redirect('/login');
     }
 
-    $user = session('user');
+    // Always load fresh from DB so updates (certificate, approval, etc.) reflect immediately
+    $user = User::find(session('user_id'));
+    if (!$user) {
+        session()->flush();
+        return redirect('/login');
+    }
+    session(['user' => $user]); // keep session in sync
 
     // ===== AUTO-TIMEOUT: if student forgot to time out before lunch =====
     if ($user->role === 'student') {
@@ -1078,8 +1084,17 @@ Route::post('/add-company', function () {
 })->name('add-company');
 
 Route::delete('/delete-company/{id}', function ($id) {
-    \App\Models\Company::findOrFail($id)->delete();
-    return back()->with('success', 'Company archived successfully!');
+    $company = \App\Models\Company::findOrFail($id);
+    // Soft-delete all users (students & supervisors) under this company
+    \App\Models\User::where('company_id', $id)->each(function ($user) {
+        if ($user->role === 'student' && $user->school_id_number) {
+            \App\Models\StudentSchoolId::where('school_id_number', $user->school_id_number)
+                ->update(['is_used' => true]); // keep blocked while archived
+        }
+        $user->delete();
+    });
+    $company->delete();
+    return back()->with('success', 'Company and its users archived successfully!');
 })->name('delete-company');
 
 Route::put('/update-company/{id}', function ($id) {
@@ -1097,12 +1112,36 @@ Route::put('/update-company/{id}', function ($id) {
 })->name('update-company');
 
 Route::post('/restore-company/{id}', function ($id) {
-    \App\Models\Company::withTrashed()->findOrFail($id)->restore();
-    return back()->with('success', 'Company restored successfully!');
+    $company = \App\Models\Company::withTrashed()->findOrFail($id);
+    $company->restore();
+    // Restore all users that were under this company
+    \App\Models\User::withTrashed()->where('company_id', $id)->each(function ($user) {
+        $user->restore();
+        // Re-mark student school IDs as used (they still own them)
+        if ($user->role === 'student' && $user->school_id_number) {
+            \App\Models\StudentSchoolId::where('school_id_number', $user->school_id_number)
+                ->update(['is_used' => true]);
+        }
+    });
+    return back()->with('success', 'Company and its users restored successfully!');
 })->name('restore-company');
 
 Route::delete('/force-delete-company/{id}', function ($id) {
-    \App\Models\Company::withTrashed()->findOrFail($id)->forceDelete();
+    $company = \App\Models\Company::withTrashed()->findOrFail($id);
+    // Permanently delete all users under this company and their records
+    \App\Models\User::withTrashed()->where('company_id', $id)->each(function ($user) {
+        \App\Models\TimeInRecord::where('student_id', $user->id)->delete();
+        \App\Models\DailyHourLog::where('student_id', $user->id)->delete();
+        \App\Models\StudentHours::where('student_id', $user->id)->delete();
+        \App\Models\StudentRequirement::where('student_id', $user->id)->delete();
+        \App\Models\StudentEvaluation::where('student_id', $user->id)->orWhere('supervisor_id', $user->id)->delete();
+        if ($user->role === 'student' && $user->school_id_number) {
+            \App\Models\StudentSchoolId::where('school_id_number', $user->school_id_number)
+                ->update(['is_used' => false]);
+        }
+        $user->forceDelete();
+    });
+    $company->forceDelete();
     return back()->with('success', 'Company permanently deleted!');
 })->name('force-delete-company');
 
@@ -1207,6 +1246,30 @@ Route::post('/reset-password', function () {
 
 // Student School ID Routes
 Route::get('/api/school-ids', function () {
+    // Auto-sync is_used: any school_id_number that belongs to a registered student = used
+    $usedIds = \App\Models\User::whereNotNull('school_id_number')
+        ->pluck('school_id_number')
+        ->filter()
+        ->unique()
+        ->toArray();
+
+    if (!empty($usedIds)) {
+        // Mark as used where a student exists
+        \App\Models\StudentSchoolId::whereIn('school_id_number', $usedIds)
+            ->where('is_used', false)
+            ->update(['is_used' => true]);
+        // Mark as available where no student exists (handles deleted users)
+        \App\Models\StudentSchoolId::whereNotIn('school_id_number', $usedIds)
+            ->where('is_used', true)
+            ->whereNull('deleted_at')
+            ->update(['is_used' => false]);
+    } else {
+        // No students at all — reset all non-archived to available
+        \App\Models\StudentSchoolId::where('is_used', true)
+            ->whereNull('deleted_at')
+            ->update(['is_used' => false]);
+    }
+
     $sy = request('school_year');
     $query = \App\Models\StudentSchoolId::orderBy('created_at', 'desc');
     if ($sy) $query->where('school_year', $sy);
@@ -1227,12 +1290,16 @@ Route::post('/api/school-ids', function () {
 });
 
 Route::delete('/api/school-ids/{id}', function ($id) {
-    \App\Models\StudentSchoolId::findOrFail($id)->delete();
+    $sid = \App\Models\StudentSchoolId::findOrFail($id);
+    $sid->update(['is_used' => true]); // block registration
+    $sid->delete();                    // soft delete
     return response()->json(['success' => true]);
 });
 
 Route::post('/api/school-ids/{id}/restore', function ($id) {
-    \App\Models\StudentSchoolId::withTrashed()->findOrFail($id)->restore();
+    $sid = \App\Models\StudentSchoolId::withTrashed()->findOrFail($id);
+    $sid->restore();
+    $sid->update(['is_used' => false]); // re-enable for registration
     return response()->json(['success' => true]);
 });
 
@@ -1445,6 +1512,21 @@ Route::get('/api/users', function () {
 });
 
 // return single user for editing
+Route::get('/api/users/archived', function () {
+    $archived = User::onlyTrashed()->orderBy('deleted_at', 'desc')->get();
+    $data = $archived->map(fn($u) => [
+        'id'               => $u->id,
+        'name'             => $u->name,
+        'email'            => $u->email,
+        'role'             => $u->role,
+        'school_year'      => $u->school_year,
+        'school_id_number' => $u->school_id_number,
+        'company'          => $u->company ? $u->company->name : null,
+        'deleted_at'       => $u->deleted_at?->format('M d, Y'),
+    ]);
+    return response()->json(['users' => $data]);
+});
+
 Route::get('/api/users/{id}', function ($id) {
     $user = User::findOrFail($id);
     return response()->json([
@@ -1460,31 +1542,52 @@ Route::get('/api/users/{id}', function ($id) {
 // create user (used by ccit head form)
 Route::post('/api/users', function () {
     $validated = request()->validate([
-        'name' => 'required|string|max:255',
-        'email' => 'required|email|max:255|unique:users',
-        'password' => ['required','min:8','max:128','confirmed','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/'],
-        'role' => 'required|in:student,supervisor,coordinator,ccit_head',
-        'company_id' => 'nullable|exists:companies,id',
-        'school_year' => 'nullable|string|max:20',
+        'name'             => 'required|string|max:255',
+        'email'            => 'required|email|max:255|unique:users',
+        'password'         => ['required','min:8','max:128','confirmed','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/'],
+        'role'             => 'required|in:student,supervisor,coordinator,ccit_head',
+        'company_id'       => 'nullable|exists:companies,id',
+        'school_year'      => 'nullable|string|max:20',
         'school_id_number' => 'nullable|string|max:50',
     ]);
 
     // Company required for student/supervisor
     if (in_array($validated['role'], ['student','supervisor']) && !$validated['company_id']) {
-        return response()->json(['success' => false, 'message' => 'Company is required for students and supervisors'], 422);
+        return response()->json(['success' => false, 'message' => 'Company is required for students and supervisors.'], 422);
+    }
+
+    // School ID validation for students
+    if ($validated['role'] === 'student') {
+        if (empty($validated['school_id_number'])) {
+            return response()->json(['success' => false, 'message' => 'School ID number is required for students.'], 422);
+        }
+        $schoolId = \App\Models\StudentSchoolId::where('school_id_number', $validated['school_id_number'])
+            ->where('is_used', false)
+            ->whereNull('deleted_at')
+            ->first();
+        if (!$schoolId) {
+            // Check if it exists at all to give a better message
+            $exists = \App\Models\StudentSchoolId::withTrashed()
+                ->where('school_id_number', $validated['school_id_number'])->exists();
+            $msg = $exists
+                ? 'This School ID has already been used or is archived.'
+                : 'This School ID is not on the approved list.';
+            return response()->json(['success' => false, 'message' => $msg], 422);
+        }
     }
 
     $user = User::create([
-        'name' => $validated['name'],
-        'email' => $validated['email'],
-        'password' => Hash::make($validated['password']),
-        'role' => $validated['role'],
-        'company_id' => $validated['company_id'],
-        'school_year' => $validated['school_year'] ?? null,
+        'name'             => $validated['name'],
+        'email'            => $validated['email'],
+        'password'         => Hash::make($validated['password']),
+        'role'             => $validated['role'],
+        'company_id'       => $validated['company_id'],
+        'school_year'      => $validated['school_year'] ?? null,
         'school_id_number' => $validated['school_id_number'] ?? null,
+        'is_approved'      => true,
     ]);
 
-    // Mark school ID as used when adding a student
+    // Mark school ID as used
     if ($validated['role'] === 'student' && !empty($validated['school_id_number'])) {
         \App\Models\StudentSchoolId::where('school_id_number', $validated['school_id_number'])
             ->update(['is_used' => true]);
@@ -1498,26 +1601,59 @@ Route::put('/api/users/{id}', function ($id) {
     $user = User::findOrFail($id);
 
     $validated = request()->validate([
-        'name' => 'required|string|max:255',
-        'email' => 'required|email|max:255|unique:users,email,' . $user->id,
-        'password' => ['nullable','min:8','max:128','confirmed','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/'],
-        'role' => 'required|in:student,supervisor,coordinator,ccit_head',
-        'company_id' => 'nullable|exists:companies,id',
-        'school_year' => 'nullable|string|max:20',
+        'name'             => 'required|string|max:255',
+        'email'            => 'required|email|max:255|unique:users,email,' . $user->id,
+        'password'         => ['nullable','min:8','max:128','confirmed','regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).+$/'],
+        'role'             => 'required|in:student,supervisor,coordinator,ccit_head',
+        'company_id'       => 'nullable|exists:companies,id',
+        'school_year'      => 'nullable|string|max:20',
         'school_id_number' => 'nullable|string|max:50',
     ]);
 
     if (in_array($validated['role'], ['student','supervisor']) && !$validated['company_id']) {
-        return response()->json(['success' => false, 'message' => 'Company is required for students and supervisors'], 422);
+        return response()->json(['success' => false, 'message' => 'Company is required for students and supervisors.'], 422);
+    }
+
+    // School ID validation for students
+    if ($validated['role'] === 'student') {
+        $newSid = $validated['school_id_number'] ?? null;
+        $oldSid = $user->school_id_number;
+
+        if (empty($newSid)) {
+            return response()->json(['success' => false, 'message' => 'School ID number is required for students.'], 422);
+        }
+
+        // Only validate if the school ID is being changed
+        if ($newSid !== $oldSid) {
+            // Must exist in the approved list and not be soft-deleted
+            $sidRecord = \App\Models\StudentSchoolId::where('school_id_number', $newSid)
+                ->whereNull('deleted_at')
+                ->first();
+
+            if (!$sidRecord) {
+                $exists = \App\Models\StudentSchoolId::withTrashed()->where('school_id_number', $newSid)->exists();
+                $msg = $exists ? 'This School ID is archived and cannot be used.' : 'This School ID is not on the approved list.';
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+
+            // Must not be used by another student
+            if ($sidRecord->is_used) {
+                $owner = User::where('school_id_number', $newSid)->where('id', '!=', $id)->first();
+                $msg = $owner
+                    ? "This School ID is already used by {$owner->name}."
+                    : 'This School ID has already been used.';
+                return response()->json(['success' => false, 'message' => $msg], 422);
+            }
+        }
     }
 
     $oldSchoolId = $user->school_id_number;
 
-    $user->name = $validated['name'];
-    $user->email = $validated['email'];
-    $user->role = $validated['role'];
-    $user->company_id = $validated['company_id'];
-    $user->school_year = $validated['school_year'] ?? null;
+    $user->name             = $validated['name'];
+    $user->email            = $validated['email'];
+    $user->role             = $validated['role'];
+    $user->company_id       = $validated['company_id'];
+    $user->school_year      = $validated['school_year'] ?? null;
     $user->school_id_number = $validated['school_id_number'] ?? null;
     if (!empty($validated['password'])) {
         $user->password = Hash::make($validated['password']);
@@ -1570,13 +1706,41 @@ Route::get('/api/analytics', function () {
 
 Route::delete('/api/users/{id}', function ($id) {
     $user = User::findOrFail($id);
-    // Free the school ID back to available if student had one
+    // Mark student's school ID as inactive when archiving
+    if ($user->role === 'student' && $user->school_id_number) {
+        \App\Models\StudentSchoolId::where('school_id_number', $user->school_id_number)
+            ->update(['is_used' => true]); // keep as "used" so it can't be re-registered
+    }
+    $user->delete(); // soft delete — records stay, just hidden
+    return response()->json(['success' => true, 'message' => 'User archived successfully']);
+});
+
+Route::post('/api/users/{id}/restore', function ($id) {
+    $user = User::withTrashed()->findOrFail($id);
+    $user->restore(); // un-soft-delete — records become visible again
+    // Restore student's school ID back to "used" (they still own it)
+    if ($user->role === 'student' && $user->school_id_number) {
+        \App\Models\StudentSchoolId::where('school_id_number', $user->school_id_number)
+            ->update(['is_used' => true]);
+    }
+    return response()->json(['success' => true, 'message' => 'User restored successfully']);
+});
+
+Route::delete('/api/users/{id}/force', function ($id) {
+    $user = User::withTrashed()->findOrFail($id);
+    // Permanently delete all related records
+    \App\Models\TimeInRecord::where('student_id', $id)->delete();
+    \App\Models\DailyHourLog::where('student_id', $id)->delete();
+    \App\Models\StudentHours::where('student_id', $id)->delete();
+    \App\Models\StudentRequirement::where('student_id', $id)->delete();
+    \App\Models\StudentEvaluation::where('student_id', $id)->orWhere('supervisor_id', $id)->delete();
+    // Free the school ID permanently
     if ($user->role === 'student' && $user->school_id_number) {
         \App\Models\StudentSchoolId::where('school_id_number', $user->school_id_number)
             ->update(['is_used' => false]);
     }
-    $user->delete();
-    return response()->json(['success' => true, 'message' => 'User removed successfully']);
+    $user->forceDelete();
+    return response()->json(['success' => true, 'message' => 'User permanently deleted']);
 });
 
 Route::post('/api/users/{id}/approve', function ($id) {
@@ -1589,7 +1753,7 @@ Route::post('/api/users/{id}/approve', function ($id) {
 Route::delete('/api/users/{id}/deny', function ($id) {
     $user = User::findOrFail($id);
     try { MailHelper::sendDenied($user->email, $user->name); } catch (\Throwable) {}
-    $user->delete();
+    $user->delete(); // soft delete
     return response()->json(['success' => true]);
 });
 
@@ -1643,7 +1807,7 @@ Route::get('/api/reports/students', function () {
 
 Route::get('/api/reports/attendance-data', function () {
     $rows = [];
-    foreach (\App\Models\TimeInRecord::with('student')->orderBy('date','desc')->get() as $rec) {
+    foreach (\App\Models\TimeInRecord::with('student')->whereHas('student')->orderBy('date','desc')->get() as $rec) {
         if (!$rec->student) continue;
         $hrs = $rec->time_out ? round(\Carbon\Carbon::parse($rec->time_in)->diffInMinutes(\Carbon\Carbon::parse($rec->time_out))/60, 2) : 0;
         $rows[] = [
@@ -1660,7 +1824,8 @@ Route::get('/api/reports/attendance-data', function () {
 
 Route::get('/api/reports/attendance', function () {
     $rows = [];
-    foreach (\App\Models\TimeInRecord::with('student')->orderBy('date','desc')->get() as $rec) {
+    foreach (\App\Models\TimeInRecord::with('student')->whereHas('student')->orderBy('date','desc')->get() as $rec) {
+        if (!$rec->student) continue;
         $hrs = $rec->time_out ? round(\Carbon\Carbon::parse($rec->time_in)->diffInMinutes(\Carbon\Carbon::parse($rec->time_out))/60,4) : 0;
         $rows[] = ['date'=>$rec->date->format('Y-m-d'),'name'=>$rec->student->name,'company'=>$rec->student->company->name??'N/A','time_in'=>$rec->time_in,'time_out'=>$rec->time_out??'-','hours'=>$hrs,'status'=>$rec->status,'verified'=>$rec->verified];
     }
@@ -1671,3 +1836,57 @@ Route::get('/api/reports/attendance', function () {
         ->header('Content-Disposition', 'attachment; filename="Attendance_Report_' . now()->format('Y-m-d') . '.xls"');
 });
 
+
+// ── Certificate Routes ──────────────────────────────────────────────────────
+
+// Award / re-award certificate (supervisor action)
+Route::post('/award-certificate/{studentId}', function ($studentId) {
+    $supervisor = User::findOrFail(session('user_id'));
+    $student    = User::findOrFail($studentId);
+
+    $student->update([
+        'certificate_awarded_at'  => now(),
+        'certificate_awarded_by'  => $supervisor->name,
+    ]);
+
+    return response()->json(['success' => true, 'message' => 'Certificate awarded to ' . $student->name . '!']);
+})->name('award-certificate');
+
+// Upload certificate image (supervisor action)
+Route::post('/upload-certificate/{studentId}', function ($studentId) {
+    $supervisor = User::findOrFail(session('user_id'));
+    $student    = User::findOrFail($studentId);
+
+    request()->validate([
+        'certificate_image' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
+    ]);
+
+    // Delete old file if exists
+    if ($student->certificate_image_path) {
+        \Illuminate\Support\Facades\Storage::disk('public')->delete($student->certificate_image_path);
+    }
+
+    $path = request()->file('certificate_image')->store('certificates', 'public');
+
+    $student->update([
+        'certificate_image_path' => $path,
+        'certificate_awarded_at' => now(),
+        'certificate_awarded_by' => $supervisor->name,
+    ]);
+
+    return response()->json(['success' => true, 'url' => asset('storage/' . $path)]);
+})->name('upload-certificate');
+
+// View certificate page (student or supervisor)
+Route::get('/certificate/{studentId}', function ($studentId) {
+    $student = User::findOrFail($studentId);
+    if (!$student->certificate_awarded_at) {
+        abort(404, 'Certificate not yet awarded.');
+    }
+    $sh       = \App\Models\StudentHours::where('student_id', $studentId)->first();
+    $required = $sh->total_hours_required ?? 600;
+    $actual   = \App\Models\TimeInRecord::where('student_id', $studentId)->whereNotNull('time_out')->get()
+                    ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
+    $hours    = round(max($sh->hours_completed ?? 0, $actual), 2);
+    return view('certificate', compact('student', 'hours', 'required'));
+})->name('certificate');

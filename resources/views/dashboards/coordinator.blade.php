@@ -278,8 +278,8 @@
                 ->when($activeSY, fn($q) => $q->where('school_year', $activeSY->label))
                 ->count();
             $_totalCompanies = \App\Models\Company::count();
-            $_pendingReports = \App\Models\StudentRequirement::where('status', 'pending')->count();
-            $_pendingTimeIns = \App\Models\TimeInRecord::where('status', 'pending')->count();
+            $_pendingReports = \App\Models\StudentRequirement::where('status', 'pending')->whereHas('student')->count();
+            $_pendingTimeIns = \App\Models\TimeInRecord::where('status', 'pending')->whereHas('student')->count();
         @endphp
 
         <!-- Header Info Card -->
@@ -335,9 +335,9 @@
                 else $_buckets['76-100%']++;
             }
             // Reports status counts
-            $_repApproved = \App\Models\StudentRequirement::where('status','approved')->count();
-            $_repPending  = \App\Models\StudentRequirement::where('status','pending')->count();
-            $_repRejected = \App\Models\StudentRequirement::where('status','rejected')->count();
+            $_repApproved = \App\Models\StudentRequirement::where('status','approved')->whereHas('student')->count();
+            $_repPending  = \App\Models\StudentRequirement::where('status','pending')->whereHas('student')->count();
+            $_repRejected = \App\Models\StudentRequirement::where('status','rejected')->whereHas('student')->count();
             // Top 5 companies by intern count
             $_topCompanies = \App\Models\Company::withCount('students')->orderByDesc('students_count')->limit(5)->get();
             // Time-ins last 7 days
@@ -345,7 +345,7 @@
             for($i=6;$i>=0;$i--){
                 $d=\Carbon\Carbon::now()->subDays($i);
                 $_dtrLabels[]=$d->format('D');
-                $_dtrCounts[]=\App\Models\TimeInRecord::whereDate('date',$d->toDateString())->count();
+                $_dtrCounts[]=\App\Models\TimeInRecord::whereDate('date',$d->toDateString())->whereHas('student')->count();
             }
         @endphp
 
@@ -871,6 +871,7 @@
             <?php
             try {
                 $allReports = \App\Models\StudentRequirement::with('student')
+                    ->whereHas('student')
                     ->orderBy('created_at', 'desc')
                     ->get();
             } catch (\Exception $e) {

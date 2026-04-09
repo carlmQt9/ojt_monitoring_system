@@ -444,17 +444,118 @@
         @if($_ojtDone)
         <!-- OJT Completed Banner -->
         <div class="mb-8">
-            <div class="bg-gradient-to-r from-green-900/40 to-emerald-900/40 border-2 border-green-500/60 rounded-2xl p-8 text-center">
-                <div class="text-6xl mb-4">🎉</div>
-                <h2 class="text-3xl font-bold text-green-400 mb-2">Congratulations!</h2>
-                <p class="text-white text-lg font-semibold mb-1">You have completed your OJT!</p>
-                <p class="text-gray-300 text-sm mb-4">You have successfully completed <span class="text-green-400 font-bold">{{ number_format($_timeinCompleted, 2) }} / {{ $_timeinRequired }} hours</span> of On-the-Job Training.</p>
+            {{-- ── Top congratulations banner ── --}}
+            <div class="bg-gradient-to-br from-green-900/50 via-emerald-900/40 to-teal-900/30 border border-green-500/40 rounded-2xl p-8 text-center mb-6">
+                <div class="text-6xl mb-3">🎉</div>
+                <h2 class="text-3xl font-bold text-green-400 mb-1">Congratulations, {{ explode(' ', $user->name)[0] }}!</h2>
+                <p class="text-white text-base font-semibold mb-3">You have successfully completed your On-the-Job Training.</p>
                 <div class="inline-flex items-center gap-2 bg-green-500/20 border border-green-500/40 rounded-full px-6 py-2">
-                    <span class="text-green-400 text-lg">✓</span>
-                    <span class="text-green-300 font-semibold">OJT Hours Requirement Fulfilled</span>
+                    <span class="text-green-400">✓</span>
+                    <span class="text-green-300 font-semibold text-sm">
+                        {{ number_format($_timeinCompleted, 2) }} / {{ $_timeinRequired }} hours — OJT Requirement Fulfilled
+                    </span>
                 </div>
-                <p class="text-gray-400 text-xs mt-4">Time-in is no longer required. Please coordinate with your supervisor for final evaluation.</p>
             </div>
+
+            {{-- ── Certificate section ── --}}
+            @if($user->certificate_awarded_at)
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                {{-- Left: certificate image or placeholder --}}
+                <div class="bg-slate-800/60 border border-yellow-500/30 rounded-2xl overflow-hidden flex flex-col">
+                    @if($user->certificate_image_path)
+                    {{-- Clickable certificate preview --}}
+                    <div class="relative group cursor-pointer flex-1 flex items-center justify-center bg-slate-900/50 min-h-[220px]"
+                         onclick="openCertImageModal('{{ asset('storage/' . $user->certificate_image_path) }}', '{{ addslashes($user->name) }}')">
+                        <img src="{{ asset('storage/' . $user->certificate_image_path) }}"
+                             alt="Certificate of Completion"
+                             class="w-full h-full object-contain max-h-72 transition-transform duration-300 group-hover:scale-[1.02]">
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                            <span class="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-sm font-semibold px-4 py-2 rounded-xl">
+                                🔍 Click to view full size
+                            </span>
+                        </div>
+                    </div>
+                    {{-- Action buttons --}}
+                    <div class="flex gap-3 p-4 border-t border-slate-700/60">
+                        <button onclick="openCertImageModal('{{ asset('storage/' . $user->certificate_image_path) }}', '{{ addslashes($user->name) }}')"
+                            class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors">
+                            👁 View
+                        </button>
+                        <button onclick="_certImageUrl='{{ asset('storage/' . $user->certificate_image_path) }}';_certImageName='{{ addslashes($user->name) }}';printCertImage()"
+                            class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors">
+                            🖨️ Print
+                        </button>
+                        <button onclick="_certImageUrl='{{ asset('storage/' . $user->certificate_image_path) }}';_certImageName='{{ addslashes($user->name) }}';downloadCertImage()"
+                            class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold rounded-xl transition-colors">
+                            ⬇️ Download
+                        </button>
+                    </div>
+                    @else
+                    {{-- Not yet uploaded --}}
+                    <div class="flex-1 flex flex-col items-center justify-center p-10 text-center min-h-[220px]">
+                        <div class="text-5xl mb-4 opacity-40">📄</div>
+                        <p class="text-gray-400 font-semibold">Certificate not yet uploaded</p>
+                        <p class="text-gray-500 text-xs mt-2">Your supervisor will upload it soon. Check back later.</p>
+                    </div>
+                    @endif
+                </div>
+
+                {{-- Right: award details --}}
+                <div class="bg-slate-800/60 border border-yellow-500/30 rounded-2xl p-6 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center gap-3 mb-5">
+                            <div class="w-12 h-12 bg-yellow-500/20 border border-yellow-500/40 rounded-xl flex items-center justify-center text-2xl shrink-0">🏅</div>
+                            <div>
+                                <p class="text-yellow-300 font-bold text-lg leading-tight">Certificate of Completion</p>
+                                <p class="text-gray-400 text-xs">OJT Monitoring System</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
+                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Recipient</span>
+                                <span class="text-white font-semibold text-sm">{{ $user->name }}</span>
+                            </div>
+                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
+                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Company</span>
+                                <span class="text-white text-sm">{{ $user->company->name ?? '—' }}</span>
+                            </div>
+                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
+                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Hours Rendered</span>
+                                <span class="text-green-400 font-bold text-sm">{{ number_format($_timeinCompleted, 2) }} hrs</span>
+                            </div>
+                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
+                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Awarded by</span>
+                                <span class="text-white text-sm">{{ $user->certificate_awarded_by }}</span>
+                            </div>
+                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
+                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Date Awarded</span>
+                                <span class="text-white text-sm">{{ $user->certificate_awarded_at->format('F d, Y') }}</span>
+                            </div>
+                            @if($user->school_year)
+                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
+                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">School Year</span>
+                                <span class="text-white text-sm">{{ $user->school_year }}</span>
+                            </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    <div class="mt-5 pt-4 border-t border-slate-700/60">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                            <span class="text-green-400 text-xs font-semibold">OJT Successfully Completed</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            @else
+            <div class="bg-slate-800/40 border border-slate-700 rounded-2xl p-6 text-center">
+                <p class="text-gray-400 text-sm">Time-in is no longer required. Please coordinate with your supervisor for final evaluation and certificate issuance.</p>
+            </div>
+            @endif
         </div>
         @else
         <!-- Time-In Card -->
@@ -823,7 +924,18 @@
                             <!-- Camera Capture Section (replaced Upload tab with camera-only button) -->
                             <div class="mb-4">
                                 <p class="text-sm text-gray-400 mb-2">Capture a photo with your camera to time in.</p>
-                                <button type="button" id="openCameraForTimeIn" onclick="openCameraModal('timein')" class="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">📷 Open Camera</button>
+                                <button type="button" id="openCameraForTimeIn" onclick="openCameraModal('timein')"
+                                    class="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-600">
+                                    📷 Open Camera
+                                </button>
+                                <!-- Lunch break lock notice -->
+                                <div id="lunchLockNotice" class="hidden mt-3 flex items-center gap-3 px-4 py-3 bg-orange-500/10 border border-orange-500/40 rounded-lg">
+                                    <span class="text-orange-400 text-lg shrink-0">🍽️</span>
+                                    <div>
+                                        <p class="text-orange-300 text-sm font-semibold">Lunch Break — Time-in locked</p>
+                                        <p class="text-gray-400 text-xs mt-0.5">Afternoon session opens at <strong>12:50 PM</strong>. Resuming in <span id="lunchCountdown" class="text-orange-300 font-bold"></span></p>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Photo Preview (populated from modal) -->
@@ -1067,105 +1179,144 @@
             $dbOnboardingKeys = \App\Models\RequirementTemplate::where('category','onboarding')->pluck('name')->toArray();
             $onboardingKeys = !empty($dbOnboardingKeys) ? $dbOnboardingKeys : ['Internship Application Form','Letter of Acceptance','Parental Consent','School ID','Government ID','Vaccination Card','Medical Report','Insurance'];
             $onboardingReports = $allSubmitted->filter(fn($r) => collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false));
-            $dailyReports = $allSubmitted->filter(fn($r) => !collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false));
-            // Build a map of title => latest submission for resubmit check
+            $dailyReports = $allSubmitted->filter(fn($r) => !collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false))->values();
             $latestByTitle = $allSubmitted->groupBy(fn($r) => strtolower(trim($r->title)))
                 ->map(fn($group) => $group->sortByDesc('created_at')->first());
         ?>
-        <div class="space-y-6">
 
-            <!-- Onboarding Requirements Cabinet -->
-            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <h3 class="text-xl font-bold text-white mb-4">📂 Onboarding Requirements</h3>
-                @if($onboardingReports->isNotEmpty())
-                <div class="space-y-3">
-                    @foreach($onboardingReports as $req)
-                    <div class="bg-slate-700/30 rounded-lg p-3 border-l-4
-                        @if($req->status==='approved') border-green-500
-                        @elseif($req->status==='denied') border-red-500
-                        @else border-yellow-500 @endif">
-                        <div class="flex items-start justify-between gap-2">
-                            <div class="flex-1">
-                                <p class="text-gray-300 font-semibold text-sm">{{ $req->title }}</p>
-                                <p class="text-gray-400 text-xs">{{ $req->created_at->format('M d, Y') }}</p>
-                            </div>
-                            <span class="px-2 py-1 text-xs font-semibold rounded
+        <!-- Onboarding Requirements — compact grid -->
+        <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 mb-5">
+            <h3 class="text-base font-bold text-white mb-3">📂 Onboarding Requirements</h3>
+            @if($onboardingReports->isNotEmpty())
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                @foreach($onboardingReports as $req)
+                @php $latestForThis = $latestByTitle[strtolower(trim($req->title))] ?? null; @endphp
+                <div class="bg-slate-700/40 rounded-lg border-l-4 @if($req->status==='approved') border-green-500 @elseif($req->status==='denied') border-red-500 @else border-yellow-500 @endif">
+                    <!-- Collapsed header — always visible -->
+                    <button type="button" onclick="toggleReqCard(this)"
+                        class="w-full flex items-center justify-between px-3 py-2.5 text-left gap-2">
+                        <span class="text-gray-200 text-sm font-medium truncate">{{ $req->title }}</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="px-2 py-0.5 text-xs font-semibold rounded-full
                                 @if($req->status==='approved') bg-green-500/20 text-green-400
                                 @elseif($req->status==='denied') bg-red-500/20 text-red-400
                                 @else bg-yellow-500/20 text-yellow-400 @endif">
                                 {{ ucfirst($req->status) }}
                             </span>
+                            <span class="text-gray-500 text-xs">{{ $req->created_at->format('M d') }}</span>
+                            <svg class="w-3.5 h-3.5 text-gray-500 req-chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </div>
+                    </button>
+                    <!-- Expandable detail -->
+                    <div class="req-detail hidden px-3 pb-3 space-y-1.5 border-t border-slate-600/50 pt-2">
                         @if($req->feedback)
-                        <p class="text-gray-400 text-xs mt-2 bg-slate-800/50 p-2 rounded border-l border-blue-500"><strong>Feedback:</strong> {{ $req->feedback }}</p>
+                        <p class="text-xs text-gray-400 bg-slate-800/50 px-2 py-1.5 rounded border-l border-blue-500"><strong>Feedback:</strong> {{ $req->feedback }}</p>
                         @endif
-                        @if($req->file_path)
-                        <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" class="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs mt-2">📎 View File</button>
-                        @endif
-                        @if($req->status === 'denied')
-                            @php $latestForThis = $latestByTitle[strtolower(trim($req->title))] ?? null; @endphp
-                            @if($latestForThis && $latestForThis->id === $req->id)
-                            <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" class="inline-flex items-center gap-1 text-orange-400 hover:text-orange-300 text-xs mt-2 ml-2">&#8635; Resubmit</button>
-                            @else
-                            <span class="inline-flex items-center gap-1 text-gray-500 text-xs mt-2 ml-2 cursor-not-allowed" title="Already resubmitted">&#8635; Resubmitted</span>
+                        <div class="flex gap-2 flex-wrap">
+                            @if($req->file_path)
+                            <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" class="text-blue-400 hover:text-blue-300 text-xs">📎 View File</button>
                             @endif
-                        @endif
-                    </div>
-                    @endforeach
-                </div>
-                @else
-                <p class="text-gray-400 text-center py-6 text-sm">No onboarding documents submitted yet.</p>
-                @endif
-            </div>
-
-            <!-- Daily Submissions Cabinet -->
-            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-bold text-white">📋 Daily Submissions</h3>
-                    <button type="button" onclick="openUploadModal('')" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold">+ Upload Report</button>
-                </div>
-                @if($dailyReports->isNotEmpty())
-                <div class="space-y-3">
-                    @foreach($dailyReports as $req)
-                    <div class="bg-slate-700/30 rounded-lg p-3 border-l-4
-                        @if($req->status==='approved') border-green-500
-                        @elseif($req->status==='denied') border-red-500
-                        @else border-yellow-500 @endif">
-                        <div class="flex items-start justify-between gap-2">
-                            <div class="flex-1">
-                                <p class="text-gray-300 font-semibold text-sm">{{ $req->title }}</p>
-                                <p class="text-gray-400 text-xs">{{ $req->created_at->format('M d, Y') }}</p>
-                            </div>
-                            <span class="px-2 py-1 text-xs font-semibold rounded
-                                @if($req->status==='approved') bg-green-500/20 text-green-400
-                                @elseif($req->status==='denied') bg-red-500/20 text-red-400
-                                @else bg-yellow-500/20 text-yellow-400 @endif">
-                                {{ ucfirst($req->status) }}
-                            </span>
+                            @if($req->status === 'denied')
+                                @if($latestForThis && $latestForThis->id === $req->id)
+                                <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" class="text-orange-400 hover:text-orange-300 text-xs">↺ Resubmit</button>
+                                @else
+                                <span class="text-gray-500 text-xs">↺ Resubmitted</span>
+                                @endif
+                            @endif
                         </div>
-                        @if($req->feedback)
-                        <p class="text-gray-400 text-xs mt-2 bg-slate-800/50 p-2 rounded border-l border-blue-500"><strong>Feedback:</strong> {{ $req->feedback }}</p>
-                        @endif
-                        @if($req->file_path)
-                        <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" class="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-xs mt-2">📎 View File</button>
-                        @endif
-                        @if($req->status === 'denied')
-                            @php $latestForThis = $latestByTitle[strtolower(trim($req->title))] ?? null; @endphp
-                            @if($latestForThis && $latestForThis->id === $req->id)
-                            <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" class="inline-flex items-center gap-1 text-orange-400 hover:text-orange-300 text-xs mt-2 ml-2">&#8635; Resubmit</button>
-                            @else
-                            <span class="inline-flex items-center gap-1 text-gray-500 text-xs mt-2 ml-2 cursor-not-allowed" title="Already resubmitted">&#8635; Resubmitted</span>
-                            @endif
-                        @endif
                     </div>
-                    @endforeach
                 </div>
-                @else
-                <p class="text-gray-400 text-center py-6 text-sm">No daily reports submitted yet.</p>
-                @endif
+                @endforeach
             </div>
-
+            @else
+            <p class="text-gray-400 text-sm text-center py-4">No onboarding documents submitted yet.</p>
+            @endif
         </div>
+
+        <!-- Daily Submissions — table with filter tabs + show more -->
+        <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+            <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                <h3 class="text-base font-bold text-white">📋 Daily Submissions
+                    <span class="ml-1 px-2 py-0.5 bg-slate-700 text-gray-400 text-xs rounded-full font-normal">{{ $dailyReports->count() }}</span>
+                </h3>
+                <button type="button" onclick="openUploadModal('')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold">+ Upload</button>
+            </div>
+
+            @if($dailyReports->isNotEmpty())
+            <!-- Filter tabs -->
+            <div class="flex gap-1 mb-3 flex-wrap" id="dailyFilterTabs">
+                @php
+                    $dCounts = ['all'=>$dailyReports->count(), 'pending'=>$dailyReports->where('status','pending')->count(), 'approved'=>$dailyReports->where('status','approved')->count(), 'denied'=>$dailyReports->where('status','denied')->count()];
+                @endphp
+                @foreach(['all'=>'All','pending'=>'Pending','approved'=>'Approved','denied'=>'Denied'] as $fKey=>$fLabel)
+                <button onclick="filterDailyReports('{{ $fKey }}')" id="dtab-{{ $fKey }}"
+                    class="px-3 py-1 rounded-full text-xs font-semibold transition-colors
+                    @if($fKey==='all') bg-indigo-600 text-white @else bg-slate-700 text-gray-400 hover:text-white @endif">
+                    {{ $fLabel }} <span class="opacity-70">({{ $dCounts[$fKey] }})</span>
+                </button>
+                @endforeach
+            </div>
+
+            <!-- Compact table -->
+            <div class="overflow-hidden rounded-lg border border-slate-700">
+                <table class="w-full text-xs">
+                    <thead class="bg-slate-700/60">
+                        <tr>
+                            <th class="text-left py-2 px-3 text-gray-400 font-semibold">Title</th>
+                            <th class="text-center py-2 px-3 text-gray-400 font-semibold w-20">Date</th>
+                            <th class="text-center py-2 px-3 text-gray-400 font-semibold w-20">Status</th>
+                            <th class="text-center py-2 px-3 text-gray-400 font-semibold w-16">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dailyReportsTable">
+                        @foreach($dailyReports as $i => $req)
+                        @php $latestForThis = $latestByTitle[strtolower(trim($req->title))] ?? null; @endphp
+                        <tr class="daily-row border-t border-slate-700/50 hover:bg-slate-700/20 transition-colors @if($i >= 10) hidden @endif"
+                            data-status="{{ $req->status }}" data-index="{{ $i }}">
+                            <td class="py-2 px-3">
+                                <p class="text-gray-200 font-medium leading-tight">{{ $req->title }}</p>
+                                @if($req->feedback)
+                                <p class="text-gray-500 text-[10px] mt-0.5 truncate max-w-[200px]" title="{{ $req->feedback }}">{{ $req->feedback }}</p>
+                                @endif
+                            </td>
+                            <td class="py-2 px-3 text-center text-gray-400">{{ $req->created_at->format('M d, Y') }}</td>
+                            <td class="py-2 px-3 text-center">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold
+                                    @if($req->status==='approved') bg-green-500/20 text-green-400
+                                    @elseif($req->status==='denied') bg-red-500/20 text-red-400
+                                    @else bg-yellow-500/20 text-yellow-400 @endif">
+                                    {{ ucfirst($req->status) }}
+                                </span>
+                            </td>
+                            <td class="py-2 px-3 text-center">
+                                <div class="flex items-center justify-center gap-1">
+                                    @if($req->file_path)
+                                    <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" class="px-2 py-1 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-[10px]">View</button>
+                                    @endif
+                                    @if($req->status === 'denied' && $latestForThis && $latestForThis->id === $req->id)
+                                    <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" class="px-2 py-1 bg-orange-600/80 hover:bg-orange-600 text-white rounded text-[10px]">Resubmit</button>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            @if($dailyReports->count() > 10)
+            <div class="mt-3 text-center">
+                <button id="showMoreDailyBtn" onclick="showMoreDaily()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-lg text-xs">
+                    Show more ({{ $dailyReports->count() - 10 }} remaining)
+                </button>
+            </div>
+            @endif
+
+            @else
+            <p class="text-gray-400 text-sm text-center py-6">No daily reports submitted yet.</p>
+            @endif
+        </div>
+
         </section><!-- end reports -->
 
     </div><!-- end inner px wrapper -->
@@ -1326,6 +1477,40 @@
             const t2 = msUntil(12, 50);  // 12:50: afternoon time-in button opens
             if (t1 !== null) setTimeout(() => location.reload(), t1);
             if (t2 !== null) setTimeout(() => location.reload(), t2);
+        })();
+
+        // ── Lunch-break camera lock (12:05 → 12:49) ──────────────────────
+        (function() {
+            const btn     = document.getElementById('openCameraForTimeIn');
+            const notice  = document.getElementById('lunchLockNotice');
+            const counter = document.getElementById('lunchCountdown');
+            if (!btn) return;
+
+            function checkLunchLock() {
+                const now  = new Date();
+                const h    = now.getHours();
+                const m    = now.getMinutes();
+                const totalMin = h * 60 + m;
+                const lockStart = 12 * 60 + 5;   // 12:05
+                const lockEnd   = 12 * 60 + 50;  // 12:50
+
+                const locked = totalMin >= lockStart && totalMin < lockEnd;
+                btn.disabled = locked;
+                if (notice) notice.classList.toggle('hidden', !locked);
+
+                if (locked && counter) {
+                    // countdown to 12:50
+                    const target = new Date();
+                    target.setHours(12, 50, 0, 0);
+                    const diff = Math.max(0, Math.floor((target - now) / 1000));
+                    const mm = String(Math.floor(diff / 60)).padStart(2, '0');
+                    const ss = String(diff % 60).padStart(2, '0');
+                    counter.textContent = mm + ':' + ss;
+                }
+            }
+
+            checkLunchLock();
+            setInterval(checkLunchLock, 1000);
         })();
 
         // ============ AUTO SET TIME IN ============
@@ -2182,6 +2367,53 @@
         document.getElementById('uploadModal')?.addEventListener('click', function(e){ if(e.target===this) closeUploadModal(); });
         // ===== END UPLOAD MODAL =====
 
+        // ===== REPORTS SECTION =====
+        function toggleReqCard(btn) {
+            const detail = btn.nextElementSibling;
+            const chevron = btn.querySelector('.req-chevron');
+            detail.classList.toggle('hidden');
+            if (chevron) chevron.style.transform = detail.classList.contains('hidden') ? '' : 'rotate(180deg)';
+        }
+
+        let _dailyShowAll = false;
+        function filterDailyReports(status) {
+            _dailyShowAll = false;
+            document.querySelectorAll('#dailyFilterTabs button').forEach(b => {
+                b.className = b.className.replace('bg-indigo-600 text-white','bg-slate-700 text-gray-400 hover:text-white');
+            });
+            const activeBtn = document.getElementById('dtab-' + status);
+            if (activeBtn) activeBtn.className = activeBtn.className.replace('bg-slate-700 text-gray-400 hover:text-white','bg-indigo-600 text-white');
+
+            let visible = 0;
+            document.querySelectorAll('.daily-row').forEach(row => {
+                const match = status === 'all' || row.dataset.status === status;
+                if (match && visible < 10) { row.classList.remove('hidden'); visible++; }
+                else row.classList.add('hidden');
+            });
+            const showMoreBtn = document.getElementById('showMoreDailyBtn');
+            if (showMoreBtn) {
+                const total = [...document.querySelectorAll('.daily-row')].filter(r => status === 'all' || r.dataset.status === status).length;
+                showMoreBtn.classList.toggle('hidden', total <= 10);
+                showMoreBtn.textContent = `Show more (${total - visible} remaining)`;
+            }
+        }
+
+        function showMoreDaily() {
+            const activeTab = document.querySelector('#dailyFilterTabs button.bg-indigo-600')?.id?.replace('dtab-','') || 'all';
+            const hidden = [...document.querySelectorAll('.daily-row')].filter(r => {
+                const match = activeTab === 'all' || r.dataset.status === activeTab;
+                return match && r.classList.contains('hidden');
+            });
+            hidden.slice(0, 20).forEach(r => r.classList.remove('hidden'));
+            const remaining = hidden.length - 20;
+            const btn = document.getElementById('showMoreDailyBtn');
+            if (btn) {
+                if (remaining <= 0) btn.classList.add('hidden');
+                else btn.textContent = `Show more (${remaining} remaining)`;
+            }
+        }
+        // ===== END REPORTS SECTION =====
+
         // Confirm modal (logout / home)
         function showConfirm(type) {
             const icon = document.getElementById('confirmIcon');
@@ -2299,6 +2531,59 @@
         </div>
     </div>
     <!-- ===== END UPLOAD LOADER OVERLAY ===== -->
+
+    <!-- ===== CERTIFICATE IMAGE MODAL ===== -->
+    <div id="certImageModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4"
+         onclick="if(event.target===this)closeCertImageModal()">
+        <div class="bg-slate-900 border border-yellow-500/30 rounded-2xl shadow-2xl flex flex-col"
+             style="max-width:960px;width:100%;max-height:92vh;">
+            <div class="flex justify-between items-center px-5 py-3 border-b border-slate-700 shrink-0">
+                <span class="text-sm font-semibold text-yellow-300">🏅 OJT Certificate of Completion</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="printCertImage()"
+                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">🖨️ Print</button>
+                    <button onclick="downloadCertImage()"
+                        class="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs font-semibold">⬇️ Download</button>
+                    <button onclick="closeCertImageModal()"
+                        class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-lg">✕</button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-auto flex items-center justify-center p-4 bg-slate-950/50 rounded-b-2xl">
+                <img id="certImageEl" src="" alt="Certificate"
+                     class="max-w-full max-h-full object-contain rounded-lg shadow-xl">
+            </div>
+        </div>
+    </div>
+    <!-- ===== END CERTIFICATE IMAGE MODAL ===== -->
+
+    <script>
+    let _certImageUrl = '', _certImageName = '';
+    function openCertImageModal(url, name) {
+        _certImageUrl = url; _certImageName = name;
+        document.getElementById('certImageEl').src = url;
+        document.getElementById('certImageModal').classList.remove('hidden');
+    }
+    function closeCertImageModal() {
+        document.getElementById('certImageModal').classList.add('hidden');
+        document.getElementById('certImageEl').src = '';
+    }
+    function printCertImage() {
+        const win = window.open('', '_blank');
+        win.document.write(`<!DOCTYPE html><html><head><style>
+            *{margin:0;padding:0;box-sizing:border-box;}
+            body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff;}
+            img{max-width:100%;max-height:100vh;object-fit:contain;}
+            @page{size:landscape;margin:5mm;}
+        </style></head><body><img src="${_certImageUrl}" onload="window.print();window.close()"></body></html>`);
+        win.document.close();
+    }
+    function downloadCertImage() {
+        const a = document.createElement('a');
+        a.href = _certImageUrl;
+        a.download = 'OJT_Certificate_' + _certImageName.replace(/\s+/g,'_') + '.' + _certImageUrl.split('.').pop();
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    </script>
 
 </body>
 </html>

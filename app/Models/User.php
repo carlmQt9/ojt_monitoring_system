@@ -4,14 +4,30 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 use App\Models\StudentEvaluation;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
+
+    /**
+     * Override SoftDeletes boot to only apply when the column actually exists.
+     * This prevents crashes on environments where the migration hasn't run yet.
+     */
+    public static function bootSoftDeletes(): void
+    {
+        try {
+            if (Schema::connection(config('database.default'))->hasColumn('users', 'deleted_at')) {
+                static::addGlobalScope(new \Illuminate\Database\Eloquent\SoftDeletingScope());
+            }
+        } catch (\Throwable) {
+            // DB unavailable during boot — skip soft deletes
+        }
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -28,6 +44,9 @@ class User extends Authenticatable
         'is_active',
         'is_approved',
         'school_id_number',
+        'certificate_awarded_at',
+        'certificate_awarded_by',
+        'certificate_image_path',
     ];
 
     /**
@@ -50,6 +69,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'certificate_awarded_at' => 'datetime',
         ];
     }
 
