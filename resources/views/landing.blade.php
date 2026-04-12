@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <link rel="icon" type="image/jpeg" href="/logo.jpg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>PRMSU Sta.Cruz OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -94,9 +95,7 @@
         <div class="max-w-7xl mx-auto px-6 flex items-center justify-between h-16">
             <!-- Logo -->
             <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-400 to-blue-700 flex items-center justify-center glow-blue">
-                    <span class="text-white font-bold text-xs">OMS</span>
-                </div>
+                <img src="/8ae598d6-2434-4785-90dc-c0e59f0596a3.jpg" alt="OJT Logo" class="w-9 h-9 rounded-lg object-cover glow-blue">
                 <span class="font-bold text-white text-sm hidden sm:block leading-tight">PRMSU <span class="text-blue-400">OJT</span> Monitoring System</span>
             </div>
 
@@ -252,9 +251,9 @@
                 </p>
                 <ul class="space-y-3 text-blue-200 text-sm">
                     <li class="flex items-center gap-3"><span class="w-6 h-6 bg-green-500/20 rounded-full flex items-center justify-center text-green-400 text-xs">✓</span> <span><span class="text-green-400 font-semibold">Students</span> — camera time-in/out, OJT hours tracking, task logs, requirements &amp; report uploads, DTR view</span></li>
-                    <li class="flex items-center gap-3"><span class="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 text-xs">✓</span> <span><span class="text-purple-400 font-semibold">Supervisors</span> — monitor assigned interns, approve/reject requirements &amp; reports, view attendance</span></li>
-                    <li class="flex items-center gap-3"><span class="w-6 h-6 bg-orange-500/20 rounded-full flex items-center justify-center text-orange-400 text-xs">✓</span> <span><span class="text-orange-400 font-semibold">Coordinators</span> — oversee all students, view &amp; export DTR, manage companies, review reports</span></li>
-                    <li class="flex items-center gap-3"><span class="w-6 h-6 bg-red-500/20 rounded-full flex items-center justify-center text-red-400 text-xs">✓</span> <span><span class="text-red-400 font-semibold">CCIT Head</span> — full analytics, user management, approve accounts, manage school years &amp; school IDs</span></li>
+                    <li class="flex items-center gap-3"><span class="w-6 h-6 bg-purple-500/20 rounded-full flex items-center justify-center text-purple-400 text-xs">✓</span> <span><span class="text-purple-400 font-semibold">Supervisors</span> — monitor assigned interns, approve/deny time-in records &amp; requirements, submit performance evaluations, award completion certificates</span></li>
+                    <li class="flex items-center gap-3"><span class="w-6 h-6 bg-orange-500/20 rounded-full flex items-center justify-center text-orange-400 text-xs">✓</span> <span><span class="text-orange-400 font-semibold">Coordinators</span> — oversee all students, approve/deny time-in records &amp; requirements, view &amp; export DTR, manage companies</span></li>
+                    <li class="flex items-center gap-3"><span class="w-6 h-6 bg-red-500/20 rounded-full flex items-center justify-center text-red-400 text-xs">✓</span> <span><span class="text-red-400 font-semibold">CCIT Head</span> — full analytics, user management, manage school years &amp; school IDs, configure required hours, manage requirement templates, generate PDF reports</span></li>
                 </ul>
             </div>
             <div class="grid grid-cols-2 gap-4">
@@ -266,17 +265,17 @@
                 <div class="bg-purple-900/20 border border-purple-700/40 rounded-xl p-5 hover:border-purple-500 transition-colors">
                     <div class="flex items-center gap-2 mb-2"><span class="w-8 h-8 bg-purple-500/20 rounded-lg flex items-center justify-center text-purple-400 text-sm">👔</span></div>
                     <div class="text-xl font-bold text-purple-400 mb-1">Supervisor</div>
-                    <div class="text-xs text-purple-300/70">Intern monitoring · Approve/Reject submissions</div>
+                    <div class="text-xs text-purple-300/70">Intern monitoring · Approve/Deny · Evaluations · Certificates</div>
                 </div>
                 <div class="bg-orange-900/20 border border-orange-700/40 rounded-xl p-5 hover:border-orange-500 transition-colors">
                     <div class="flex items-center gap-2 mb-2"><span class="w-8 h-8 bg-orange-500/20 rounded-lg flex items-center justify-center text-orange-400 text-sm">📋</span></div>
                     <div class="text-xl font-bold text-orange-400 mb-1">Coordinator</div>
-                    <div class="text-xs text-orange-300/70">All students · DTR export · Companies · Reports</div>
+                    <div class="text-xs text-orange-300/70">All students · Time-in approval · DTR export · Companies</div>
                 </div>
                 <div class="bg-red-900/20 border border-red-700/40 rounded-xl p-5 hover:border-red-500 transition-colors">
                     <div class="flex items-center gap-2 mb-2"><span class="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center text-red-400 text-sm">🏫</span></div>
                     <div class="text-xl font-bold text-red-400 mb-1">CCIT Head</div>
-                    <div class="text-xs text-red-300/70">Analytics · Users · School IDs · School Years</div>
+                    <div class="text-xs text-red-300/70">Analytics · Users · School IDs · School Years · PDF Reports</div>
                 </div>
             </div>
         </div>
@@ -299,6 +298,7 @@
                     ['icon'=>'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z','title'=>'Analytics Dashboard','desc'=>'Role-based dashboards with charts for student progress, completion rates, attendance trends, report statuses, and top companies.','color'=>'purple'],
                     ['icon'=>'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z','title'=>'DTR Auto-Generation','desc'=>'Daily Time Records are automatically generated from attendance logs. Coordinators and CCIT Head can view DTR inline or export as a Word document per student.','color'=>'yellow'],
                     ['icon'=>'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z','title'=>'School Year, IDs & User Management','desc'=>'CCIT Head manages school years, required OJT hours, approved school ID numbers, company assignments, and all user accounts with approval workflow.','color'=>'red'],
+                    ['icon'=>'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z','title'=>'Role-Based Access Control (RBAC)','desc'=>'Every route and feature is protected by role-based middleware. Students, Supervisors, Coordinators, and the CCIT Head each access only their designated portal — preventing unauthorized actions across all user boundaries.','color'=>'purple'],
                 ];
                 $colors = ['blue'=>'from-blue-500 to-blue-700','cyan'=>'from-cyan-500 to-blue-600','purple'=>'from-purple-500 to-blue-600','green'=>'from-green-500 to-cyan-600','yellow'=>'from-yellow-500 to-orange-500','red'=>'from-red-500 to-pink-600'];
                 @endphp
@@ -339,7 +339,7 @@
                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
                     <h3 class="text-white font-semibold mb-2">Department</h3>
-                    <p class="text-blue-300 text-sm leading-relaxed">College of Computing &amp;<br>Information Technology<br><span class="text-blue-400 font-medium">(CCIT Department)</span></p>
+                    <p class="text-blue-300 text-sm leading-relaxed">College of Communication &amp;<br>Information Technology<br><span class="text-blue-400 font-medium">(CCIT Department)</span></p>
                 </div>
                 <div class="bg-blue-900/20 border border-blue-800/40 rounded-xl p-6 text-center hover:border-blue-500/60 transition-all">
                     <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
@@ -376,9 +376,7 @@
     <footer class="border-t border-blue-900/40 py-10 light-footer" style="background:#030a1e">
         <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-700 flex items-center justify-center">
-                    <span class="text-white font-bold text-xs">OMS</span>
-                </div>
+                <img src="/8ae598d6-2434-4785-90dc-c0e59f0596a3.jpg" alt="OJT Logo" class="w-8 h-8 rounded-lg object-cover">
                 <span class="text-blue-200 text-sm font-semibold">PRMSU Sta. Cruz — OJT Monitoring System</span>
             </div>
             <div class="flex gap-6 text-sm text-blue-400">

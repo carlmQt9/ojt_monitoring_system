@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <link rel="icon" type="image/jpeg" href="/logo.jpg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Reset Password - OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -32,8 +33,8 @@
         <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-8 backdrop-blur">
             <!-- Logo -->
             <div class="flex items-center justify-center mb-8">
-                <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-600 rounded-lg flex items-center justify-center">
-                    <span class="text-white font-bold text-lg">OMS</span>
+                <div class="w-12 h-12 rounded-lg overflow-hidden">
+                    <img src="/8ae598d6-2434-4785-90dc-c0e59f0596a3.jpg" alt="OJT Logo" class="w-full h-full object-cover">
                 </div>
             </div>
 

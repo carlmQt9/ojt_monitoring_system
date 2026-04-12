@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <link rel="icon" type="image/jpeg" href="/logo.jpg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Dashboard - OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>

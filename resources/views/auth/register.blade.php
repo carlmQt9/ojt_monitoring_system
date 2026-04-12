@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <link rel="icon" type="image/jpeg" href="/logo.jpg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Register - OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -14,6 +15,8 @@
         .input-field::placeholder { color: rgba(147,197,253,0.4); }
         .input-field option { background: #0d1b4b; color: white; }
         .glow-btn { box-shadow: 0 0 20px rgba(59,130,246,0.4); }
+        select.appearance-none { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+        select option { background: #0a1a5c; color: #fff; padding: 8px; }
         input[type="password"]::-ms-reveal,
         input[type="password"]::-ms-clear { display: none; }
         input[type="password"]::-webkit-contacts-auto-fill-button,
@@ -49,7 +52,7 @@
         body.light .border-red-700\/40 { border-color: rgba(185,28,28,0.5) !important; }
     </style>
 </head>
-<body class="text-white min-h-screen flex items-center justify-center p-4 relative overflow-auto">
+<body class="text-white min-h-screen flex items-start md:items-center justify-center p-3 md:p-4 relative overflow-auto">
     <div class="dot-pattern absolute inset-0 opacity-40"></div>
     <div class="absolute top-20 left-10 w-72 h-72 bg-blue-600 rounded-full blur-3xl opacity-20"></div>
     <div class="absolute bottom-10 right-10 w-96 h-96 bg-blue-800 rounded-full blur-3xl opacity-20"></div>
@@ -64,16 +67,16 @@
 
     @include('partials.success-popup')
 
-    <div class="relative w-full max-w-5xl flex flex-col md:flex-row rounded-3xl overflow-hidden shadow-2xl my-6" style="border:1px solid rgba(59,130,246,0.2)">
+    <div class="relative w-full max-w-5xl flex flex-col md:flex-row rounded-3xl overflow-hidden shadow-2xl my-2 md:my-6" style="border:1px solid rgba(59,130,246,0.2)">
 
-        <!-- Left Panel -->
-        <div class="w-full md:w-5/12 flex flex-col items-center justify-center p-10 md:p-12 relative overflow-hidden" style="background:linear-gradient(135deg,#050d2e,#0a1a5c,#0d2d8a)">
+        <!-- Left Panel — hidden on mobile -->
+        <div class="hidden md:flex w-full md:w-5/12 flex-col items-center justify-center p-10 md:p-12 relative overflow-hidden" style="background:linear-gradient(135deg,#050d2e,#0a1a5c,#0d2d8a)">
             <div class="absolute top-0 left-0 w-full h-full dot-pattern opacity-30"></div>
             <div class="absolute -top-10 -left-10 w-48 h-48 bg-blue-500 rounded-full blur-3xl opacity-20"></div>
             <div class="relative z-10 text-center space-y-5">
                 <div class="flex items-center gap-3 justify-center">
-                    <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-400 to-blue-700 flex items-center justify-center" style="box-shadow:0 0 30px rgba(59,130,246,0.4)">
-                        <span class="text-white font-bold text-sm">OMS</span>
+                    <div class="w-12 h-12 rounded-lg overflow-hidden" style="box-shadow:0 0 30px rgba(59,130,246,0.4)">
+                        <img src="/8ae598d6-2434-4785-90dc-c0e59f0596a3.jpg" alt="OJT Logo" class="w-full h-full object-cover">
                     </div>
                     <span class="font-bold text-white text-xl leading-tight">PRMSU <span class="text-blue-400">OJT</span> System</span>
                 </div>
@@ -89,25 +92,34 @@
         </div>
 
         <!-- Right Panel -->
-        <div class="w-full md:w-7/12 p-8 md:p-10 flex flex-col justify-center card">
-            <div class="mb-6">
-                <h2 class="text-2xl font-bold text-white">Create Account</h2>
+        <div class="w-full md:w-7/12 p-5 sm:p-8 md:p-10 flex flex-col justify-center card">
+
+            <!-- Mobile-only logo header -->
+            <div class="flex items-center gap-3 mb-5 md:hidden">
+                <div class="w-9 h-9 rounded-lg overflow-hidden shrink-0">
+                    <img src="/8ae598d6-2434-4785-90dc-c0e59f0596a3.jpg" alt="OJT Logo" class="w-full h-full object-cover">
+                </div>
+                <span class="font-bold text-white text-base leading-tight">PRMSU <span class="text-blue-400">OJT</span> System</span>
+            </div>
+
+            <div class="mb-4">
+                <h2 class="text-xl sm:text-2xl font-bold text-white">Create Account</h2>
                 <p class="text-blue-300 text-sm mt-1">Already have an account? <a href="{{ route('login') }}" class="text-blue-400 hover:text-blue-300 font-semibold transition-colors">Sign in</a></p>
             </div>
 
-            <form method="POST" action="{{ route('register') }}" class="space-y-4">
+            <form method="POST" action="{{ route('register') }}" class="space-y-3">
                 @csrf
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1.5">Full Name</label>
+                        <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1">Full Name</label>
                         <input type="text" name="name" required value="{{ old('name') }}"
                             class="input-field w-full px-4 py-2.5 rounded-xl text-sm"
                             placeholder="John Doe" maxlength="100" minlength="2">
                         @error('name')<span class="text-red-400 text-xs mt-1 block">{{ $message }}</span>@enderror
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1.5">Email Address</label>
+                        <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1">Email Address</label>
                         <input type="email" name="email" required value="{{ old('email') }}"
                             class="input-field w-full px-4 py-2.5 rounded-xl text-sm"
                             placeholder="your@email.com" maxlength="255">
@@ -116,53 +128,135 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1.5">Role</label>
-                    <select name="role" id="role" required onchange="updateFormVisibility()"
-                        class="input-field w-full px-4 py-2.5 rounded-xl text-sm">
-                        <option value="">Select a role</option>
-                        <option value="student" {{ old('role') == 'student' ? 'selected' : '' }}>Student</option>
-                        <option value="supervisor" {{ old('role') == 'supervisor' ? 'selected' : '' }}>Supervisor</option>
-                        <option value="coordinator" {{ old('role') == 'coordinator' ? 'selected' : '' }}>Coordinator</option>
-                        <option value="ccit_head" {{ old('role') == 'ccit_head' ? 'selected' : '' }}>CCIT Head</option>
-                    </select>
+                    <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1">Role</label>
+                    {{-- Hidden real input for form submission --}}
+                    <input type="hidden" name="role" id="role" value="{{ old('role') }}">
+                    {{-- Custom dropdown --}}
+                    <div class="relative" id="roleDropdown">
+                        <button type="button" onclick="toggleRoleDropdown()"
+                            class="input-field w-full px-4 py-2.5 rounded-xl text-sm flex items-center justify-between gap-2 text-left"
+                            id="roleDropdownBtn">
+                            <span id="roleDropdownLabel" class="flex items-center gap-2.5">
+                                <span id="roleDropdownIcon" class="text-base">👤</span>
+                                <span id="roleDropdownText" class="text-blue-300/60">Select a role</span>
+                            </span>
+                            <svg id="roleDropdownArrow" class="w-4 h-4 text-blue-400 transition-transform duration-200 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div id="roleDropdownMenu"
+                            class="hidden absolute z-50 w-full mt-1.5 rounded-xl overflow-hidden shadow-2xl"
+                            style="background:rgba(8,20,70,0.98);border:1px solid rgba(59,130,246,0.35);backdrop-filter:blur(16px)">
+                            @php
+                            $roleOptions = [
+                                ['value'=>'student',     'icon'=>'🎓', 'label'=>'Student',     'sub'=>'Track OJT hours & submit requirements'],
+                                ['value'=>'supervisor',  'icon'=>'👔', 'label'=>'Supervisor',   'sub'=>'Monitor & evaluate assigned interns'],
+                                ['value'=>'coordinator', 'icon'=>'📋', 'label'=>'Coordinator',  'sub'=>'Oversee all students & manage companies'],
+                                ['value'=>'ccit_head',   'icon'=>'🏫', 'label'=>'CCIT Head',    'sub'=>'Full system administration & analytics'],
+                            ];
+                            @endphp
+                            @foreach($roleOptions as $opt)
+                            <button type="button"
+                                onclick="selectRole('{{ $opt['value'] }}','{{ $opt['icon'] }}','{{ $opt['label'] }}')"
+                                class="role-option w-full flex items-center gap-3 px-4 py-3 text-left transition-all hover:bg-blue-600/20 border-b border-blue-900/40 last:border-0
+                                    {{ old('role') == $opt['value'] ? 'bg-blue-600/20' : '' }}"
+                                data-value="{{ $opt['value'] }}">
+                                <span class="text-xl shrink-0">{{ $opt['icon'] }}</span>
+                                <div class="min-w-0">
+                                    <div class="text-sm font-semibold text-white">{{ $opt['label'] }}</div>
+                                    <div class="text-xs text-blue-400/70 truncate">{{ $opt['sub'] }}</div>
+                                </div>
+                                <svg class="role-check w-4 h-4 text-blue-400 ml-auto shrink-0 {{ old('role') == $opt['value'] ? '' : 'hidden' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </button>
+                            @endforeach
+                        </div>
+                    </div>
                     @error('role')<span class="text-red-400 text-xs mt-1 block">{{ $message }}</span>@enderror
                 </div>
 
                 <div id="companySection" class="hidden">
-                    <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1.5">Company / Organization</label>
-                    <select name="company_id" id="company_id"
-                        class="input-field w-full px-4 py-2.5 rounded-xl text-sm">
-                        <option value="">Select your company</option>
-                        <?php
-                        $companies = \App\Models\Company::all();
-                        foreach($companies as $company) {
-                            $selected = old('company_id') == $company->id ? 'selected' : '';
-                            echo "<option value=\"{$company->id}\" {$selected}>{$company->name}</option>";
-                        }
-                        ?>
-                    </select>
+                    <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1">Company / Organization</label>
+                    <input type="hidden" name="company_id" id="company_id" value="{{ old('company_id') }}">
+                    <div class="relative" id="companyDropdown">
+                        <button type="button" onclick="toggleDropdown('companyDropdown')"
+                            class="input-field w-full px-4 py-2.5 rounded-xl text-sm flex items-center justify-between gap-2 text-left">
+                            <span id="companyDropdownLabel" class="flex items-center gap-2.5">
+                                <span class="text-base">🏢</span>
+                                <span id="companyDropdownText" class="text-blue-300/60">Select your company</span>
+                            </span>
+                            <svg id="companyDropdownArrow" class="w-4 h-4 text-blue-400 transition-transform duration-200 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div id="companyDropdownMenu"
+                            class="hidden absolute z-50 w-full mt-1.5 rounded-xl overflow-hidden shadow-2xl max-h-52 overflow-y-auto"
+                            style="background:rgba(8,20,70,0.98);border:1px solid rgba(59,130,246,0.35);backdrop-filter:blur(16px)">
+                            <?php $companies = \App\Models\Company::orderBy('name')->get(); ?>
+                            @if($companies->isEmpty())
+                                <div class="px-4 py-3 text-sm text-blue-400/60 text-center">No companies available</div>
+                            @else
+                                @foreach($companies as $company)
+                                <button type="button"
+                                    onclick="selectDropdown('companyDropdown','company_id','{{ $company->id }}','🏢','{{ addslashes($company->name) }}')"
+                                    class="custom-option w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all hover:bg-blue-600/20 border-b border-blue-900/40 last:border-0 {{ old('company_id') == $company->id ? 'bg-blue-600/20' : '' }}"
+                                    data-value="{{ $company->id }}">
+                                    <span class="text-lg shrink-0">🏢</span>
+                                    <span class="text-sm text-white truncate">{{ $company->name }}</span>
+                                    <svg class="option-check w-4 h-4 text-blue-400 ml-auto shrink-0 {{ old('company_id') == $company->id ? '' : 'hidden' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </button>
+                                @endforeach
+                            @endif
+                        </div>
+                    </div>
                     @error('company_id')<span class="text-red-400 text-xs mt-1 block">{{ $message }}</span>@enderror
                 </div>
 
                 <?php $schoolYears = \App\Models\SchoolYear::orderBy('label', 'desc')->get(); ?>
                 @if($schoolYears->isNotEmpty())
                 <div id="schoolYearSection" class="hidden">
-                    <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1.5">School Year</label>
-                    <select name="school_year" id="school_year"
-                        class="input-field w-full px-4 py-2.5 rounded-xl text-sm">
-                        <option value="">Select school year</option>
-                        @foreach($schoolYears as $sy)
-                            <option value="{{ $sy->label }}" {{ (old('school_year') == $sy->label || ($sy->is_active && !old('school_year'))) ? 'selected' : '' }}>
-                                {{ $sy->label }}{{ $sy->is_active ? ' (Active)' : '' }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1">School Year</label>
+                    <input type="hidden" name="school_year" id="school_year" value="{{ old('school_year', $schoolYears->firstWhere('is_active', true)?->label ?? '') }}">
+                    <div class="relative" id="schoolYearDropdown">
+                        <button type="button" onclick="toggleDropdown('schoolYearDropdown')"
+                            class="input-field w-full px-4 py-2.5 rounded-xl text-sm flex items-center justify-between gap-2 text-left">
+                            <span id="schoolYearDropdownLabel" class="flex items-center gap-2.5">
+                                <span class="text-base">📅</span>
+                                <span id="schoolYearDropdownText" class="text-blue-300/60">Select school year</span>
+                            </span>
+                            <svg id="schoolYearDropdownArrow" class="w-4 h-4 text-blue-400 transition-transform duration-200 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div id="schoolYearDropdownMenu"
+                            class="hidden absolute z-50 w-full mt-1.5 rounded-xl overflow-hidden shadow-2xl"
+                            style="background:rgba(8,20,70,0.98);border:1px solid rgba(59,130,246,0.35);backdrop-filter:blur(16px)">
+                            @foreach($schoolYears as $sy)
+                            <button type="button"
+                                onclick="selectDropdown('schoolYearDropdown','school_year','{{ $sy->label }}','📅','{{ $sy->label }}{{ $sy->is_active ? ' ★' : '' }}')"
+                                class="custom-option w-full flex items-center gap-3 px-4 py-2.5 text-left transition-all hover:bg-blue-600/20 border-b border-blue-900/40 last:border-0 {{ (old('school_year', $schoolYears->firstWhere('is_active',true)?->label) == $sy->label) ? 'bg-blue-600/20' : '' }}"
+                                data-value="{{ $sy->label }}">
+                                <span class="text-lg shrink-0">📅</span>
+                                <div class="min-w-0">
+                                    <div class="text-sm font-semibold text-white">{{ $sy->label }}</div>
+                                    @if($sy->is_active)<div class="text-xs text-green-400">★ Active Year</div>@endif
+                                </div>
+                                <svg class="option-check w-4 h-4 text-blue-400 ml-auto shrink-0 {{ (old('school_year', $schoolYears->firstWhere('is_active',true)?->label) == $sy->label) ? '' : 'hidden' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </button>
+                            @endforeach
+                        </div>
+                    </div>
                     @error('school_year')<span class="text-red-400 text-xs mt-1 block">{{ $message }}</span>@enderror
                 </div>
                 @endif
 
                 <div id="schoolIdSection" class="hidden">
-                    <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1.5">School ID Number</label>
+                    <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1">School ID Number</label>
                     <input type="text" name="school_id_number" id="school_id_number"
                         value="{{ old('school_id_number') }}"
                         class="input-field w-full px-4 py-2.5 rounded-xl text-sm font-mono"
@@ -170,9 +264,9 @@
                     @error('school_id_number')<span class="text-red-400 text-xs mt-1 block">{{ $message }}</span>@enderror
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1.5">Password</label>
+                        <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1">Password</label>
                         <div class="relative">
                             <input type="password" name="password" id="reg_password" required
                                 class="input-field w-full px-4 py-2.5 pr-11 rounded-xl text-sm"
@@ -198,7 +292,7 @@
                         @error('password')<span class="text-red-400 text-xs mt-1 block">{{ $message }}</span>@enderror
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1.5">Confirm Password</label>
+                        <label class="block text-xs font-semibold text-blue-300 uppercase tracking-wider mb-1">Confirm Password</label>
                         <div class="relative">
                             <input type="password" name="password_confirmation" id="reg_password_confirmation" required
                                 class="input-field w-full px-4 py-2.5 pr-11 rounded-xl text-sm"
@@ -242,6 +336,110 @@
     </div>
 
     <script>
+        // Custom role dropdown
+        function toggleRoleDropdown() { toggleDropdown('roleDropdown'); }
+        function selectRole(value, icon, label) {
+            document.getElementById('role').value = value;
+            document.getElementById('roleDropdownIcon').textContent = icon;
+            document.getElementById('roleDropdownText').textContent = label;
+            document.getElementById('roleDropdownText').classList.remove('text-blue-300/60');
+            document.getElementById('roleDropdownText').classList.add('text-white');
+            // update checkmarks
+            document.querySelectorAll('.role-option').forEach(btn => {
+                const check = btn.querySelector('.role-check');
+                if (btn.dataset.value === value) {
+                    btn.classList.add('bg-blue-600/20');
+                    check.classList.remove('hidden');
+                } else {
+                    btn.classList.remove('bg-blue-600/20');
+                    check.classList.add('hidden');
+                }
+            });
+            toggleRoleDropdown();
+            updateFormVisibility();
+        }
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            ['roleDropdown','companyDropdown','schoolYearDropdown'].forEach(id => {
+                const dd = document.getElementById(id);
+                if (dd && !dd.contains(e.target)) {
+                    const menu = document.getElementById(id + 'Menu');
+                    const arrow = document.getElementById(id + 'Arrow');
+                    if (menu) menu.classList.add('hidden');
+                    if (arrow) arrow.style.transform = '';
+                }
+            });
+        });
+
+        // Generic dropdown toggle
+        function toggleDropdown(id) {
+            const menu = document.getElementById(id + 'Menu');
+            const arrow = document.getElementById(id + 'Arrow');
+            // close all others first
+            ['roleDropdown','companyDropdown','schoolYearDropdown'].forEach(other => {
+                if (other !== id) {
+                    const m = document.getElementById(other + 'Menu');
+                    const a = document.getElementById(other + 'Arrow');
+                    if (m) m.classList.add('hidden');
+                    if (a) a.style.transform = '';
+                }
+            });
+            const isOpen = !menu.classList.contains('hidden');
+            menu.classList.toggle('hidden', isOpen);
+            arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+        }
+
+        // Generic option select
+        function selectDropdown(dropdownId, inputId, value, icon, label) {
+            document.getElementById(inputId).value = value;
+            document.getElementById(dropdownId + 'Text').textContent = label;
+            document.getElementById(dropdownId + 'Text').classList.remove('text-blue-300/60');
+            document.getElementById(dropdownId + 'Text').classList.add('text-white');
+            // update checkmarks within this dropdown
+            const menu = document.getElementById(dropdownId + 'Menu');
+            menu.querySelectorAll('.custom-option').forEach(btn => {
+                const check = btn.querySelector('.option-check');
+                if (btn.dataset.value == value) {
+                    btn.classList.add('bg-blue-600/20');
+                    check.classList.remove('hidden');
+                } else {
+                    btn.classList.remove('bg-blue-600/20');
+                    check.classList.add('hidden');
+                }
+            });
+            toggleDropdown(dropdownId);
+        }
+        // Init label if old value exists
+        (function() {
+            const oldRole = document.getElementById('role').value;
+            if (oldRole) {
+                const map = {student:['🎓','Student'],supervisor:['👔','Supervisor'],coordinator:['📋','Coordinator'],ccit_head:['🏫','CCIT Head']};
+                if (map[oldRole]) selectRole(oldRole, map[oldRole][0], map[oldRole][1]);
+            }
+            // Init school year label
+            const syInput = document.getElementById('school_year');
+            if (syInput && syInput.value) {
+                const syText = document.getElementById('schoolYearDropdownText');
+                if (syText) {
+                    syText.textContent = syInput.value;
+                    syText.classList.remove('text-blue-300/60');
+                    syText.classList.add('text-white');
+                }
+            }
+            // Init company label
+            const coInput = document.getElementById('company_id');
+            if (coInput && coInput.value) {
+                const btn = document.querySelector(`#companyDropdownMenu [data-value="${coInput.value}"]`);
+                if (btn) {
+                    const name = btn.querySelector('span.text-sm')?.textContent?.trim();
+                    if (name) {
+                        const t = document.getElementById('companyDropdownText');
+                        t.textContent = name; t.classList.remove('text-blue-300/60'); t.classList.add('text-white');
+                    }
+                }
+            }
+        })();
+
         function togglePw(id, iconId) {
             const input = document.getElementById(id);
             const show = input.type === 'password';
@@ -315,6 +513,8 @@
                 companySection.classList.add('hidden');
                 companyInput.required = false;
                 companyInput.value = '';
+                const ct = document.getElementById('companyDropdownText');
+                if (ct) { ct.textContent = 'Select your company'; ct.classList.add('text-blue-300/60'); ct.classList.remove('text-white'); }
             }
 
             if (schoolYearSection) {
@@ -323,6 +523,8 @@
                 } else {
                     schoolYearSection.classList.add('hidden');
                     if (schoolYearInput) schoolYearInput.value = '';
+                    const st = document.getElementById('schoolYearDropdownText');
+                    if (st) { st.textContent = 'Select school year'; st.classList.add('text-blue-300/60'); st.classList.remove('text-white'); }
                 }
             }
 

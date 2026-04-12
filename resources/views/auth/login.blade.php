@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <link rel="icon" type="image/jpeg" href="/logo.jpg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Login - OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -72,8 +73,8 @@
             <div class="absolute -top-10 -left-10 w-48 h-48 bg-blue-500 rounded-full blur-3xl opacity-20"></div>
             <div class="relative z-10 text-center space-y-5">
                 <div class="flex items-center gap-3 justify-center">
-                    <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-400 to-blue-700 flex items-center justify-center" style="box-shadow:0 0 30px rgba(59,130,246,0.4)">
-                        <span class="text-white font-bold text-sm">OMS</span>
+                    <div class="w-12 h-12 rounded-lg overflow-hidden" style="box-shadow:0 0 30px rgba(59,130,246,0.4)">
+                        <img src="/8ae598d6-2434-4785-90dc-c0e59f0596a3.jpg" alt="OJT Logo" class="w-full h-full object-cover">
                     </div>
                     <span class="font-bold text-white text-xl leading-tight">PRMSU <span class="text-blue-400">OJT</span> System</span>
                 </div>

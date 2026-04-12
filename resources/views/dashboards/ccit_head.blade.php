@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <link rel="icon" type="image/jpeg" href="/logo.jpg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>CCIT Head Dashboard - OJT Monitoring System</title>
@@ -129,9 +130,7 @@
     <aside id="sidebar" class="mobile-hidden">
         <!-- Logo -->
         <div class="flex items-center gap-3 px-4 py-3 border-b border-white/10">
-            <div class="w-9 h-9 bg-gradient-to-br from-red-400 to-red-600 rounded-lg flex items-center justify-center shrink-0">
-                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422A12.083 12.083 0 0112 21a12.083 12.083 0 01-6.16-10.422L12 14z"/></svg>
-            </div>
+            <img src="/8ae598d6-2434-4785-90dc-c0e59f0596a3.jpg" alt="OJT Logo" class="w-9 h-9 rounded-lg object-cover shrink-0">
             <div class="min-w-0">
                 <div class="sidebar-title text-sm font-bold text-white truncate">OJT Monitoring System</div>
                 <div class="sidebar-subtitle text-xs text-red-300 truncate">CCIT Head</div>
