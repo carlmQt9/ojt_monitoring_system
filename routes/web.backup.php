@@ -186,14 +186,14 @@ Route::get('/dashboard', function () {
     } else {
         return view('dashboards.student', ['user' => $user]);
     }
-})->name('dashboard')->middleware('auth.custom');
+})->name('dashboard');
 
 Route::get('/logout', function () {
     session()->flush();
     return redirect('/');
-})->middleware('auth.custom');
+});
 
-// Time-In Routes — Students only
+// Time-In Routes
 Route::post('/time-in', function () {
     $rules = [
         'student_id' => 'required|exists:users,id',
@@ -274,7 +274,7 @@ Route::post('/time-in', function () {
     ]);
 
     return back()->with('success', 'Successfully timed in (' . ucfirst($session) . ' session)!');
-})->name('time-in')->middleware(['auth.custom', 'role:student']);
+})->name('time-in');
 
 Route::post('/time-out', function () {
     $rules = [
@@ -413,7 +413,7 @@ Route::post('/time-out', function () {
         : sprintf('Time-out recorded! %.2f hrs — awaiting approval.', $regularThisSession);
 
     return back()->with('success', $msg);
-})->name('time-out')->middleware(['auth.custom', 'role:student']);
+})->name('time-out');
 
 // AJAX time-out endpoint: returns JSON with updated student hours
 Route::post('/time-out-ajax', function () {
@@ -494,7 +494,7 @@ Route::post('/time-out-ajax', function () {
             'progress_percentage' => $studentHours->total_hours_required > 0 ? round(($studentHours->hours_completed / $studentHours->total_hours_required) * 100, 2) : 0,
         ],
     ]);
-})->name('time-out-ajax')->middleware(['auth.custom', 'role:student']);
+})->name('time-out-ajax');
 
 Route::get('/time-in-status/{studentId}/{date}', function ($studentId, $date) {
     $record = \App\Models\TimeInRecord::where('student_id', $studentId)
@@ -507,7 +507,7 @@ Route::get('/time-in-status/{studentId}/{date}', function ($studentId, $date) {
         'time_out' => $record?->time_out,
         'verified' => $record?->verified,
     ]);
-})->name('time-in-status')->middleware('auth.custom');
+})->name('time-in-status');
 
 // Student Hours Routes: Log Hours removed
 
@@ -528,7 +528,7 @@ Route::get('/student-progress/{studentId}', function ($studentId) {
         'daily_logs' => $dailyLogs,
         'progress_percentage' => ($studentHours->hours_completed / 600) * 100,
     ]);
-})->name('student-progress')->middleware('auth.custom');
+})->name('student-progress');
 
 // Approval Routes
 Route::post('/approve-hours/{logId}', function ($logId) {
@@ -559,7 +559,7 @@ Route::post('/approve-hours/{logId}', function ($logId) {
     ]);
 
     return back()->with('success', 'Hours log approved!');
-})->name('approve-hours')->middleware(['auth.custom', 'role:coordinator,supervisor']);
+})->name('approve-hours');
 
 Route::post('/deny-hours/{logId}', function ($logId) {
     $validated = request()->validate([
@@ -577,7 +577,7 @@ Route::post('/deny-hours/{logId}', function ($logId) {
     ]);
 
     return back()->with('success', 'Hours log denied with reason provided.');
-})->name('deny-hours')->middleware(['auth.custom', 'role:coordinator,supervisor']);
+})->name('deny-hours');
 
 Route::post('/approve-time-in/{recordId}', function ($recordId) {
     $record = \App\Models\TimeInRecord::findOrFail($recordId);
@@ -647,7 +647,7 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
     }
 
     return back()->with('success', $msg);
-})->name('approve-time-in')->middleware(['auth.custom', 'role:coordinator,supervisor']);
+})->name('approve-time-in');
 
 Route::post('/deny-time-in/{recordId}', function ($recordId) {
     $validated = request()->validate(['reason' => 'required|string']);
@@ -712,7 +712,7 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
     }
 
     return back()->with('success', 'OT denied. Only regular hours (up to 8 hrs) have been recorded.');
-})->name('deny-time-in')->middleware(['auth.custom', 'role:coordinator,supervisor']);
+})->name('deny-time-in');
 
 // Bulk approve all pending time-in records for a student
 Route::post('/approve-all-time-in/{studentId}', function ($studentId) {
@@ -882,7 +882,7 @@ Route::post('/upload-requirement', function () {
     }
 
     return back()->with('success', 'Requirement submitted successfully! Waiting for approval.');
-})->name('upload-requirement')->middleware(['auth.custom', 'role:student']);
+})->name('upload-requirement');
 
 Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
     $validated = request()->validate([
@@ -950,7 +950,7 @@ Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
     }
 
     return back()->with('success', 'Requirement approved!');
-})->name('approve-requirement')->middleware(['auth.custom', 'role:coordinator,ccit_head,supervisor']);
+})->name('approve-requirement');
 
 Route::post('/save-evaluation/{studentId}', function ($studentId) {
     try {
@@ -1000,7 +1000,7 @@ Route::post('/save-evaluation/{studentId}', function ($studentId) {
     } catch (\Throwable $e) {
         return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
     }
-})->name('save-evaluation')->middleware(['auth.custom', 'role:supervisor']);
+})->name('save-evaluation');
 
 Route::post('/reject-requirement/{requirementId}', function ($requirementId) {
     $validated = request()->validate([
@@ -1035,7 +1035,7 @@ Route::post('/reject-requirement/{requirementId}', function ($requirementId) {
     }
 
     return response()->json(['success' => true, 'message' => 'Requirement rejected!']);
-})->name('reject-requirement')->middleware(['auth.custom', 'role:coordinator,ccit_head,supervisor']);
+})->name('reject-requirement');
 
 Route::get('/generate-dtr-word/{studentId}', function ($studentId) {
     $student = User::findOrFail($studentId);
@@ -1052,7 +1052,7 @@ Route::get('/generate-dtr-word/{studentId}', function ($studentId) {
     return response($content)
         ->header('Content-Type', 'application/msword')
         ->header('Content-Disposition', 'attachment; filename="DTR_' . preg_replace('/[^A-Za-z0-9_]/','',$student->name) . '_' . now()->format('Y-m-d') . '.doc"');
-})->name('generate-dtr-word')->middleware(['auth.custom', 'role:coordinator,ccit_head,supervisor']);
+})->name('generate-dtr-word');
 
 Route::get('/generate-dtr/{studentId}', function ($studentId) {
     $student = User::findOrFail($studentId);
@@ -1066,7 +1066,7 @@ Route::get('/generate-dtr/{studentId}', function ($studentId) {
     $company    = $student->company->name ?? 'N/A';
     $byMonth    = $timeInRecords->groupBy(fn($r) => $r->date->format('Y-m'));
     return view('reports.dtr', compact('student','company','byMonth','totalHours','required','remaining','pct'));
-})->name('generate-dtr')->middleware(['auth.custom', 'role:coordinator,ccit_head,supervisor']);
+})->name('generate-dtr');
 // Company Routes
 Route::post('/add-company', function () {
     $validated = request()->validate([
@@ -1081,7 +1081,7 @@ Route::post('/add-company', function () {
     \App\Models\Company::create($validated);
 
     return back()->with('success', 'Company added successfully!');
-})->name('add-company')->middleware(['auth.custom', 'role:coordinator,ccit_head']);
+})->name('add-company');
 
 Route::delete('/delete-company/{id}', function ($id) {
     $company = \App\Models\Company::findOrFail($id);
@@ -1095,7 +1095,7 @@ Route::delete('/delete-company/{id}', function ($id) {
     });
     $company->delete();
     return back()->with('success', 'Company and its users archived successfully!');
-})->name('delete-company')->middleware(['auth.custom', 'role:coordinator,ccit_head']);
+})->name('delete-company');
 
 Route::put('/update-company/{id}', function ($id) {
     $company = \App\Models\Company::findOrFail($id);
@@ -1109,7 +1109,7 @@ Route::put('/update-company/{id}', function ($id) {
     ]);
     $company->update($validated);
     return back()->with('success', 'Company updated successfully!');
-})->name('update-company')->middleware(['auth.custom', 'role:coordinator,ccit_head']);
+})->name('update-company');
 
 Route::post('/restore-company/{id}', function ($id) {
     $company = \App\Models\Company::withTrashed()->findOrFail($id);
@@ -1124,7 +1124,7 @@ Route::post('/restore-company/{id}', function ($id) {
         }
     });
     return back()->with('success', 'Company and its users restored successfully!');
-})->name('restore-company')->middleware(['auth.custom', 'role:coordinator,ccit_head']);
+})->name('restore-company');
 
 Route::delete('/force-delete-company/{id}', function ($id) {
     $company = \App\Models\Company::withTrashed()->findOrFail($id);
@@ -1143,7 +1143,7 @@ Route::delete('/force-delete-company/{id}', function ($id) {
     });
     $company->forceDelete();
     return back()->with('success', 'Company permanently deleted!');
-})->name('force-delete-company')->middleware(['auth.custom', 'role:coordinator,ccit_head']);
+})->name('force-delete-company');
 
 // Requirement Template Routes
 Route::post('/requirement-templates', function () {
@@ -1152,93 +1152,39 @@ Route::post('/requirement-templates', function () {
         'category'    => 'required|in:onboarding,daily',
         'description' => 'nullable|string|max:500',
         'max_files'   => 'required|integer|min:1|max:20',
-        'sort_order'  => 'nullable|integer|min:1',
+        'sort_order'  => 'nullable|integer|min:0',
     ]);
-
-    $requestedOrder = $validated['sort_order'] ?? null;
-    $category = $validated['category'];
-
-    if ($requestedOrder) {
-        // Shift existing templates in the same category up to make room
-        \App\Models\RequirementTemplate::where('category', $category)
-            ->where('sort_order', '>=', $requestedOrder)
-            ->increment('sort_order');
-        $validated['sort_order'] = $requestedOrder;
-    } else {
-        // Auto-assign next available sort_order for this category
-        $max = \App\Models\RequirementTemplate::where('category', $category)->max('sort_order') ?? 0;
-        $validated['sort_order'] = $max + 1;
-    }
-
     \App\Models\RequirementTemplate::create($validated);
     return back()->with('success', 'Requirement added successfully!');
-})->name('requirement-templates.store')->middleware(['auth.custom', 'role:ccit_head']);
+})->name('requirement-templates.store');
 
 Route::put('/requirement-templates/{id}', function ($id) {
     $tpl = \App\Models\RequirementTemplate::findOrFail($id);
-    $newCategory = request()->input('category', $tpl->category);
-
-    // Max allowed = highest sort_order in the target category (always gapless after reorder)
-    $totalInCategory = \App\Models\RequirementTemplate::where('category', $newCategory)->count();
-
     $validated = request()->validate([
         'name'        => 'required|string|max:255',
         'category'    => 'required|in:onboarding,daily',
         'description' => 'nullable|string|max:500',
         'max_files'   => 'required|integer|min:1|max:20',
-        'sort_order'  => 'required|integer|min:1|max:' . $totalInCategory,
+        'sort_order'  => 'nullable|integer|min:0',
     ]);
-
-    $newOrder = (int) $validated['sort_order'];
-    $oldOrder = (int) $tpl->sort_order;
-    $newCategory = $validated['category'];
-    $oldCategory = $tpl->category;
-
-    if ($newCategory !== $oldCategory) {
-        // Moving to a different category: close gap in old, make room in new
-        \App\Models\RequirementTemplate::where('category', $oldCategory)
-            ->where('id', '!=', $id)
-            ->where('sort_order', '>', $oldOrder)
-            ->decrement('sort_order');
-
-        \App\Models\RequirementTemplate::where('category', $newCategory)
-            ->where('id', '!=', $id)
-            ->where('sort_order', '>=', $newOrder)
-            ->increment('sort_order');
-    } elseif ($newOrder !== $oldOrder) {
-        if ($newOrder < $oldOrder) {
-            // Moving up: shift items between new and old position down by 1
-            \App\Models\RequirementTemplate::where('category', $newCategory)
-                ->where('id', '!=', $id)
-                ->whereBetween('sort_order', [$newOrder, $oldOrder - 1])
-                ->increment('sort_order');
-        } else {
-            // Moving down: shift items between old and new position up by 1
-            \App\Models\RequirementTemplate::where('category', $newCategory)
-                ->where('id', '!=', $id)
-                ->whereBetween('sort_order', [$oldOrder + 1, $newOrder])
-                ->decrement('sort_order');
-        }
-    }
-
     $tpl->update($validated);
     return back()->with('success', 'Requirement updated successfully!');
-})->name('requirement-templates.update')->middleware(['auth.custom', 'role:ccit_head']);
+})->name('requirement-templates.update');
 
 Route::delete('/requirement-templates/{id}', function ($id) {
     \App\Models\RequirementTemplate::findOrFail($id)->delete();
     return back()->with('success', 'Requirement archived!');
-})->name('requirement-templates.destroy')->middleware(['auth.custom', 'role:ccit_head']);
+})->name('requirement-templates.destroy');
 
 Route::post('/requirement-templates/{id}/restore', function ($id) {
     \App\Models\RequirementTemplate::withTrashed()->findOrFail($id)->restore();
     return back()->with('success', 'Requirement restored!');
-})->name('requirement-templates.restore')->middleware(['auth.custom', 'role:ccit_head']);
+})->name('requirement-templates.restore');
 
 Route::delete('/requirement-templates/{id}/force', function ($id) {
     \App\Models\RequirementTemplate::withTrashed()->findOrFail($id)->forceDelete();
     return back()->with('success', 'Requirement permanently deleted!');
-})->name('requirement-templates.force-delete')->middleware(['auth.custom', 'role:ccit_head']);
+})->name('requirement-templates.force-delete');
 
 // Forgot Password
 Route::post('/forgot-password', function () {
@@ -1299,12 +1245,6 @@ Route::post('/reset-password', function () {
 })->name('reset-password')->middleware('guest');
 
 // Student School ID Routes
-// ============================================================
-// All API routes below require authentication
-// Role-specific restrictions are enforced per route
-// ============================================================
-Route::middleware('auth.custom')->group(function () {
-
 Route::get('/api/school-ids', function () {
     // Auto-sync is_used: any school_id_number that belongs to a registered student = used
     $usedIds = \App\Models\User::whereNotNull('school_id_number')
@@ -1467,7 +1407,7 @@ Route::post('/api/settings', function () {
     cache(['settings.email_notifications' => $notify]);
 
     return response()->json(['success' => true]);
-})->middleware('role:ccit_head');
+});
 
 // retrieve current settings
 Route::get('/api/settings', function () {
@@ -1569,7 +1509,7 @@ Route::get('/api/users', function () {
         ];
     });
     return response()->json(['users' => $usersData]);
-})->middleware('role:ccit_head');
+});
 
 // return single user for editing
 Route::get('/api/users/archived', function () {
@@ -1896,8 +1836,6 @@ Route::get('/api/reports/attendance', function () {
         ->header('Content-Disposition', 'attachment; filename="Attendance_Report_' . now()->format('Y-m-d') . '.xls"');
 });
 
-}); // End auth.custom middleware group for API routes
-
 
 // ── Certificate Routes ──────────────────────────────────────────────────────
 
@@ -1912,7 +1850,7 @@ Route::post('/award-certificate/{studentId}', function ($studentId) {
     ]);
 
     return response()->json(['success' => true, 'message' => 'Certificate awarded to ' . $student->name . '!']);
-})->name('award-certificate')->middleware(['auth.custom', 'role:supervisor']);
+})->name('award-certificate');
 
 // Upload certificate image (supervisor action)
 Route::post('/upload-certificate/{studentId}', function ($studentId) {
@@ -1937,7 +1875,7 @@ Route::post('/upload-certificate/{studentId}', function ($studentId) {
     ]);
 
     return response()->json(['success' => true, 'url' => asset('storage/' . $path)]);
-})->name('upload-certificate')->middleware(['auth.custom', 'role:supervisor']);
+})->name('upload-certificate');
 
 // View certificate page (student or supervisor)
 Route::get('/certificate/{studentId}', function ($studentId) {
@@ -1951,4 +1889,4 @@ Route::get('/certificate/{studentId}', function ($studentId) {
                     ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
     $hours    = round(max($sh->hours_completed ?? 0, $actual), 2);
     return view('certificate', compact('student', 'hours', 'required'));
-})->name('certificate')->middleware('auth.custom');
+})->name('certificate');

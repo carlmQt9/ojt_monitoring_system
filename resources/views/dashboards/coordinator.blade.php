@@ -1607,15 +1607,20 @@
                         : l.status === 'denied'
                         ? `<span class="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-300">${l.status}</span>`
                         : `<span class="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-300">${l.status || 'pending'}</span>`;
-                    const actions = l.status === 'pending'
-                        ? `<div class="flex gap-1">
-                            <form method="POST" action="{{ url('/approve-time-in') }}/${l.id}" style="display:inline">
-                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                                <button type="submit" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">Approve</button>
-                            </form>
-                            <button onclick="showCoordDenyTimeModal(${l.id})" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Deny</button>
-                           </div>`
-                        : '-';
+                    let actions = '-';
+                    if (l.status === 'pending') {
+                        if (!l.time_out) {
+                            actions = `<span class="text-blue-300 text-xs" title="Student has not timed out yet">⏳ Active</span>`;
+                        } else {
+                            actions = `<div class="flex gap-1">
+                                <form method="POST" action="{{ url('/approve-time-in') }}/${l.id}" style="display:inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">Approve</button>
+                                </form>
+                                <button onclick="showCoordDenyTimeModal(${l.id})" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Deny</button>
+                            </div>`;
+                        }
+                    }
                     html += `<tr class="border-b border-slate-700/30"><td class="py-2 pr-3 text-sm">${l.date || '-'}</td><td class="py-2 pr-3 text-sm">${l.time_in || '-'}</td><td class="py-2 pr-3 text-sm">${l.time_out || '-'}</td><td class="py-2 pr-3 text-sm">${statusBadge}</td><td class="py-2 pr-3 text-sm">${l.photo ? '<button onclick="openPhotoPopup(\'' + l.photo + '\')" class="text-blue-400 hover:underline">View</button>' : '-'}</td><td class="py-2 text-sm">${actions}</td></tr>`;
                 });
                 html += '</tbody></table>';

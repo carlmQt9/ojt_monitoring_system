@@ -521,6 +521,8 @@
         <?php
             $reqTemplates = \App\Models\RequirementTemplate::orderBy('category')->orderBy('sort_order')->orderBy('name')->get();
             $archivedTemplates = \App\Models\RequirementTemplate::onlyTrashed()->orderBy('deleted_at','desc')->get();
+            $onboardingCount = \App\Models\RequirementTemplate::where('category','onboarding')->count();
+            $dailyCount = \App\Models\RequirementTemplate::where('category','daily')->count();
         ?>
         <div class="mb-6">
             <div class="flex justify-between items-center mb-6">
@@ -556,7 +558,7 @@
                                 <td class="py-3 px-3 text-center text-gray-400 text-sm">{{ $tpl->sort_order }}</td>
                                 <td class="py-3 px-3 text-center">
                                     <div class="flex items-center justify-center gap-2">
-                                        <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }})" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Edit</button>
+                                        <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }},{{ $tpl->category === 'onboarding' ? $onboardingCount : $dailyCount }})" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Edit</button>
                                         <button onclick="showArchiveTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Archive</button>
                                     </div>
                                 </td>
@@ -595,7 +597,7 @@
                                 <td class="py-3 px-3 text-center text-gray-400 text-sm">{{ $tpl->sort_order }}</td>
                                 <td class="py-3 px-3 text-center">
                                     <div class="flex items-center justify-center gap-2">
-                                        <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }})" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Edit</button>
+                                        <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }},{{ $tpl->category === 'onboarding' ? $onboardingCount : $dailyCount }})" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Edit</button>
                                         <button onclick="showArchiveTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Archive</button>
                                     </div>
                                 </td>
@@ -716,7 +718,7 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-2">Sort Order</label>
-                        <input type="number" name="sort_order" value="0" min="0" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                        <input type="number" name="sort_order" value="" min="1" placeholder="Auto" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
                     </div>
                 </div>
                 <div class="flex gap-3 pt-2">
@@ -758,7 +760,8 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-2">Sort Order</label>
-                        <input type="number" name="sort_order" id="edit_tpl_sort_order" min="0" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                        <input type="number" name="sort_order" id="edit_tpl_sort_order" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
+                        <p class="text-xs text-gray-500 mt-1">Range: 1 to <span id="edit_tpl_max_hint">—</span></p>
                     </div>
                 </div>
                 <div class="flex gap-3 pt-2">
@@ -2337,15 +2340,34 @@
         function closeAddTemplateModal() {
             document.getElementById('addTemplateModal').classList.add('hidden');
         }
-        function showEditTemplateModal(id, name, category, description, maxFiles, sortOrder) {
+        function showEditTemplateModal(id, name, category, description, maxFiles, sortOrder, categoryCount) {
             document.getElementById('edit_tpl_name').value = name;
             document.getElementById('edit_tpl_category').value = category;
             document.getElementById('edit_tpl_description').value = description;
             document.getElementById('edit_tpl_max_files').value = maxFiles;
-            document.getElementById('edit_tpl_sort_order').value = sortOrder;
+            const orderInput = document.getElementById('edit_tpl_sort_order');
+            orderInput.value = sortOrder;
+            orderInput.min = 1;
+            orderInput.max = categoryCount;
+            orderInput.setAttribute('max', categoryCount);
+            orderInput.title = 'Enter a number between 1 and ' + categoryCount;
+            document.getElementById('edit_tpl_max_hint').textContent = categoryCount;
+            // store for submit validation
+            orderInput.dataset.maxAllowed = categoryCount;
             document.getElementById('editTemplateForm').action = '/requirement-templates/' + id;
             document.getElementById('editTemplateModal').classList.remove('hidden');
         }
+
+        document.getElementById('editTemplateForm').addEventListener('submit', function(e) {
+            const orderInput = document.getElementById('edit_tpl_sort_order');
+            const val = parseInt(orderInput.value);
+            const max = parseInt(orderInput.dataset.maxAllowed || orderInput.max);
+            if (isNaN(val) || val < 1 || val > max) {
+                e.preventDefault();
+                alert('Sort order must be between 1 and ' + max + '.');
+                orderInput.focus();
+            }
+        });
         function closeEditTemplateModal() {
             document.getElementById('editTemplateModal').classList.add('hidden');
         }
