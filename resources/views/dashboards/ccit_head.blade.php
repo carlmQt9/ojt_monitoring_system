@@ -24,15 +24,32 @@
         body.light .text-gray-300 { color: #2d3f5a !important; }
         body.light .text-gray-400 { color: #3d5070 !important; }
         body.light .text-gray-500 { color: #4a6080 !important; }
-        body.light .text-green-400,body.light .text-green-300,body.light .text-green-200 { color: #15803d !important; }
-        body.light .text-blue-400,body.light .text-blue-300,body.light .text-blue-200 { color: #1d4ed8 !important; }
-        body.light .text-red-400,body.light .text-red-300,body.light .text-red-200 { color: #b91c1c !important; }
-        body.light .text-yellow-400,body.light .text-yellow-300 { color: #92400e !important; }
-        body.light .text-purple-400,body.light .text-purple-300 { color: #6d28d9 !important; }
+        body.light .text-green-100,body.light .text-green-200,body.light .text-green-300,body.light .text-green-400 { color: #15803d !important; }
+        body.light .text-blue-100,body.light .text-blue-200,body.light .text-blue-300,body.light .text-blue-400 { color: #1d4ed8 !important; }
+        body.light .text-orange-100,body.light .text-orange-200,body.light .text-orange-300,body.light .text-orange-400 { color: #c2410c !important; }
+        body.light .text-yellow-100,body.light .text-yellow-200,body.light .text-yellow-300,body.light .text-yellow-400 { color: #92400e !important; }
+        body.light .text-red-100,body.light .text-red-200,body.light .text-red-300,body.light .text-red-400 { color: #b91c1c !important; }
+        body.light .text-purple-100,body.light .text-purple-200,body.light .text-purple-300,body.light .text-purple-400 { color: #6d28d9 !important; }
+        body.light .text-indigo-100,body.light .text-indigo-200,body.light .text-indigo-300,body.light .text-indigo-400 { color: #4338ca !important; }
+        body.light .text-cyan-200,body.light .text-cyan-300,body.light .text-cyan-400 { color: #0369a1 !important; }
         body.light button[class*="bg-green-6"],body.light button[class*="bg-blue-6"],
         body.light button[class*="bg-red-6"],body.light button[class*="bg-orange-6"],
         body.light button[class*="bg-yellow-6"],body.light button[class*="bg-indigo-6"],
-        body.light a[class*="bg-red-6"],body.light a[class*="bg-blue-6"] { color: #fff !important; }
+        body.light button[class*="bg-purple-6"],
+        body.light a[class*="bg-red-6"],body.light a[class*="bg-blue-6"],
+        body.light a[class*="bg-indigo-6"],body.light a[class*="bg-green-6"] { color: #fff !important; }
+        body.light button[class*="bg-green-6"] span,body.light button[class*="bg-blue-6"] span,
+        body.light button[class*="bg-red-6"] span,body.light button[class*="bg-orange-6"] span,
+        body.light button[class*="bg-yellow-6"] span,body.light button[class*="bg-indigo-6"] span,
+        body.light button[class*="bg-purple-6"] span { color: #fff !important; }
+        /* Ensure small action buttons keep white text */
+        body.light button.bg-indigo-600,body.light button.bg-indigo-700,
+        body.light button.bg-red-600,body.light button.bg-red-700,
+        body.light button.bg-red-800,body.light button.bg-red-900,
+        body.light button.bg-blue-600,body.light button.bg-blue-700,
+        body.light button.bg-green-600,body.light button.bg-green-700,
+        body.light button.bg-orange-600,body.light button.bg-orange-700,
+        body.light button.bg-purple-600,body.light button.bg-purple-700 { color: #fff !important; }
         body.light [class*="bg-slate-900"] { background: #c8daf0 !important; }
         body.light [class*="bg-slate-800"] { background: #d0e4f8 !important; }
         body.light [class*="bg-slate-700"] { background: #bdd4ec !important; }
@@ -91,6 +108,15 @@
         body.light #sidebar .nav-item.active .nav-icon { color: #fca5a5 !important; }
         body.light #sidebar .nav-item:not(.active):hover { background: rgba(255,255,255,0.08) !important; }
         body.light #top-header { background:rgba(220,235,255,0.97); border-color:#7aaad4; }
+        /* Search bar light mode */
+        body.light #studentDropdownWrapper .flex { background: #fff !important; border-color: #7aaad4 !important; }
+        body.light #studentDropdownWrapper .flex:focus-within { border-color: #b91c1c !important; box-shadow: 0 0 0 3px rgba(185,28,28,0.12) !important; }
+        body.light #studentSearchInput { color: #1a2a4a !important; }
+        body.light #studentSearchInput::placeholder { color: #7a9abf !important; }
+        body.light #studentDropdownList { background: #fff !important; border-color: #c0d4ec !important; box-shadow: 0 8px 32px rgba(30,58,138,0.12) !important; }
+        body.light #studentDropdownOptions button { color: #1a2a4a !important; }
+        body.light #studentDropdownOptions button:hover { background: rgba(185,28,28,0.07) !important; }
+        /* Archive/Trash modals — always dark (handled via inline styles on modal panels) */
         @keyframes slideInRight { from{opacity:0;transform:translateX(60px)} to{opacity:1;transform:translateX(0)} }
         @keyframes slideOutRight { from{opacity:1;transform:translateX(0)} to{opacity:0;transform:translateX(60px)} }
 
@@ -355,23 +381,34 @@
                 <h2 class="text-2xl font-bold text-white mb-1">📈 Student Analytics</h2>
                 <p class="text-gray-400 text-sm">View comprehensive system analytics and reports</p>
             </div>
-            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div class="bg-slate-700/50 rounded-lg p-4">
-                        <h4 class="text-gray-300 mb-2">Select Student</h4>
-                        <select id="analyticsStudentSelect" class="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500">
-                            <option value="">Choose a student...</option>
-                        </select>
+            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
+                <!-- Searchable Student Filter -->
+                <div class="mb-5">
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">Select Student</label>
+                    <div class="relative" id="studentDropdownWrapper">
+                        <div class="flex items-center gap-2 px-4 py-3 bg-slate-700 border-2 border-slate-600 rounded-2xl focus-within:border-red-500 focus-within:bg-slate-700/80 transition-all shadow-inner">
+                            <svg class="w-4 h-4 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
+                            <input type="text" id="studentSearchInput" placeholder="Search student name…"
+                                class="flex-1 bg-transparent text-white text-sm placeholder-slate-400 focus:outline-none font-medium"
+                                autocomplete="off"
+                                oninput="filterStudentDropdown()"
+                                onfocus="openStudentDropdown()"
+                            >
+                            <button type="button" id="clearStudentBtn" onclick="clearStudentFilter()" class="hidden w-5 h-5 rounded-full bg-slate-500 hover:bg-slate-400 text-white flex items-center justify-center text-xs transition-colors shrink-0">✕</button>
+                        </div>
+                        <!-- Dropdown list -->
+                        <div id="studentDropdownList"
+                            class="hidden absolute z-30 w-full mt-2 bg-slate-800 border border-slate-600/80 rounded-2xl shadow-2xl max-h-60 overflow-y-auto"
+                            style="backdrop-filter:blur(8px)">
+                            <div id="studentDropdownOptions"></div>
+                        </div>
                     </div>
-                    <div class="bg-slate-700/50 rounded-lg p-4">
-                        <h4 class="text-gray-300 mb-2">Report Period</h4>
-                        <select id="reportPeriod" class="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500">
-                            <option value="all">All Time</option>
-                            <option value="month">This Month</option>
-                            <option value="week">This Week</option>
-                        </select>
-                    </div>
+                    <!-- Hidden real select for JS compatibility -->
+                    <select id="analyticsStudentSelect" class="hidden">
+                        <option value="">All Students</option>
+                    </select>
                 </div>
+
                 <div class="hidden md:block overflow-x-auto">
                     <table class="w-full text-sm text-left text-gray-300">
                         <thead class="text-xs text-gray-400 bg-slate-700/50">
@@ -524,20 +561,21 @@
             $dailyCount = \App\Models\RequirementTemplate::where('category','daily')->count();
         ?>
         <div class="mb-6">
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
                 <h2 class="text-2xl font-bold text-white">Manage Requirements</h2>
-                <div class="flex gap-2">
-                    <button onclick="toggleArchivedTemplates()" id="archivedTemplatesBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition-colors">🗑 Archive Trash</button>
-                    <button onclick="showAddTemplateModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors">+ Add Requirement</button>
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="toggleArchivedTemplates()" id="archivedTemplatesBtn" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition-colors">🗑 Archive Trash</button>
+                    <button onclick="showAddTemplateModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors">+ Add Requirement</button>
                 </div>
             </div>
 
             <!-- Onboarding Requirements -->
-            <div class="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <div class="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
                 <h3 class="text-lg font-bold text-white mb-4">📂 Onboarding Requirements</h3>
                 @php $onboardingTpls = $reqTemplates->where('category','onboarding'); @endphp
                 @if($onboardingTpls->isNotEmpty())
-                <div class="overflow-x-auto">
+                {{-- Desktop table --}}
+                <div class="hidden sm:block overflow-x-auto">
                     <table class="w-full">
                         <thead>
                             <tr class="border-b border-slate-700">
@@ -566,17 +604,39 @@
                         </tbody>
                     </table>
                 </div>
+                {{-- Mobile card list --}}
+                <div class="sm:hidden space-y-3">
+                    @foreach($onboardingTpls as $tpl)
+                    <div class="bg-slate-700/30 border border-slate-600/50 rounded-xl p-4">
+                        <div class="flex items-start justify-between gap-2 mb-1">
+                            <p class="text-gray-200 font-semibold text-sm leading-tight">{{ $tpl->name }}</p>
+                            <span class="shrink-0 px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold">{{ $tpl->max_files }} file{{ $tpl->max_files != 1 ? 's' : '' }}</span>
+                        </div>
+                        @if($tpl->description)
+                        <p class="text-gray-400 text-xs mb-2">{{ $tpl->description }}</p>
+                        @endif
+                        <p class="text-gray-500 text-xs mb-3">Order: {{ $tpl->sort_order }}</p>
+                        <div class="flex gap-2">
+                            <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }},{{ $tpl->category === 'onboarding' ? $onboardingCount : $dailyCount }})"
+                                class="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors">✏️ Edit</button>
+                            <button onclick="showArchiveTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')"
+                                class="flex-1 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition-colors">🗑 Archive</button>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
                 @else
                 <p class="text-gray-400 text-center py-6">No onboarding requirements yet.</p>
                 @endif
             </div>
 
             <!-- Daily Requirements -->
-            <div class="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <div class="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
                 <h3 class="text-lg font-bold text-white mb-4">📋 Daily Submission Requirements</h3>
                 @php $dailyTpls = $reqTemplates->where('category','daily'); @endphp
                 @if($dailyTpls->isNotEmpty())
-                <div class="overflow-x-auto">
+                {{-- Desktop table --}}
+                <div class="hidden sm:block overflow-x-auto">
                     <table class="w-full">
                         <thead>
                             <tr class="border-b border-slate-700">
@@ -605,6 +665,27 @@
                         </tbody>
                     </table>
                 </div>
+                {{-- Mobile card list --}}
+                <div class="sm:hidden space-y-3">
+                    @foreach($dailyTpls as $tpl)
+                    <div class="bg-slate-700/30 border border-slate-600/50 rounded-xl p-4">
+                        <div class="flex items-start justify-between gap-2 mb-1">
+                            <p class="text-gray-200 font-semibold text-sm leading-tight">{{ $tpl->name }}</p>
+                            <span class="shrink-0 px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs font-semibold">{{ $tpl->max_files }} file{{ $tpl->max_files != 1 ? 's' : '' }}</span>
+                        </div>
+                        @if($tpl->description)
+                        <p class="text-gray-400 text-xs mb-2">{{ $tpl->description }}</p>
+                        @endif
+                        <p class="text-gray-500 text-xs mb-3">Order: {{ $tpl->sort_order }}</p>
+                        <div class="flex gap-2">
+                            <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }},{{ $tpl->category === 'onboarding' ? $onboardingCount : $dailyCount }})"
+                                class="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors">✏️ Edit</button>
+                            <button onclick="showArchiveTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')"
+                                class="flex-1 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition-colors">🗑 Archive</button>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
                 @else
                 <p class="text-gray-400 text-center py-6">No daily requirements yet.</p>
                 @endif
@@ -618,8 +699,8 @@
     </div><!-- /main-content -->
 
     <!-- Archived School Years Modal -->
-    <div id="archivedSchoolYearsModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+    <div id="archivedSchoolYearsModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" style="backdrop-filter:blur(4px)">
+        <div class="rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col" style="background:#1e293b;border:1px solid #334155">
             <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
                 <h3 class="text-lg font-bold text-yellow-400">🗑 Archived School Years</h3>
                 <button onclick="closeArchivedSchoolYearsModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
@@ -631,8 +712,8 @@
     </div>
 
     <!-- Archived School IDs Modal -->
-    <div id="archivedSchoolIdsModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+    <div id="archivedSchoolIdsModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" style="backdrop-filter:blur(4px)">
+        <div class="rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col" style="background:#1e293b;border:1px solid #334155">
             <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
                 <h3 class="text-lg font-bold text-yellow-400">🗑 Archived School IDs</h3>
                 <button onclick="closeArchivedSchoolIdsModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
@@ -644,42 +725,63 @@
     </div>
 
     <!-- Archived Requirements Modal -->
-    <div id="archivedTemplatesModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
+    <div id="archivedTemplatesModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" style="backdrop-filter:blur(4px)">
+        <div class="rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col" style="background:#1e293b;border:1px solid #334155">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700 shrink-0">
                 <h3 class="text-lg font-bold text-yellow-400">🗑 Archived Requirements</h3>
                 <button onclick="closeArchivedTemplatesModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
             </div>
             <div class="overflow-auto flex-1 p-4">
                 @if($archivedTemplates->isNotEmpty())
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b border-slate-700">
-                            <th class="text-left py-2 px-3 text-gray-300 font-semibold">Name</th>
-                            <th class="text-left py-2 px-3 text-gray-300 font-semibold">Category</th>
-                            <th class="text-center py-2 px-3 text-gray-300 font-semibold">Archived On</th>
-                            <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($archivedTemplates as $tpl)
-                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80">
-                            <td class="py-3 px-3 text-gray-400 line-through">{{ $tpl->name }}</td>
-                            <td class="py-3 px-3 text-gray-500 text-sm capitalize">{{ $tpl->category }}</td>
-                            <td class="py-3 px-3 text-center text-gray-500 text-sm">{{ $tpl->deleted_at->format('M d, Y') }}</td>
-                            <td class="py-3 px-3 text-center">
-                                <div class="flex items-center justify-center gap-2">
-                                    <form action="{{ route('requirement-templates.restore', $tpl->id) }}" method="POST" class="inline">
-                                        @csrf
-                                        <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
-                                    </form>
-                                    <button onclick="showForceDeleteTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
-                                </div>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                {{-- Desktop table --}}
+                <div class="hidden sm:block">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-slate-700">
+                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Name</th>
+                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Category</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Archived On</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($archivedTemplates as $tpl)
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80">
+                                <td class="py-3 px-3 text-gray-400 line-through">{{ $tpl->name }}</td>
+                                <td class="py-3 px-3 text-gray-500 text-sm capitalize">{{ $tpl->category }}</td>
+                                <td class="py-3 px-3 text-center text-gray-500 text-sm">{{ $tpl->deleted_at->format('M d, Y') }}</td>
+                                <td class="py-3 px-3 text-center">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <form action="{{ route('requirement-templates.restore', $tpl->id) }}" method="POST" class="inline">
+                                            @csrf
+                                            <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
+                                        </form>
+                                        <button onclick="showForceDeleteTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                {{-- Mobile cards --}}
+                <div class="sm:hidden space-y-3">
+                    @foreach($archivedTemplates as $tpl)
+                    <div class="bg-slate-700/30 border border-slate-600/50 rounded-xl p-4 opacity-90">
+                        <p class="text-gray-400 line-through font-semibold text-sm mb-0.5">{{ $tpl->name }}</p>
+                        <p class="text-gray-500 text-xs capitalize mb-1">{{ $tpl->category }}</p>
+                        <p class="text-gray-500 text-xs mb-3">Archived: {{ $tpl->deleted_at->format('M d, Y') }}</p>
+                        <div class="flex gap-2">
+                            <form action="{{ route('requirement-templates.restore', $tpl->id) }}" method="POST" class="flex-1">
+                                @csrf
+                                <button type="submit" class="w-full py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold">♻️ Restore</button>
+                            </form>
+                            <button onclick="showForceDeleteTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')"
+                                class="flex-1 py-1.5 bg-red-800 hover:bg-red-900 text-white rounded-lg text-xs font-semibold">🗑 Delete</button>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
                 @else
                 <p class="text-gray-400 text-center py-10">No archived requirements.</p>
                 @endif
@@ -950,20 +1052,13 @@
                         <h3 class="text-xl font-semibold text-white">Student Analytics Reports</h3>
                         <button onclick="closeAnalyticsModal()" class="text-gray-400 hover:text-gray-200 text-2xl">&times;</button>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div class="bg-slate-700/50 rounded-lg p-4">
-                            <h4 class="text-gray-300 mb-2">Select Student</h4>
-                            <select id="analyticsStudentSelect" class="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500">
-                                <option value="">Choose a student...</option>
-                            </select>
-                        </div>
-                        <div class="bg-slate-700/50 rounded-lg p-4">
-                            <h4 class="text-gray-300 mb-2">Report Period</h4>
-                            <select id="reportPeriod" class="w-full px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500">
-                                <option value="all">All Time</option>
-                                <option value="month">This Month</option>
-                                <option value="week">This Week</option>
-                            </select>
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">Select Student</label>
+                        <div class="flex items-center gap-2 px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-xl focus-within:border-red-500 transition-colors">
+                            <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
+                            <input type="text" id="analyticsStudentSelect" placeholder="Search student name…"
+                                class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none"
+                                autocomplete="off">
                         </div>
                     </div>
                     <div class="overflow-x-auto">
@@ -1756,20 +1851,95 @@
                 .then(response => response.json())
                 .then(data => {
                     analyticsData = data.analytics || [];
+                    // Populate hidden select for compatibility
                     const studentSelect = document.getElementById('analyticsStudentSelect');
+                    if (studentSelect && studentSelect.tagName === 'SELECT') {
+                        studentSelect.innerHTML = '<option value="">All Students</option>';
+                        if (data.students) {
+                            data.students.forEach(student => {
+                                studentSelect.innerHTML += `<option value="${student.id}">${student.name}</option>`;
+                            });
+                        }
+                        studentSelect.onchange = function() {
+                            const id = this.value;
+                            renderAnalytics(id ? analyticsData.filter(a => a.student_id == id) : analyticsData);
+                        };
+                    }
+                    // Populate custom dropdown options
                     if (data.students) {
-                        studentSelect.innerHTML = '<option value="">Choose a student...</option>';
-                        data.students.forEach(student => {
-                            studentSelect.innerHTML += `<option value="${student.id}">${student.name}</option>`;
-                        });
+                        _analyticsStudents = data.students;
+                        buildStudentDropdown(data.students);
                     }
                     renderAnalytics(analyticsData);
-                    studentSelect.onchange = function() {
-                        const id = this.value;
-                        renderAnalytics(id ? analyticsData.filter(a => a.student_id == id) : analyticsData);
-                    };
                 });
         }
+
+        // ===== Searchable student dropdown =====
+        let _analyticsStudents = [];
+        let _selectedStudentId = '';
+
+        function buildStudentDropdown(students) {
+            const opts = document.getElementById('studentDropdownOptions');
+            if (!opts) return;
+            opts.innerHTML = '';
+            // All option
+            const allBtn = document.createElement('button');
+            allBtn.type = 'button';
+            allBtn.className = 'w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-slate-700/80 transition-colors flex items-center gap-3 border-b border-slate-700/60 rounded-t-2xl';
+            allBtn.innerHTML = '<span class="w-7 h-7 rounded-full bg-slate-600 text-gray-300 flex items-center justify-center text-xs shrink-0">👥</span><span class="font-medium">All Students</span>';
+            allBtn.onclick = () => selectStudent('', 'All Students');
+            opts.appendChild(allBtn);
+            students.forEach((s, i) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                const isLast = i === students.length - 1;
+                btn.className = `w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-red-600/10 hover:text-white transition-colors flex items-center gap-3 ${isLast ? 'rounded-b-2xl' : 'border-b border-slate-700/40'}`;
+                btn.dataset.id = s.id;
+                btn.dataset.name = s.name.toLowerCase();
+                const initials = s.name.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+                btn.innerHTML = `<span class="w-7 h-7 rounded-full bg-gradient-to-br from-red-600 to-red-800 text-white flex items-center justify-center text-xs font-bold shrink-0">${initials}</span><span class="truncate font-medium">${s.name}</span>`;
+                btn.onclick = () => selectStudent(s.id, s.name);
+                opts.appendChild(btn);
+            });
+        }
+
+        function filterStudentDropdown() {
+            const q = (document.getElementById('studentSearchInput')?.value || '').toLowerCase();
+            const opts = document.querySelectorAll('#studentDropdownOptions button[data-id]');
+            opts.forEach(btn => {
+                btn.style.display = btn.dataset.name.includes(q) ? '' : 'none';
+            });
+            openStudentDropdown();
+        }
+
+        function openStudentDropdown() {
+            const list = document.getElementById('studentDropdownList');
+            if (list) list.classList.remove('hidden');
+        }
+
+        function selectStudent(id, name) {
+            _selectedStudentId = id;
+            const input = document.getElementById('studentSearchInput');
+            const clearBtn = document.getElementById('clearStudentBtn');
+            if (input) input.value = id ? name : '';
+            if (clearBtn) clearBtn.classList.toggle('hidden', !id);
+            document.getElementById('studentDropdownList')?.classList.add('hidden');
+            renderAnalytics(id ? analyticsData.filter(a => a.student_id == id) : analyticsData);
+        }
+
+        function clearStudentFilter() {
+            selectStudent('', '');
+            document.getElementById('studentSearchInput')?.focus();
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const wrapper = document.getElementById('studentDropdownWrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                document.getElementById('studentDropdownList')?.classList.add('hidden');
+            }
+        });
+        // ===== End searchable student dropdown =====
 
 
         function generateSystemReport() { exportReport('system','pdf'); }
@@ -2601,8 +2771,8 @@
     </div>
 
     <!-- Archived Users Modal -->
-    <div id="archivedUsersModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[110] p-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+    <div id="archivedUsersModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[110] p-4" style="backdrop-filter:blur(4px)">
+        <div class="rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col" style="background:#1e293b;border:1px solid #334155">
             <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
                 <h3 class="text-lg font-bold text-yellow-400">🗑 Archived Users</h3>
                 <button onclick="closeArchivedUsersModal()" class="text-gray-400 hover:text-white text-xl">✕</button>

@@ -141,19 +141,25 @@
         body.light .text-gray-300 { color: #2d3f5a !important; }
         body.light .text-gray-400 { color: #3d5070 !important; }
         body.light .text-gray-500 { color: #4a6080 !important; }
-        body.light .text-green-400,body.light .text-green-300 { color: #15803d !important; }
-        body.light .text-blue-400,body.light .text-blue-300 { color: #1d4ed8 !important; }
-        body.light .text-orange-400,body.light .text-orange-300 { color: #c2410c !important; }
-        body.light .text-yellow-400,body.light .text-yellow-300 { color: #92400e !important; }
-        body.light .text-red-400,body.light .text-red-300 { color: #b91c1c !important; }
-        body.light .text-purple-400,body.light .text-purple-300 { color: #6d28d9 !important; }
-        body.light .text-indigo-400,body.light .text-indigo-300 { color: #4338ca !important; }
-        body.light .text-cyan-400 { color: #0369a1 !important; }
+        body.light .text-green-100,body.light .text-green-200,body.light .text-green-300,body.light .text-green-400 { color: #15803d !important; }
+        body.light .text-blue-100,body.light .text-blue-200,body.light .text-blue-300,body.light .text-blue-400 { color: #1d4ed8 !important; }
+        body.light .text-orange-100,body.light .text-orange-200,body.light .text-orange-300,body.light .text-orange-400 { color: #c2410c !important; }
+        body.light .text-yellow-100,body.light .text-yellow-200,body.light .text-yellow-300,body.light .text-yellow-400 { color: #92400e !important; }
+        body.light .text-red-100,body.light .text-red-200,body.light .text-red-300,body.light .text-red-400 { color: #b91c1c !important; }
+        body.light .text-purple-100,body.light .text-purple-200,body.light .text-purple-300,body.light .text-purple-400 { color: #6d28d9 !important; }
+        body.light .text-indigo-100,body.light .text-indigo-200,body.light .text-indigo-300,body.light .text-indigo-400 { color: #4338ca !important; }
+        body.light .text-cyan-200,body.light .text-cyan-300,body.light .text-cyan-400 { color: #0369a1 !important; }
         body.light button[class*="bg-green-6"],body.light button[class*="bg-blue-6"],
         body.light button[class*="bg-red-6"],body.light button[class*="bg-orange-6"],
         body.light button[class*="bg-yellow-6"],body.light button[class*="bg-indigo-6"],
         body.light button[class*="bg-purple-6"],body.light a[class*="bg-green-6"],
         body.light a[class*="bg-blue-6"],body.light a[class*="bg-purple-6"] { color: #fff !important; }
+        body.light button.bg-indigo-600,body.light button.bg-indigo-700,
+        body.light button.bg-red-600,body.light button.bg-red-700,
+        body.light button.bg-blue-600,body.light button.bg-blue-700,
+        body.light button.bg-green-600,body.light button.bg-green-700,
+        body.light button.bg-orange-600,body.light button.bg-orange-700,
+        body.light button.bg-purple-600,body.light button.bg-purple-700 { color: #fff !important; }
         body.light [class*="bg-slate-900"] { background: #c8daf0 !important; }
         body.light [class*="bg-slate-800"] { background: #d0e4f8 !important; }
         body.light [class*="bg-slate-700"] { background: #bdd4ec !important; }

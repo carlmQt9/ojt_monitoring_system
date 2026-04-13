@@ -22,26 +22,37 @@
         input[type="password"]::-webkit-contacts-auto-fill-button,
         input[type="password"]::-webkit-credentials-auto-fill-button { visibility: hidden; display: none !important; pointer-events: none; }
         /* LIGHT MODE */
-        body.light { background: linear-gradient(135deg, #b8cef0 0%, #a0bce8 40%, #b8d4f5 70%, #cce0fa 100%); }
-        body.light .text-white { color: #0f2460 !important; }
+        body.light { background: linear-gradient(135deg, #b8cef0 0%, #a0bce8 40%, #b8d4f5 70%, #cce0fa 100%); color: #0f2460; }
+        body.light .text-white,body.light .text-gray-100,body.light .text-gray-200 { color: #0f2460 !important; }
+        body.light .text-gray-300 { color: #1e3a5f !important; }
+        body.light .text-gray-400 { color: #2d4f7a !important; }
+        body.light .text-gray-500 { color: #3d5f8a !important; }
+        body.light .text-blue-100,body.light .text-blue-200 { color: #1e40af !important; }
         body.light .text-blue-300 { color: #1d4ed8 !important; }
         body.light .text-blue-400 { color: #1a3fcc !important; }
+        body.light .text-blue-500,body.light .text-blue-600 { color: #1e3a8a !important; }
         body.light .text-blue-200\/70 { color: #1e3a8a !important; }
-        body.light .text-blue-600 { color: #1e3a8a !important; }
+        body.light .text-green-100,body.light .text-green-200,body.light .text-green-300 { color: #166534 !important; }
+        body.light .text-green-400 { color: #15803d !important; }
+        body.light .text-red-100,body.light .text-red-200,body.light .text-red-300 { color: #991b1b !important; }
+        body.light .text-red-400 { color: #b91c1c !important; }
+        body.light .text-yellow-100,body.light .text-yellow-200,body.light .text-yellow-300 { color: #92400e !important; }
+        body.light .text-yellow-400 { color: #b45309 !important; }
+        body.light .text-orange-100,body.light .text-orange-200,body.light .text-orange-300 { color: #9a3412 !important; }
+        body.light .text-orange-400 { color: #c2410c !important; }
+        body.light .text-purple-100,body.light .text-purple-200,body.light .text-purple-300 { color: #5b21b6 !important; }
+        body.light .text-purple-400 { color: #6d28d9 !important; }
+        body.light .text-cyan-300,body.light .text-cyan-400 { color: #0369a1 !important; }
+        body.light .text-green-300\/60 { color: #166534 !important; }
+        body.light .text-purple-300\/60 { color: #5b21b6 !important; }
+        body.light .text-orange-300\/60 { color: #9a3412 !important; }
+        body.light .text-red-300\/60 { color: #991b1b !important; }
         body.light .card { background: rgba(220,235,255,0.95) !important; border-color: #6a9fd0 !important; }
         body.light .input-field { background: rgba(255,255,255,0.95) !important; border-color: #6a9fd0 !important; color: #0f2460 !important; }
         body.light .input-field::placeholder { color: #7aaad4 !important; }
         body.light .input-field option { background: #fff; color: #0f2460; }
         body.light [style*="background:linear-gradient(135deg,#050d2e"] { background: linear-gradient(135deg,#a8c4e8,#93b8e0,#bdd4f0) !important; }
         body.light [style*="border:1px solid rgba(59,130,246,0.2)"] { border-color: #6a9fd0 !important; }
-        body.light .text-green-400 { color: #15803d !important; }
-        body.light .text-purple-400 { color: #6d28d9 !important; }
-        body.light .text-orange-400 { color: #c2410c !important; }
-        body.light .text-red-400 { color: #b91c1c !important; }
-        body.light .text-green-300\/60 { color: #166534 !important; }
-        body.light .text-purple-300\/60 { color: #5b21b6 !important; }
-        body.light .text-orange-300\/60 { color: #9a3412 !important; }
-        body.light .text-red-300\/60 { color: #991b1b !important; }
         body.light .bg-green-900\/30 { background: rgba(187,247,208,0.6) !important; }
         body.light .bg-purple-900\/30 { background: rgba(233,213,255,0.6) !important; }
         body.light .bg-orange-900\/30 { background: rgba(254,215,170,0.6) !important; }
@@ -50,24 +61,102 @@
         body.light .border-purple-700\/40 { border-color: rgba(109,40,217,0.5) !important; }
         body.light .border-orange-700\/40 { border-color: rgba(194,65,12,0.5) !important; }
         body.light .border-red-700\/40 { border-color: rgba(185,28,28,0.5) !important; }
+        /* Navbar light mode */
+        body.light nav { background: rgba(220,235,255,0.97) !important; border-color: #7aaad4 !important; }
+        body.light nav span,body.light nav a,body.light nav p,body.light nav button { color: #0f2460 !important; }
+        body.light nav .text-blue-400 { color: #1d4ed8 !important; }
+        body.light nav a[class*="bg-blue-6"] { color: #fff !important; }
+        body.light nav a[class*="border-blue-5"] { color: #1e3a8a !important; }
+        /* Mobile menu */
+        body.light #mobileMenu { background: rgba(220,235,255,0.99) !important; }
+        body.light #mobileMenu a { color: #0f2460 !important; }
+        body.light #mobileMenu a:hover { background: rgba(100,150,210,0.2) !important; }
+        /* Role / Company / School Year dropdown menus */
+        body.light #roleDropdownMenu,
+        body.light #companyDropdownMenu,
+        body.light #schoolYearDropdownMenu { background: #fff !important; border-color: #7aaad4 !important; box-shadow: 0 8px 32px rgba(30,58,138,0.12) !important; }
+        body.light #roleDropdownMenu button,
+        body.light #companyDropdownMenu button,
+        body.light #schoolYearDropdownMenu button { color: #0f2460 !important; border-color: rgba(100,150,210,0.3) !important; }
+        body.light #roleDropdownMenu button:hover,
+        body.light #companyDropdownMenu button:hover,
+        body.light #schoolYearDropdownMenu button:hover { background: rgba(59,130,246,0.08) !important; }
+        body.light #roleDropdownMenu button div,
+        body.light #roleDropdownMenu button span,
+        body.light #companyDropdownMenu button span,
+        body.light #schoolYearDropdownMenu button div,
+        body.light #schoolYearDropdownMenu button span { color: #0f2460 !important; }
+        body.light #roleDropdownMenu button .text-xs { color: #4a6080 !important; }
+        /* Pending notice */
+        body.light #pendingNotice { background: rgba(254,243,199,0.8) !important; border-color: rgba(180,130,0,0.5) !important; }
+        body.light #pendingNotice p,body.light #pendingNotice span { color: #78350f !important; }
     </style>
 </head>
-<body class="text-white min-h-screen flex items-start md:items-center justify-center p-3 md:p-4 relative overflow-auto">
+<body class="text-white min-h-screen flex items-center justify-center p-4 pt-20 relative overflow-auto">
     <div class="dot-pattern absolute inset-0 opacity-40"></div>
     <div class="absolute top-20 left-10 w-72 h-72 bg-blue-600 rounded-full blur-3xl opacity-20"></div>
     <div class="absolute bottom-10 right-10 w-96 h-96 bg-blue-800 rounded-full blur-3xl opacity-20"></div>
+    <div class="absolute top-20 left-10 w-72 h-72 bg-blue-600 rounded-full blur-3xl opacity-20"></div>
+    <div class="absolute bottom-10 right-10 w-96 h-96 bg-blue-800 rounded-full blur-3xl opacity-20"></div>
 
-    <div class="fixed top-4 right-4 z-50">
-        <button id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode"
-            class="w-9 h-9 rounded-full flex items-center justify-center border border-blue-500/50 text-blue-300 hover:text-white hover:border-blue-400 transition-all" style="background:rgba(10,26,92,0.7);backdrop-filter:blur(8px)">
-            <svg id="iconMoon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
-            <svg id="iconSun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
-        </button>
-    </div>
+    <!-- Landing page navbar -->
+    <nav class="fixed top-0 left-0 right-0 z-50 border-b border-blue-900/50" style="background:rgba(5,13,46,0.92);backdrop-filter:blur(12px)">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14 sm:h-16">
+            <!-- Logo -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <img src="/8ae598d6-2434-4785-90dc-c0e59f0596a3.jpg" alt="OJT Logo" class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg object-cover">
+                <span class="font-bold text-white text-xs sm:text-sm leading-tight">PRMSU <span class="text-blue-400">OJT</span> Monitoring System</span>
+            </div>
+            <!-- Desktop links -->
+            <div class="hidden md:flex items-center gap-8 text-sm text-blue-200">
+                <a href="/" class="hover:text-white transition-colors">Home</a>
+                <a href="/#about" class="hover:text-white transition-colors">About</a>
+                <a href="/#features" class="hover:text-white transition-colors">Features</a>
+                <a href="/#contact" class="hover:text-white transition-colors">Contact</a>
+            </div>
+            <!-- Right side -->
+            <div class="flex items-center gap-2">
+                <button id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode"
+                    class="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center border border-blue-500/50 text-blue-300 hover:text-white hover:border-blue-400 transition-all" style="background:rgba(10,26,92,0.7)">
+                    <svg id="iconMoon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                    <svg id="iconSun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+                </button>
+                <!-- Desktop auth buttons -->
+                <a href="{{ route('login') }}" class="hidden sm:inline-flex px-4 py-1.5 border border-blue-500 text-blue-300 hover:text-white hover:border-blue-400 rounded-full text-sm font-semibold transition-all">Log in</a>
+                <a href="{{ route('register') }}" class="hidden sm:inline-flex px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-full text-sm font-semibold transition-all">Register</a>
+                <!-- Mobile hamburger -->
+                <button id="mobileMenuBtn" onclick="toggleMobileMenu()" class="md:hidden w-8 h-8 flex items-center justify-center text-blue-300 hover:text-white transition-colors">
+                    <svg id="hamburgerIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    <svg id="closeIcon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+        <!-- Mobile dropdown menu -->
+        <div id="mobileMenu" class="hidden md:hidden border-t border-blue-900/50 px-4 py-3 space-y-1" style="background:rgba(5,13,46,0.97)">
+            <a href="/" class="block px-3 py-2 rounded-lg text-sm text-blue-200 hover:text-white hover:bg-blue-800/40 transition-colors">Home</a>
+            <a href="/#about" class="block px-3 py-2 rounded-lg text-sm text-blue-200 hover:text-white hover:bg-blue-800/40 transition-colors">About</a>
+            <a href="/#features" class="block px-3 py-2 rounded-lg text-sm text-blue-200 hover:text-white hover:bg-blue-800/40 transition-colors">Features</a>
+            <a href="/#contact" class="block px-3 py-2 rounded-lg text-sm text-blue-200 hover:text-white hover:bg-blue-800/40 transition-colors">Contact</a>
+            <div class="flex gap-2 pt-2 border-t border-blue-900/50">
+                <a href="{{ route('login') }}" class="flex-1 text-center px-4 py-2 border border-blue-500 text-blue-300 hover:text-white rounded-full text-sm font-semibold transition-all">Log in</a>
+                <a href="{{ route('register') }}" class="flex-1 text-center px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-sm font-semibold transition-all">Register</a>
+            </div>
+        </div>
+    </nav>
+    <script>
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobileMenu');
+            const ham  = document.getElementById('hamburgerIcon');
+            const cls  = document.getElementById('closeIcon');
+            const open = menu.classList.toggle('hidden');
+            ham.classList.toggle('hidden', !open);
+            cls.classList.toggle('hidden', open);
+        }
+    </script>
 
     @include('partials.success-popup')
 
-    <div class="relative w-full max-w-5xl flex flex-col md:flex-row rounded-3xl overflow-hidden shadow-2xl my-2 md:my-6" style="border:1px solid rgba(59,130,246,0.2)">
+    <div class="relative w-full max-w-5xl flex flex-col md:flex-row rounded-3xl overflow-hidden shadow-2xl my-6" style="border:1px solid rgba(59,130,246,0.2)">
 
         <!-- Left Panel — hidden on mobile -->
         <div class="hidden md:flex w-full md:w-5/12 flex-col items-center justify-center p-10 md:p-12 relative overflow-hidden" style="background:linear-gradient(135deg,#050d2e,#0a1a5c,#0d2d8a)">
@@ -80,10 +169,10 @@
                     </div>
                     <span class="font-bold text-white text-xl leading-tight">PRMSU <span class="text-blue-400">OJT</span> System</span>
                 </div>
-                <p class="text-blue-200/70 text-sm max-w-xs mx-auto hidden md:block" style="color: inherit;">
+                <p class="text-blue-200/70 text-sm max-w-xs mx-auto hidden md:block">
                     Join the platform to track your internship journey with ease.
                 </p>
-                <div class="hidden md:flex justify-center gap-5 pt-2 text-xs text-blue-600">
+                <div class="hidden md:flex justify-center gap-5 pt-2 text-xs text-blue-400">
                     <div class="text-center"><div class="text-xl font-bold text-white">600</div>OJT Hours</div>
                     <div class="text-center"><div class="text-xl font-bold text-white">DTR</div>Reports</div>
                     <div class="text-center"><div class="text-xl font-bold text-white">Live</div>Tracking</div>
@@ -329,11 +418,11 @@
                 </button>
 
                 <div class="text-center">
-                    <a href="/" class="text-blue-500/60 hover:text-blue-400 text-xs transition-colors">← Return to website</a>
                 </div>
             </form>
         </div>
     </div>
+    </div>{{-- end centering wrapper --}}
 
     <script>
         // Custom role dropdown

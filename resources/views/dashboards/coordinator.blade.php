@@ -131,18 +131,25 @@
         body.light .text-gray-300 { color: #2d3f5a !important; }
         body.light .text-gray-400 { color: #3d5070 !important; }
         body.light .text-gray-500 { color: #4a6080 !important; }
-        body.light .text-green-400,body.light .text-green-300 { color: #15803d !important; }
-        body.light .text-blue-400,body.light .text-blue-300 { color: #1d4ed8 !important; }
-        body.light .text-orange-400,body.light .text-orange-300 { color: #c2410c !important; }
-        body.light .text-yellow-400,body.light .text-yellow-300 { color: #92400e !important; }
-        body.light .text-red-400,body.light .text-red-300 { color: #b91c1c !important; }
-        body.light .text-purple-400,body.light .text-purple-300 { color: #6d28d9 !important; }
-        body.light .text-indigo-400,body.light .text-indigo-300 { color: #4338ca !important; }
+        body.light .text-green-100,body.light .text-green-200,body.light .text-green-300,body.light .text-green-400 { color: #15803d !important; }
+        body.light .text-blue-100,body.light .text-blue-200,body.light .text-blue-300,body.light .text-blue-400 { color: #1d4ed8 !important; }
+        body.light .text-orange-100,body.light .text-orange-200,body.light .text-orange-300,body.light .text-orange-400 { color: #c2410c !important; }
+        body.light .text-yellow-100,body.light .text-yellow-200,body.light .text-yellow-300,body.light .text-yellow-400 { color: #92400e !important; }
+        body.light .text-red-100,body.light .text-red-200,body.light .text-red-300,body.light .text-red-400 { color: #b91c1c !important; }
+        body.light .text-purple-100,body.light .text-purple-200,body.light .text-purple-300,body.light .text-purple-400 { color: #6d28d9 !important; }
+        body.light .text-indigo-100,body.light .text-indigo-200,body.light .text-indigo-300,body.light .text-indigo-400 { color: #4338ca !important; }
+        body.light .text-cyan-200,body.light .text-cyan-300,body.light .text-cyan-400 { color: #0369a1 !important; }
         body.light button[class*="bg-green-6"],body.light button[class*="bg-blue-6"],
         body.light button[class*="bg-red-6"],body.light button[class*="bg-orange-6"],
         body.light button[class*="bg-yellow-6"],body.light button[class*="bg-indigo-6"],
         body.light button[class*="bg-purple-6"],body.light a[class*="bg-green-6"],
         body.light a[class*="bg-blue-6"],body.light a[class*="bg-orange-6"] { color: #fff !important; }
+        body.light button.bg-indigo-600,body.light button.bg-indigo-700,
+        body.light button.bg-red-600,body.light button.bg-red-700,
+        body.light button.bg-blue-600,body.light button.bg-blue-700,
+        body.light button.bg-green-600,body.light button.bg-green-700,
+        body.light button.bg-orange-600,body.light button.bg-orange-700,
+        body.light button.bg-purple-600,body.light button.bg-purple-700 { color: #fff !important; }
         body.light [class*="bg-slate-900"] { background: #c8daf0 !important; }
         body.light [class*="bg-slate-800"] { background: #d0e4f8 !important; }
         body.light [class*="bg-slate-700"] { background: #bdd4ec !important; }
@@ -162,6 +169,7 @@
         body.light .header-info-card .stat-value-indigo { color: #4338ca !important; }
         body.light .header-info-card .stat-value-yellow { color: #92400e !important; }
         body.light .header-info-card .divider { background: #cbd5e1 !important; }
+        /* Archive/Trash modals — always dark (handled via inline styles on modal panels) */
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-gray-100">
@@ -416,18 +424,18 @@
         <!-- Company Statistics Section -->
         <section id="section-companies" class="dash-section hidden">
         <div class="mb-12">
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
                 <h2 class="text-2xl font-bold text-white">Company/Organization Statistics</h2>
-                <div class="flex gap-2">
-                    <button onclick="toggleArchivedCompanies()" id="archivedTrashBtn" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition-colors">🗑 Archive Trash</button>
-                    <button onclick="showAddCompanyModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors">
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="toggleArchivedCompanies()" id="archivedTrashBtn" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition-colors">🗑 Archive Trash</button>
+                    <button onclick="showAddCompanyModal()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors">
                         + Add Company
                     </button>
                 </div>
             </div>
 
             <!-- All Companies Overview -->
-            <div class="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-6">
+            <div class="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
                 <h3 class="text-lg font-bold text-white mb-4">All Companies Overview</h3>
                 <?php 
                 $allCompanies = \App\Models\Company::withCount('students')
@@ -437,23 +445,24 @@
                 $totalInterns = $allCompanies->sum('students_count');
                 $avgInternsPerCompany = $totalCompanies > 0 ? round($totalInterns / $totalCompanies, 1) : 0;
                 ?>
-                <div class="grid grid-cols-3 gap-4 mb-6">
-                    <div class="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-lg p-4">
-                        <p class="text-blue-300 text-sm">Total Companies</p>
-                        <p class="text-3xl font-bold text-blue-400 mt-2">{{ $totalCompanies }}</p>
+                <div class="grid grid-cols-3 gap-3 mb-6">
+                    <div class="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-lg p-3 sm:p-4">
+                        <p class="text-blue-300 text-xs sm:text-sm">Total Companies</p>
+                        <p class="text-2xl sm:text-3xl font-bold text-blue-400 mt-1 sm:mt-2">{{ $totalCompanies }}</p>
                     </div>
-                    <div class="bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 rounded-lg p-4">
-                        <p class="text-green-300 text-sm">Total Interns</p>
-                        <p class="text-3xl font-bold text-green-400 mt-2">{{ $totalInterns }}</p>
+                    <div class="bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/30 rounded-lg p-3 sm:p-4">
+                        <p class="text-green-300 text-xs sm:text-sm">Total Interns</p>
+                        <p class="text-2xl sm:text-3xl font-bold text-green-400 mt-1 sm:mt-2">{{ $totalInterns }}</p>
                     </div>
-                    <div class="bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-lg p-4">
-                        <p class="text-purple-300 text-sm">Avg per Company</p>
-                        <p class="text-3xl font-bold text-purple-400 mt-2">{{ $avgInternsPerCompany }}</p>
+                    <div class="bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-lg p-3 sm:p-4">
+                        <p class="text-purple-300 text-xs sm:text-sm">Avg per Company</p>
+                        <p class="text-2xl sm:text-3xl font-bold text-purple-400 mt-1 sm:mt-2">{{ $avgInternsPerCompany }}</p>
                     </div>
                 </div>
 
                 @if($allCompanies->isNotEmpty())
-                <div class="overflow-x-auto">
+                {{-- Desktop table --}}
+                <div class="hidden sm:block overflow-x-auto">
                     <table class="w-full">
                         <thead>
                             <tr class="border-b border-slate-700">
@@ -495,6 +504,34 @@
                             @endforeach
                         </tbody>
                     </table>
+                </div>
+                {{-- Mobile card list --}}
+                <div class="sm:hidden space-y-3">
+                    @foreach($allCompanies as $company)
+                    <div class="bg-slate-700/30 border border-slate-600/50 rounded-xl p-4">
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                            <p class="text-gray-200 font-semibold text-sm leading-tight">{{ $company->name }}</p>
+                            <span class="shrink-0 px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded-full text-xs font-semibold">{{ $company->students_count }} intern{{ $company->students_count != 1 ? 's' : '' }}</span>
+                        </div>
+                        @if($company->industry)
+                        <p class="text-gray-400 text-xs mb-0.5">🏭 {{ $company->industry }}</p>
+                        @endif
+                        @if($company->location)
+                        <p class="text-gray-400 text-xs mb-0.5">📍 {{ $company->location }}</p>
+                        @endif
+                        @if($company->contact_email)
+                        <p class="text-xs mb-2"><a href="mailto:{{ $company->contact_email }}" class="text-blue-400">{{ $company->contact_email }}</a></p>
+                        @elseif($company->contact_phone)
+                        <p class="text-xs mb-2"><a href="tel:{{ $company->contact_phone }}" class="text-blue-400">{{ $company->contact_phone }}</a></p>
+                        @endif
+                        <div class="flex gap-2 mt-3">
+                            <button onclick="showEditCompanyModal({{ $company->id }}, '{{ addslashes($company->name) }}', '{{ addslashes($company->industry ?? '') }}', '{{ addslashes($company->location ?? '') }}', '{{ addslashes($company->contact_person ?? '') }}', '{{ addslashes($company->contact_email ?? '') }}', '{{ addslashes($company->contact_phone ?? '') }}')"
+                                class="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors">✏️ Edit</button>
+                            <button onclick="showDeleteCompanyModal({{ $company->id }}, '{{ addslashes($company->name) }}')"
+                                class="flex-1 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition-colors">🗑 Archive</button>
+                        </div>
+                    </div>
+                    @endforeach
                 </div>
                 @else
                 <p class="text-gray-400 text-center py-8">No companies registered yet</p>
@@ -1081,64 +1118,65 @@
     </div>
 
     <!-- Add Company Modal -->
-    <div id="addCompanyModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div class="bg-slate-800 rounded-xl max-w-md w-full border border-slate-700">
-            <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 rounded-t-xl">
-                <h2 class="text-xl font-bold text-white">Add New Company</h2>
+    <div id="addCompanyModal" class="hidden fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+        <div class="bg-slate-800 rounded-t-2xl sm:rounded-xl w-full sm:max-w-md border border-slate-700 max-h-[90vh] flex flex-col">
+            <div class="bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-4 rounded-t-2xl sm:rounded-t-xl flex items-center justify-between shrink-0">
+                <h2 class="text-lg font-bold text-white">Add New Company</h2>
+                <button type="button" onclick="closeAddCompanyModal()" class="text-white/70 hover:text-white text-xl leading-none">✕</button>
             </div>
 
-            <form action="{{ route('add-company') }}" method="POST" class="p-6 space-y-4">
+            <form action="{{ route('add-company') }}" method="POST" class="p-5 space-y-3 overflow-y-auto">
                 @csrf
 
                 <div>
-                    <label for="company_name" class="block text-sm font-medium text-gray-300 mb-2">Company Name *</label>
+                    <label for="company_name" class="block text-sm font-medium text-gray-300 mb-1.5">Company Name *</label>
                     <input type="text" name="name" id="company_name" required
-                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none"
+                        class="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none text-sm"
                         placeholder="Enter company name">
                 </div>
 
                 <div>
-                    <label for="industry" class="block text-sm font-medium text-gray-300 mb-2">Industry</label>
+                    <label for="industry" class="block text-sm font-medium text-gray-300 mb-1.5">Industry</label>
                     <input type="text" name="industry" id="industry"
-                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none"
+                        class="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none text-sm"
                         placeholder="e.g., Information Technology">
                 </div>
 
                 <div>
-                    <label for="location" class="block text-sm font-medium text-gray-300 mb-2">Location</label>
+                    <label for="location" class="block text-sm font-medium text-gray-300 mb-1.5">Location</label>
                     <input type="text" name="location" id="location"
-                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none"
+                        class="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none text-sm"
                         placeholder="City, Province">
                 </div>
 
                 <div>
-                    <label for="contact_person" class="block text-sm font-medium text-gray-300 mb-2">Contact Person</label>
+                    <label for="contact_person" class="block text-sm font-medium text-gray-300 mb-1.5">Contact Person</label>
                     <input type="text" name="contact_person" id="contact_person"
-                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none"
+                        class="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none text-sm"
                         placeholder="Full name">
                 </div>
 
                 <div>
-                    <label for="contact_email" class="block text-sm font-medium text-gray-300 mb-2">Contact Email</label>
+                    <label for="contact_email" class="block text-sm font-medium text-gray-300 mb-1.5">Contact Email</label>
                     <input type="email" name="contact_email" id="contact_email"
-                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none"
+                        class="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none text-sm"
                         placeholder="email@company.com">
                 </div>
 
                 <div>
-                    <label for="contact_phone" class="block text-sm font-medium text-gray-300 mb-2">Contact Phone</label>
+                    <label for="contact_phone" class="block text-sm font-medium text-gray-300 mb-1.5">Contact Phone</label>
                     <input type="tel" name="contact_phone" id="contact_phone"
-                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none"
+                        class="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none text-sm"
                         placeholder="09XXXXXXXXX">
                 </div>
 
-                <div class="flex gap-3 pt-4">
+                <div class="flex gap-3 pt-2 pb-1">
                     <button type="button" onclick="closeAddCompanyModal()" 
-                        class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
+                        class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-sm font-semibold">
                         Cancel
                     </button>
                     <button type="submit" 
-                        class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-semibold">
+                        class="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors font-semibold text-sm">
                         Add Company
                     </button>
                 </div>
@@ -1226,44 +1264,66 @@
     </div>
 
     <!-- Archived Companies Modal -->
-    <div id="archivedCompaniesModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-        <div class="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
+    <div id="archivedCompaniesModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" style="backdrop-filter:blur(4px)">
+        <div class="rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col" style="background:#1e293b;border:1px solid #334155">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700 shrink-0">
                 <h3 class="text-lg font-bold text-yellow-400">🗑 Archived Companies</h3>
                 <button onclick="closeArchivedCompaniesModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
             </div>
             <div class="overflow-auto flex-1 p-4">
                 @if($archivedCompanies->isNotEmpty())
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b border-slate-700">
-                            <th class="text-left py-2 px-3 text-gray-300 font-semibold">Company Name</th>
-                            <th class="text-left py-2 px-3 text-gray-300 font-semibold">Industry</th>
-                            <th class="text-left py-2 px-3 text-gray-300 font-semibold">Location</th>
-                            <th class="text-center py-2 px-3 text-gray-300 font-semibold">Archived On</th>
-                            <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($archivedCompanies as $archived)
-                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors opacity-80">
-                            <td class="py-3 px-3 text-gray-400 line-through">{{ $archived->name }}</td>
-                            <td class="py-3 px-3 text-gray-500 text-sm">{{ $archived->industry ?? '-' }}</td>
-                            <td class="py-3 px-3 text-gray-500 text-sm">{{ $archived->location ?? '-' }}</td>
-                            <td class="py-3 px-3 text-center text-gray-500 text-sm">{{ $archived->deleted_at->format('M d, Y') }}</td>
-                            <td class="py-3 px-3 text-center">
-                                <div class="flex items-center justify-center gap-2">
-                                    <form action="{{ route('restore-company', $archived->id) }}" method="POST" class="inline">
-                                        @csrf
-                                        <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
-                                    </form>
-                                    <button onclick="showForceDeleteModal({{ $archived->id }}, '{{ addslashes($archived->name) }}')" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
-                                </div>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+                {{-- Desktop table --}}
+                <div class="hidden sm:block">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-slate-700">
+                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Company Name</th>
+                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Industry</th>
+                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Location</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Archived On</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($archivedCompanies as $archived)
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors opacity-80">
+                                <td class="py-3 px-3 text-gray-400 line-through">{{ $archived->name }}</td>
+                                <td class="py-3 px-3 text-gray-500 text-sm">{{ $archived->industry ?? '-' }}</td>
+                                <td class="py-3 px-3 text-gray-500 text-sm">{{ $archived->location ?? '-' }}</td>
+                                <td class="py-3 px-3 text-center text-gray-500 text-sm">{{ $archived->deleted_at->format('M d, Y') }}</td>
+                                <td class="py-3 px-3 text-center">
+                                    <div class="flex items-center justify-center gap-2">
+                                        <form action="{{ route('restore-company', $archived->id) }}" method="POST" class="inline">
+                                            @csrf
+                                            <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
+                                        </form>
+                                        <button onclick="showForceDeleteModal({{ $archived->id }}, '{{ addslashes($archived->name) }}')" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                {{-- Mobile cards --}}
+                <div class="sm:hidden space-y-3">
+                    @foreach($archivedCompanies as $archived)
+                    <div class="bg-slate-700/30 border border-slate-600/50 rounded-xl p-4 opacity-90">
+                        <p class="text-gray-400 line-through font-semibold text-sm mb-0.5">{{ $archived->name }}</p>
+                        @if($archived->industry)<p class="text-gray-500 text-xs">🏭 {{ $archived->industry }}</p>@endif
+                        @if($archived->location)<p class="text-gray-500 text-xs">📍 {{ $archived->location }}</p>@endif
+                        <p class="text-gray-500 text-xs mt-1 mb-3">Archived: {{ $archived->deleted_at->format('M d, Y') }}</p>
+                        <div class="flex gap-2">
+                            <form action="{{ route('restore-company', $archived->id) }}" method="POST" class="flex-1">
+                                @csrf
+                                <button type="submit" class="w-full py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold">♻️ Restore</button>
+                            </form>
+                            <button onclick="showForceDeleteModal({{ $archived->id }}, '{{ addslashes($archived->name) }}')"
+                                class="flex-1 py-1.5 bg-red-800 hover:bg-red-900 text-white rounded-lg text-xs font-semibold">🗑 Delete</button>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
                 @else
                 <p class="text-gray-400 text-center py-10">No archived companies.</p>
                 @endif
