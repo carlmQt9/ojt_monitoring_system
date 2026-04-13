@@ -1338,10 +1338,26 @@ Route::get('/api/school-ids', function () {
 });
 
 Route::post('/api/school-ids', function () {
+    $number = trim(request()->input('school_id_number', ''));
+
+    if (empty($number)) {
+        return response()->json(['success' => false, 'message' => 'School ID number is required.'], 422);
+    }
+
+    // Check duplicate including soft-deleted (archived) records
+    $exists = \App\Models\StudentSchoolId::withTrashed()
+        ->where('school_id_number', $number)
+        ->exists();
+
+    if ($exists) {
+        return response()->json(['success' => false, 'message' => "ID '{$number}' already exists (or is archived)."], 422);
+    }
+
     $validated = request()->validate([
-        'school_id_number' => 'required|string|regex:/^\d{2}-\d{1}-\d{1}-\d{4}$/|unique:student_school_ids,school_id_number',
+        'school_id_number' => ['required','string','max:30'],
         'school_year'      => 'nullable|string|max:20',
     ]);
+
     $id = \App\Models\StudentSchoolId::create([
         'school_id_number' => $validated['school_id_number'],
         'school_year'      => $validated['school_year'] ?? null,
@@ -1353,6 +1369,15 @@ Route::delete('/api/school-ids/{id}', function ($id) {
     $sid = \App\Models\StudentSchoolId::findOrFail($id);
     $sid->update(['is_used' => true]); // block registration
     $sid->delete();                    // soft delete
+
+    // Also archive the student user who owns this school ID (if any)
+    $user = \App\Models\User::where('school_id_number', $sid->school_id_number)
+        ->whereNull('deleted_at')
+        ->first();
+    if ($user) {
+        $user->delete(); // soft delete the user
+    }
+
     return response()->json(['success' => true]);
 });
 
@@ -1360,6 +1385,17 @@ Route::post('/api/school-ids/{id}/restore', function ($id) {
     $sid = \App\Models\StudentSchoolId::withTrashed()->findOrFail($id);
     $sid->restore();
     $sid->update(['is_used' => false]); // re-enable for registration
+
+    // Also restore the student user who owns this school ID (if archived)
+    $user = \App\Models\User::withTrashed()
+        ->where('school_id_number', $sid->school_id_number)
+        ->whereNotNull('deleted_at')
+        ->first();
+    if ($user) {
+        $user->restore();
+        $sid->update(['is_used' => true]); // mark as used again since user exists
+    }
+
     return response()->json(['success' => true]);
 });
 

@@ -486,7 +486,17 @@
         <section id="section-interns" class="dash-section hidden">
         <!-- Interns Progress Monitoring Section -->
         <div class="mb-12">
-            <h2 class="text-2xl font-bold text-white mb-6">👥 Interns Management & Progress Tracking</h2>
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+                <h2 class="text-2xl font-bold text-white">👥 Interns Management & Progress Tracking</h2>
+                <div class="w-full sm:max-w-sm">
+                    <div class="flex items-center gap-2 px-3 py-2.5 bg-slate-700/50 border border-slate-600 rounded-xl focus-within:border-purple-500 transition-colors">
+                        <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
+                        <input type="search" id="internSearch" placeholder="Search intern by name or email..."
+                            class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none"
+                            oninput="filterInterns(this.value)">
+                    </div>
+                </div>
+            </div>
             
             @if($supervisorStudents->isEmpty())
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-8 text-center">
@@ -529,7 +539,7 @@
                         ->get();
                     $canEvaluate = $studentHours->hours_completed >= ($studentHours->total_hours_required ?? 600);
                     ?>
-                    <div class="student-card bg-slate-800/50 border border-slate-700 rounded-xl p-6 hover:border-purple-500/50 transition-colors" data-student-id="{{ $student->id }}">
+                    <div class="student-card bg-slate-800/50 border border-slate-700 rounded-xl p-6 hover:border-purple-500/50 transition-colors" data-student-id="{{ $student->id }}" data-intern="{{ strtolower($student->name . ' ' . $student->email) }}">
                         <!-- Clickable Student Header -->
                         <div class="student-header-btn cursor-pointer" onclick="toggleStudentExpand(this)">
                             <div class="flex justify-between items-start">
@@ -1476,6 +1486,14 @@
         // ===== END SIDEBAR LOGIC =====
 
         // Toggle student card expansion — collapse others first
+        function filterInterns(q) {
+            q = q.toLowerCase();
+            document.querySelectorAll('.student-card').forEach(card => {
+                const match = (card.dataset.intern || '').includes(q);
+                card.style.display = match ? '' : 'none';
+            });
+        }
+
         function toggleStudentExpand(element) {
             const card = element.closest('.student-card');
             const isExpanded = card.classList.contains('expanded');

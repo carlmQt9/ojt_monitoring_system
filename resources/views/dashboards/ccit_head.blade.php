@@ -464,12 +464,32 @@
             </div>
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
                 <p class="text-gray-400 text-sm mb-4">Only students with an approved School ID (e.g. <span class="text-red-300 font-mono">23-1-2-0001</span>) can register.</p>
+                <!-- Single add -->
                 <div class="flex flex-wrap gap-2 mb-2">
                     <input id="newSchoolIdInput" type="text" placeholder="e.g. 23-1-2-0001"
                         class="flex-1 min-w-[160px] px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded-lg focus:outline-none focus:border-red-500 text-sm font-mono">
                     <button onclick="addSchoolId()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm">Add</button>
                 </div>
                 <p id="sidError" class="text-red-400 text-xs mb-3 hidden"></p>
+                <!-- Bulk import -->
+                <details class="mb-4">
+                    <summary class="text-sm text-gray-400 hover:text-white cursor-pointer select-none mb-2">📋 Bulk Import (paste multiple IDs)</summary>
+                    <div class="mt-3 space-y-2">
+                        <textarea id="bulkSchoolIdInput" rows="6"
+                            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded-lg focus:outline-none focus:border-red-500 text-sm font-mono resize-y"
+                            placeholder="Paste one ID per line, e.g.:&#10;22-1-2-0500&#10;22-1-2-0401&#10;22-1-2-0009"></textarea>
+                        <p class="text-gray-500 text-xs">One ID per line. Duplicates and invalid formats are skipped automatically.</p>
+                        <p id="bulkSidError" class="text-red-400 text-xs hidden"></p>
+                        <button onclick="bulkAddSchoolIds()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold">Import All</button>
+                    </div>
+                </details>
+                <!-- Search school IDs -->
+                <div class="flex items-center gap-2 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg mb-3 focus-within:border-red-500 transition-colors">
+                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
+                    <input type="text" id="schoolIdSearch" placeholder="Search school IDs…"
+                        class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none font-mono"
+                        oninput="filterSchoolIdList(this.value)">
+                </div>
                 <div id="schoolIdList" class="space-y-2 overflow-y-auto">
                     <p class="text-gray-400 text-sm text-center py-4">Loading...</p>
                 </div>
@@ -705,6 +725,13 @@
                 <h3 class="text-lg font-bold text-yellow-400">🗑 Archived School Years</h3>
                 <button onclick="closeArchivedSchoolYearsModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
             </div>
+            <div class="px-4 pt-3 shrink-0">
+                <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-600 focus-within:border-yellow-500 transition-colors" style="background:#0f172a">
+                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
+                    <input type="text" placeholder="Search school years…" class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none"
+                        oninput="filterArchiveList('archivedSchoolYearsList', this.value)">
+                </div>
+            </div>
             <div class="overflow-auto flex-1 p-4">
                 <div id="archivedSchoolYearsList"><p class="text-gray-400 text-center py-8">Loading...</p></div>
             </div>
@@ -718,6 +745,13 @@
                 <h3 class="text-lg font-bold text-yellow-400">🗑 Archived School IDs</h3>
                 <button onclick="closeArchivedSchoolIdsModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
             </div>
+            <div class="px-4 pt-3 shrink-0">
+                <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-600 focus-within:border-yellow-500 transition-colors" style="background:#0f172a">
+                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
+                    <input type="text" placeholder="Search school IDs…" class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none font-mono"
+                        oninput="filterArchiveList('archivedSchoolIdsList', this.value)">
+                </div>
+            </div>
             <div class="overflow-auto flex-1 p-4">
                 <div id="archivedSchoolIdsList"><p class="text-gray-400 text-center py-8">Loading...</p></div>
             </div>
@@ -730,6 +764,13 @@
             <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700 shrink-0">
                 <h3 class="text-lg font-bold text-yellow-400">🗑 Archived Requirements</h3>
                 <button onclick="closeArchivedTemplatesModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+            </div>
+            <div class="px-4 pt-3 shrink-0">
+                <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-600 focus-within:border-yellow-500 transition-colors" style="background:#0f172a">
+                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
+                    <input type="text" id="archivedTemplatesSearch" placeholder="Search requirements…" class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none"
+                        oninput="filterBladeArchive('archivedTemplatesSearch', '.archived-tpl-row', '.archived-tpl-card')">
+                </div>
             </div>
             <div class="overflow-auto flex-1 p-4">
                 @if($archivedTemplates->isNotEmpty())
@@ -746,7 +787,7 @@
                         </thead>
                         <tbody>
                             @foreach($archivedTemplates as $tpl)
-                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80">
+                            <tr class="archived-tpl-row border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80" data-search="{{ strtolower($tpl->name . ' ' . $tpl->category) }}">
                                 <td class="py-3 px-3 text-gray-400 line-through">{{ $tpl->name }}</td>
                                 <td class="py-3 px-3 text-gray-500 text-sm capitalize">{{ $tpl->category }}</td>
                                 <td class="py-3 px-3 text-center text-gray-500 text-sm">{{ $tpl->deleted_at->format('M d, Y') }}</td>
@@ -767,7 +808,7 @@
                 {{-- Mobile cards --}}
                 <div class="sm:hidden space-y-3">
                     @foreach($archivedTemplates as $tpl)
-                    <div class="bg-slate-700/30 border border-slate-600/50 rounded-xl p-4 opacity-90">
+                    <div class="archived-tpl-card bg-slate-700/30 border border-slate-600/50 rounded-xl p-4 opacity-90" data-search="{{ strtolower($tpl->name . ' ' . $tpl->category) }}">
                         <p class="text-gray-400 line-through font-semibold text-sm mb-0.5">{{ $tpl->name }}</p>
                         <p class="text-gray-500 text-xs capitalize mb-1">{{ $tpl->category }}</p>
                         <p class="text-gray-500 text-xs mb-3">Archived: {{ $tpl->deleted_at->format('M d, Y') }}</p>
@@ -986,6 +1027,7 @@
                             <label class="block text-gray-300 mb-2">Email</label>
                             <input type="email" name="email" required class="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500">
                         </div>
+                        <div id="passwordFields">
                         <div>
                             <label class="block text-gray-300 mb-2">Password</label>
                             <div class="relative">
@@ -1006,6 +1048,7 @@
                                 </button>
                             </div>
                         </div>
+                        </div>{{-- end passwordFields --}}
                         <div>
                             <label class="block text-gray-300 mb-2">Role</label>
                             <select name="role" required class="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500">
@@ -1316,12 +1359,17 @@
             if (editingUserId) {
                 title.textContent = 'Edit User';
                 submitBtn.textContent = 'Save Changes';
-                // make password optional when editing
-                if (pwd) pwd.removeAttribute('required');
-                if (pwdConf) pwdConf.removeAttribute('required');
+                // hide password fields when editing — privacy
+                const pwdFields = document.getElementById('passwordFields');
+                if (pwdFields) pwdFields.classList.add('hidden');
+                if (pwd) { pwd.removeAttribute('required'); pwd.value = ''; }
+                if (pwdConf) { pwdConf.removeAttribute('required'); pwdConf.value = ''; }
             } else {
                 title.textContent = 'Add New User';
                 submitBtn.textContent = 'Add User';
+                // show password fields when adding
+                const pwdFields = document.getElementById('passwordFields');
+                if (pwdFields) pwdFields.classList.remove('hidden');
                 if (pwd) pwd.setAttribute('required', '');
                 if (pwdConf) pwdConf.setAttribute('required', '');
             }
@@ -1685,9 +1733,11 @@
         }
         function pixelAction(label, action, successMsg) {
             showPixelLoader(label);
-            return action().finally(() => {
+            return action().then(() => {
                 hidePixelLoader();
                 showPixelSuccess(successMsg);
+            }).catch(() => {
+                hidePixelLoader();
             });
         }
 
@@ -2058,6 +2108,39 @@
         function closeSchoolIdModal() {
             document.getElementById('schoolIdModal').classList.add('hidden');
         }
+        // ===== SEARCH / FILTER HELPERS =====
+        function filterSchoolIdList(q) {
+            q = q.toLowerCase();
+            document.querySelectorAll('#schoolIdList [data-sid]').forEach(el => {
+                el.style.display = el.dataset.sid.toLowerCase().includes(q) ? '' : 'none';
+            });
+        }
+        // Filter JS-rendered archive lists (school years, school IDs, users)
+        function filterArchiveList(containerId, q) {
+            q = q.toLowerCase();
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            // Filter table rows
+            container.querySelectorAll('tr[data-search]').forEach(el => {
+                el.style.display = el.dataset.search.includes(q) ? '' : 'none';
+            });
+            // Filter mobile cards
+            container.querySelectorAll('div[data-search]').forEach(el => {
+                el.style.display = el.dataset.search.includes(q) ? '' : 'none';
+            });
+        }
+        // Filter Blade-rendered archive lists (companies, requirements)
+        function filterBladeArchive(inputId, rowSelector, cardSelector) {
+            const q = (document.getElementById(inputId)?.value || '').toLowerCase();
+            document.querySelectorAll(rowSelector).forEach(el => {
+                el.style.display = (el.dataset.search || '').includes(q) ? '' : 'none';
+            });
+            document.querySelectorAll(cardSelector).forEach(el => {
+                el.style.display = (el.dataset.search || '').includes(q) ? '' : 'none';
+            });
+        }
+        // ===== END SEARCH / FILTER HELPERS =====
+
         function loadSchoolIdList() {
             const sy = currentSchoolYear;
             const url = sy ? `/api/school-ids?school_year=${encodeURIComponent(sy)}` : '/api/school-ids';
@@ -2084,7 +2167,7 @@
                             </thead>
                             <tbody class="divide-y divide-slate-700">
                                 ${ids.map(sid => `
-                                <tr class="bg-slate-800/50 hover:bg-slate-700/50">
+                                <tr class="bg-slate-800/50 hover:bg-slate-700/50" data-sid="${sid.school_id_number} ${sid.school_year || ''}">
                                     <td class="px-4 py-2 font-mono font-semibold text-white">${sid.school_id_number}</td>
                                     <td class="px-4 py-2">${sid.school_year || '<span class="text-gray-500">—</span>'}</td>
                                     <td class="px-4 py-2">${sid.is_used
@@ -2101,7 +2184,7 @@
                         </div>
                         <div class="md:hidden space-y-3">
                             ${ids.map(sid => `
-                            <div class="bg-slate-700/30 rounded-xl p-4 border border-slate-700">
+                            <div class="bg-slate-700/30 rounded-xl p-4 border border-slate-700" data-sid="${sid.school_id_number} ${sid.school_year || ''}">
                                 <div class="flex justify-between items-start mb-2">
                                     <p class="font-mono font-semibold text-white">${sid.school_id_number}</p>
                                     ${sid.is_used
@@ -2125,8 +2208,8 @@
             const input = document.getElementById('newSchoolIdInput');
             const errEl = document.getElementById('sidError');
             const val = input.value.trim();
-            if (!/^\d{2}-\d{1}-\d{1}-\d{4}$/.test(val)) {
-                errEl.textContent = 'Format must be YY-N-N-NNNN (e.g. 23-1-2-0001)';
+            if (!val) {
+                errEl.textContent = 'Please enter a School ID number.';
                 errEl.classList.remove('hidden');
                 return;
             }
@@ -2137,10 +2220,81 @@
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
                     body: JSON.stringify({ school_id_number: val, school_year: currentSchoolYear || null })
                 }).then(r => r.json()).then(data => {
-                    if (data.success) { input.value = ''; loadSchoolIdList(); }
-                    else { errEl.textContent = data.message || 'Failed to add School ID'; errEl.classList.remove('hidden'); }
+                    if (data.success) {
+                        input.value = '';
+                        loadSchoolIdList();
+                    } else {
+                        // Show error — do NOT show success
+                        errEl.textContent = data.message || 'Failed to add School ID';
+                        errEl.classList.remove('hidden');
+                        // Throw so pixelAction doesn't show success screen
+                        throw new Error(data.message || 'duplicate');
+                    }
                 })
             , 'SCHOOL ID ADDED!');
+        }
+
+        async function bulkAddSchoolIds() {
+            const textarea = document.getElementById('bulkSchoolIdInput');
+            const errEl = document.getElementById('bulkSidError');
+            errEl.classList.add('hidden');
+            const lines = textarea.value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            const valid = [...new Set(lines.filter(l => l.length >= 4))];
+            if (valid.length === 0) {
+                errEl.textContent = 'No IDs found. Paste one ID per line.';
+                errEl.classList.remove('hidden');
+                return;
+            }
+
+            // Show loading overlay
+            const overlay = document.createElement('div');
+            overlay.id = 'bulkImportOverlay';
+            overlay.className = 'fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-4';
+            overlay.style.cssText = 'background:rgba(5,13,46,0.92);backdrop-filter:blur(6px)';
+            overlay.innerHTML = `
+                <svg class="animate-spin" style="width:48px;height:48px" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="rgba(239,68,68,0.25)" stroke-width="4"/>
+                    <path d="M4 12a8 8 0 018-8" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>
+                </svg>
+                <p id="bulkImportMsg" style="color:#fca5a5;font-size:15px;font-weight:600;font-family:sans-serif;letter-spacing:.03em;">
+                    Importing 0 / ${valid.length}…
+                </p>
+                <div class="w-64 bg-slate-700 rounded-full h-2 overflow-hidden">
+                    <div id="bulkImportBar" class="bg-red-500 h-2 rounded-full transition-all duration-200" style="width:0%"></div>
+                </div>`;
+            document.body.appendChild(overlay);
+
+            let added = 0, skipped = 0;
+            const token = document.querySelector('meta[name="csrf-token"]').content;
+
+            for (let i = 0; i < valid.length; i++) {
+                const sid = valid[i];
+                try {
+                    const res = await fetch('/api/school-ids', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+                        body: JSON.stringify({ school_id_number: sid, school_year: currentSchoolYear || null })
+                    });
+                    const data = await res.json();
+                    if (data.success) added++; else skipped++;
+                } catch { skipped++; }
+
+                // Update progress
+                const pct = Math.round(((i + 1) / valid.length) * 100);
+                const msgEl = document.getElementById('bulkImportMsg');
+                const barEl = document.getElementById('bulkImportBar');
+                if (msgEl) msgEl.textContent = `Importing ${i + 1} / ${valid.length}…`;
+                if (barEl) barEl.style.width = pct + '%';
+            }
+
+            // Remove overlay
+            overlay.remove();
+            textarea.value = '';
+            loadSchoolIdList();
+
+            const color = skipped > 0 ? 'yellow' : 'green';
+            const msg = `✅ Added ${added} IDs.${skipped > 0 ? ` ${skipped} skipped (already exist).` : ''}`;
+            showToast('Bulk Import Complete', msg, color);
         }
         function deleteSchoolId(id) {
             const modal = document.createElement('div');
@@ -2580,21 +2734,40 @@
                         el.innerHTML = '<p class="text-gray-400 text-center py-8">No archived school years.</p>';
                         return;
                     }
-                    el.innerHTML = `<table class="w-full"><thead><tr class="border-b border-slate-700">
-                        <th class="text-left py-2 px-3 text-gray-300">Label</th>
-                        <th class="text-center py-2 px-3 text-gray-300">Archived On</th>
-                        <th class="text-center py-2 px-3 text-gray-300">Actions</th>
-                    </tr></thead><tbody>${data.school_years.map(sy => `
-                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80">
-                            <td class="py-3 px-3 text-gray-400 line-through">${sy.label}</td>
-                            <td class="py-3 px-3 text-center text-gray-500 text-sm">${new Date(sy.deleted_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
-                            <td class="py-3 px-3 text-center">
-                                <div class="flex items-center justify-center gap-2">
-                                    <button onclick="restoreSchoolYear(${sy.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
-                                    <button onclick="forceDeleteSchoolYear(${sy.id})" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
+                    const rows = data.school_years.map(sy => {
+                        const date = new Date(sy.deleted_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+                        return { id: sy.id, label: sy.label, date };
+                    });
+                    el.innerHTML = `
+                        <!-- Desktop table -->
+                        <div class="hidden sm:block">
+                            <table class="w-full"><thead><tr class="border-b border-slate-700">
+                                <th class="text-left py-2 px-3 text-gray-300">Label</th>
+                                <th class="text-center py-2 px-3 text-gray-300">Archived On</th>
+                                <th class="text-center py-2 px-3 text-gray-300">Actions</th>
+                            </tr></thead><tbody>${rows.map(r => `
+                                <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80" data-search="${r.label.toLowerCase()} ${r.date.toLowerCase()}">
+                                    <td class="py-3 px-3 text-gray-400 line-through">${r.label}</td>
+                                    <td class="py-3 px-3 text-center text-gray-500 text-sm">${r.date}</td>
+                                    <td class="py-3 px-3 text-center">
+                                        <div class="flex items-center justify-center gap-2">
+                                            <button onclick="restoreSchoolYear(${r.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
+                                            <button onclick="forceDeleteSchoolYear(${r.id})" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>`).join('')}</tbody></table>
+                        </div>
+                        <!-- Mobile cards -->
+                        <div class="sm:hidden space-y-3">${rows.map(r => `
+                            <div style="background:rgba(51,65,85,0.5);border:1px solid rgba(71,85,105,0.5)" class="rounded-xl p-4" data-search="${r.label.toLowerCase()} ${r.date.toLowerCase()}">
+                                <p class="text-gray-400 line-through font-semibold text-sm mb-1">${r.label}</p>
+                                <p class="text-gray-500 text-xs mb-3">Archived: ${r.date}</p>
+                                <div class="flex gap-2">
+                                    <button onclick="restoreSchoolYear(${r.id})" class="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold">♻️ Restore</button>
+                                    <button onclick="forceDeleteSchoolYear(${r.id})" class="flex-1 py-1.5 bg-red-800 hover:bg-red-900 text-white rounded-lg text-xs font-semibold">🗑 Delete</button>
                                 </div>
-                            </td>
-                        </tr>`).join('')}</tbody></table>`;
+                            </div>`).join('')}
+                        </div>`;
                 });
         }
         function restoreSchoolYear(id) {
@@ -2626,23 +2799,45 @@
                         el.innerHTML = '<p class="text-gray-400 text-center py-8">No archived school IDs.</p>';
                         return;
                     }
-                    el.innerHTML = `<table class="w-full"><thead><tr class="border-b border-slate-700">
-                        <th class="text-left py-2 px-3 text-gray-300">School ID</th>
-                        <th class="text-left py-2 px-3 text-gray-300">School Year</th>
-                        <th class="text-center py-2 px-3 text-gray-300">Archived On</th>
-                        <th class="text-center py-2 px-3 text-gray-300">Actions</th>
-                    </tr></thead><tbody>${data.school_ids.map(sid => `
-                        <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80">
-                            <td class="py-3 px-3 text-gray-400 line-through font-mono">${sid.school_id_number}</td>
-                            <td class="py-3 px-3 text-gray-500 text-sm">${sid.school_year || '-'}</td>
-                            <td class="py-3 px-3 text-center text-gray-500 text-sm">${new Date(sid.deleted_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
-                            <td class="py-3 px-3 text-center">
-                                <div class="flex items-center justify-center gap-2">
-                                    <button onclick="restoreSchoolId(${sid.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
-                                    <button onclick="forceDeleteSchoolId(${sid.id})" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
+                    const rows = data.school_ids.map(sid => ({
+                        id: sid.id,
+                        number: sid.school_id_number,
+                        year: sid.school_year || '-',
+                        date: new Date(sid.deleted_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})
+                    }));
+                    el.innerHTML = `
+                        <!-- Desktop table -->
+                        <div class="hidden sm:block">
+                            <table class="w-full"><thead><tr class="border-b border-slate-700">
+                                <th class="text-left py-2 px-3 text-gray-300">School ID</th>
+                                <th class="text-left py-2 px-3 text-gray-300">School Year</th>
+                                <th class="text-center py-2 px-3 text-gray-300">Archived On</th>
+                                <th class="text-center py-2 px-3 text-gray-300">Actions</th>
+                            </tr></thead><tbody>${rows.map(r => `
+                                <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80" data-search="${r.number.toLowerCase()} ${r.year.toLowerCase()} ${r.date.toLowerCase()}">
+                                    <td class="py-3 px-3 text-gray-400 line-through font-mono">${r.number}</td>
+                                    <td class="py-3 px-3 text-gray-500 text-sm">${r.year}</td>
+                                    <td class="py-3 px-3 text-center text-gray-500 text-sm">${r.date}</td>
+                                    <td class="py-3 px-3 text-center">
+                                        <div class="flex items-center justify-center gap-2">
+                                            <button onclick="restoreSchoolId(${r.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
+                                            <button onclick="forceDeleteSchoolId(${r.id})" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>`).join('')}</tbody></table>
+                        </div>
+                        <!-- Mobile cards -->
+                        <div class="sm:hidden space-y-3">${rows.map(r => `
+                            <div style="background:rgba(51,65,85,0.5);border:1px solid rgba(71,85,105,0.5)" class="rounded-xl p-4" data-search="${r.number.toLowerCase()} ${r.year.toLowerCase()} ${r.date.toLowerCase()}">
+                                <p class="text-gray-400 line-through font-mono font-semibold text-sm mb-0.5">${r.number}</p>
+                                <p class="text-gray-500 text-xs mb-0.5">${r.year}</p>
+                                <p class="text-gray-500 text-xs mb-3">Archived: ${r.date}</p>
+                                <div class="flex gap-2">
+                                    <button onclick="restoreSchoolId(${r.id})" class="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold">♻️ Restore</button>
+                                    <button onclick="forceDeleteSchoolId(${r.id})" class="flex-1 py-1.5 bg-red-800 hover:bg-red-900 text-white rounded-lg text-xs font-semibold">🗑 Delete</button>
                                 </div>
-                            </td>
-                        </tr>`).join('')}</tbody></table>`;
+                            </div>`).join('')}
+                        </div>`;
                 });
         }
         function restoreSchoolId(id) {
@@ -2669,31 +2864,56 @@
                         el.innerHTML = '<p class="text-gray-400 text-center py-8">No archived users.</p>';
                         return;
                     }
-                    el.innerHTML = `<table class="w-full text-xs">
-                        <thead><tr class="border-b border-slate-700">
-                            <th class="text-left py-2 px-3 text-gray-300">Name</th>
-                            <th class="text-left py-2 px-3 text-gray-300">Email</th>
-                            <th class="text-left py-2 px-3 text-gray-300">Role</th>
-                            <th class="text-left py-2 px-3 text-gray-300">School ID</th>
-                            <th class="text-center py-2 px-3 text-gray-300">Archived On</th>
-                            <th class="text-center py-2 px-3 text-gray-300">Actions</th>
-                        </tr></thead>
-                        <tbody>${data.users.map(u => `
-                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80">
-                                <td class="py-2 px-3 text-gray-400 line-through">${u.name}</td>
-                                <td class="py-2 px-3 text-gray-500">${u.email}</td>
-                                <td class="py-2 px-3 text-gray-500 capitalize">${u.role}</td>
-                                <td class="py-2 px-3 text-gray-500 font-mono">${u.school_id_number || '—'}</td>
-                                <td class="py-2 px-3 text-center text-gray-500">${u.deleted_at}</td>
-                                <td class="py-2 px-3 text-center">
-                                    <div class="flex items-center justify-center gap-2">
-                                        <button onclick="restoreUser(${u.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs">Restore</button>
-                                        <button onclick="forceDeleteUser(${u.id}, '${u.name.replace(/'/g,"\\'")}')  " class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-xs">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>`).join('')}
-                        </tbody>
-                    </table>`;
+                    const rows = data.users.map(u => ({
+                        id: u.id,
+                        name: u.name,
+                        email: u.email,
+                        role: u.role,
+                        sid: u.school_id_number || '—',
+                        date: u.deleted_at,
+                        safeName: u.name.replace(/'/g,"\\'")
+                    }));
+                    el.innerHTML = `
+                        <!-- Desktop table -->
+                        <div class="hidden sm:block overflow-x-auto">
+                            <table class="w-full text-xs"><thead><tr class="border-b border-slate-700">
+                                <th class="text-left py-2 px-3 text-gray-300">Name</th>
+                                <th class="text-left py-2 px-3 text-gray-300">Email</th>
+                                <th class="text-left py-2 px-3 text-gray-300">Role</th>
+                                <th class="text-left py-2 px-3 text-gray-300">School ID</th>
+                                <th class="text-center py-2 px-3 text-gray-300">Archived On</th>
+                                <th class="text-center py-2 px-3 text-gray-300">Actions</th>
+                            </tr></thead><tbody>${rows.map(r => `
+                                <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80" data-search="${r.name.toLowerCase()} ${r.email.toLowerCase()} ${r.role.toLowerCase()} ${r.sid.toLowerCase()}">
+                                    <td class="py-2 px-3 text-gray-400 line-through">${r.name}</td>
+                                    <td class="py-2 px-3 text-gray-500">${r.email}</td>
+                                    <td class="py-2 px-3 text-gray-500 capitalize">${r.role}</td>
+                                    <td class="py-2 px-3 text-gray-500 font-mono">${r.sid}</td>
+                                    <td class="py-2 px-3 text-center text-gray-500">${r.date}</td>
+                                    <td class="py-2 px-3 text-center">
+                                        <div class="flex items-center justify-center gap-2">
+                                            <button onclick="restoreUser(${r.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs">Restore</button>
+                                            <button onclick="forceDeleteUser(${r.id},'${r.safeName}')" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-xs">Delete</button>
+                                        </div>
+                                    </td>
+                                </tr>`).join('')}</tbody></table>
+                        </div>
+                        <!-- Mobile cards -->
+                        <div class="sm:hidden space-y-3">${rows.map(r => `
+                            <div style="background:rgba(51,65,85,0.5);border:1px solid rgba(71,85,105,0.5)" class="rounded-xl p-4" data-search="${r.name.toLowerCase()} ${r.email.toLowerCase()} ${r.role.toLowerCase()} ${r.sid.toLowerCase()}">
+                                <div class="flex items-start justify-between gap-2 mb-1">
+                                    <p class="text-gray-400 line-through font-semibold text-sm">${r.name}</p>
+                                    <span class="text-gray-500 text-xs capitalize shrink-0">${r.role}</span>
+                                </div>
+                                <p class="text-gray-500 text-xs">${r.email}</p>
+                                ${r.sid !== '—' ? `<p class="text-gray-500 text-xs font-mono">ID: ${r.sid}</p>` : ''}
+                                <p class="text-gray-500 text-xs mb-3">Archived: ${r.date}</p>
+                                <div class="flex gap-2">
+                                    <button onclick="restoreUser(${r.id})" class="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold">♻️ Restore</button>
+                                    <button onclick="forceDeleteUser(${r.id},'${r.safeName}')" class="flex-1 py-1.5 bg-red-800 hover:bg-red-900 text-white rounded-lg text-xs font-semibold">🗑 Delete</button>
+                                </div>
+                            </div>`).join('')}
+                        </div>`;
                 });
         }
         function restoreUser(id) {
@@ -2776,6 +2996,13 @@
             <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
                 <h3 class="text-lg font-bold text-yellow-400">🗑 Archived Users</h3>
                 <button onclick="closeArchivedUsersModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+            </div>
+            <div class="px-4 pt-3 shrink-0">
+                <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-600 focus-within:border-yellow-500 transition-colors" style="background:#0f172a">
+                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
+                    <input type="text" placeholder="Search users…" class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none"
+                        oninput="filterArchiveList('archivedUsersList', this.value)">
+                </div>
             </div>
             <div class="overflow-auto flex-1 p-4">
                 <div id="archivedUsersList"><p class="text-gray-400 text-center py-8">Loading...</p></div>

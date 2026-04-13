@@ -620,11 +620,14 @@
 
         <!-- Display all students with progress (REPLACED with compact table + search) -->
         <section id="section-students" class="dash-section hidden">
-        <div class="flex justify-between items-center mb-6">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
                 <h2 class="text-2xl font-bold text-white">Student Hours Tracking</h2>
-                <div class="w-full max-w-sm">
-                    <input id="studentSearch" type="search" placeholder="Search student by name..."
-                        class="w-full px-3 py-2 rounded-lg bg-slate-700/40 placeholder-gray-400 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <div class="w-full sm:max-w-sm">
+                    <div class="flex items-center gap-2 px-3 py-2.5 bg-slate-700/50 border border-slate-600 rounded-xl focus-within:border-indigo-500 transition-colors">
+                        <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
+                        <input id="studentSearch" type="search" placeholder="Search student by name..."
+                            class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none">
+                    </div>
                 </div>
             </div>
 
@@ -1270,6 +1273,13 @@
                 <h3 class="text-lg font-bold text-yellow-400">🗑 Archived Companies</h3>
                 <button onclick="closeArchivedCompaniesModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
             </div>
+            <div class="px-4 pt-3 shrink-0">
+                <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-600 focus-within:border-yellow-500 transition-colors" style="background:#0f172a">
+                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
+                    <input type="text" id="archivedCompaniesSearch" placeholder="Search companies…" class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none"
+                        oninput="filterBladeArchive('archivedCompaniesSearch', '.archived-co-row', '.archived-co-card')">
+                </div>
+            </div>
             <div class="overflow-auto flex-1 p-4">
                 @if($archivedCompanies->isNotEmpty())
                 {{-- Desktop table --}}
@@ -1286,7 +1296,7 @@
                         </thead>
                         <tbody>
                             @foreach($archivedCompanies as $archived)
-                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors opacity-80">
+                            <tr class="archived-co-row border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors opacity-80" data-search="{{ strtolower($archived->name . ' ' . ($archived->industry ?? '') . ' ' . ($archived->location ?? '')) }}">
                                 <td class="py-3 px-3 text-gray-400 line-through">{{ $archived->name }}</td>
                                 <td class="py-3 px-3 text-gray-500 text-sm">{{ $archived->industry ?? '-' }}</td>
                                 <td class="py-3 px-3 text-gray-500 text-sm">{{ $archived->location ?? '-' }}</td>
@@ -1308,7 +1318,7 @@
                 {{-- Mobile cards --}}
                 <div class="sm:hidden space-y-3">
                     @foreach($archivedCompanies as $archived)
-                    <div class="bg-slate-700/30 border border-slate-600/50 rounded-xl p-4 opacity-90">
+                    <div class="archived-co-card bg-slate-700/30 border border-slate-600/50 rounded-xl p-4 opacity-90" data-search="{{ strtolower($archived->name . ' ' . ($archived->industry ?? '') . ' ' . ($archived->location ?? '')) }}">
                         <p class="text-gray-400 line-through font-semibold text-sm mb-0.5">{{ $archived->name }}</p>
                         @if($archived->industry)<p class="text-gray-500 text-xs">🏭 {{ $archived->industry }}</p>@endif
                         @if($archived->location)<p class="text-gray-500 text-xs">📍 {{ $archived->location }}</p>@endif
@@ -1897,6 +1907,15 @@
         }
         function closeArchivedCompaniesModal() {
             document.getElementById('archivedCompaniesModal').classList.add('hidden');
+        }
+        function filterBladeArchive(inputId, rowSelector, cardSelector) {
+            const q = (document.getElementById(inputId)?.value || '').toLowerCase();
+            document.querySelectorAll(rowSelector).forEach(el => {
+                el.style.display = (el.dataset.search || '').includes(q) ? '' : 'none';
+            });
+            document.querySelectorAll(cardSelector).forEach(el => {
+                el.style.display = (el.dataset.search || '').includes(q) ? '' : 'none';
+            });
         }
 
         // ============ FILE VIEWER MODAL ============
