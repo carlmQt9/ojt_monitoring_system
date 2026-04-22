@@ -96,9 +96,13 @@
                 let label = 'SAVING';
                 if (btnText.includes('DENY') || btnText.includes('REJECT')) label = 'DENYING';
                 else if (btnText.includes('APPROV')) label = 'APPROVING';
-                else if (btnText.includes('REMOV') || btnText.includes('DELET')) label = 'DELETING';
+                else if (btnText.includes('REMOV') || btnText.includes('DELET') || btnText.includes('FOREVER')) label = 'DELETING';
+                else if (btnText.includes('ARCHIVE')) label = 'ARCHIVING';
+                else if (btnText.includes('RESTOR')) label = 'RESTORING';
                 else if (btnText.includes('SUBMIT') || btnText.includes('UPLOAD')) label = 'UPLOADING';
-                else if (btnText.includes('EVALUAT')) label = 'SAVING';
+                else if (btnText.includes('ADD') || btnText.includes('CREATE')) label = 'SAVING';
+                else if (btnText.includes('SAVE') || btnText.includes('CHANGES') || btnText.includes('UPDATE')) label = 'SAVING';
+                else if (btnText.includes('SIGN') || btnText.includes('LOGOUT')) label = 'SIGNING OUT';
                 showPixelLoader(label);
                 // Auto-hide after 8s as fallback (page will reload anyway)
                 setTimeout(hidePixelLoader, 8000);

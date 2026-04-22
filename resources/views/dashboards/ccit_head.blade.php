@@ -2792,19 +2792,27 @@
             document.getElementById('forceDeleteTemplateModal').classList.add('hidden');
         }
         function toggleArchivedTemplates() {
-            document.getElementById('archivedTemplatesModal').classList.remove('hidden');
+            const modal = document.getElementById('archivedTemplatesModal');
+            modal.classList.remove('hidden');
+            modal.style.display = '';
         }
         function closeArchivedTemplatesModal() {
-            document.getElementById('archivedTemplatesModal').classList.add('hidden');
+            const modal = document.getElementById('archivedTemplatesModal');
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
         }
 
         // ===== ARCHIVED SCHOOL YEARS =====
         function openArchivedSchoolYearsModal() {
-            document.getElementById('archivedSchoolYearsModal').classList.remove('hidden');
+            const modal = document.getElementById('archivedSchoolYearsModal');
+            modal.classList.remove('hidden');
+            modal.style.display = '';
             loadArchivedSchoolYears();
         }
         function closeArchivedSchoolYearsModal() {
-            document.getElementById('archivedSchoolYearsModal').classList.add('hidden');
+            const modal = document.getElementById('archivedSchoolYearsModal');
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
         }
         function loadArchivedSchoolYears() {
             fetch('/api/school-years/archived')
@@ -2865,11 +2873,15 @@
 
         // ===== ARCHIVED SCHOOL IDs =====
         function openArchivedSchoolIdsModal() {
-            document.getElementById('archivedSchoolIdsModal').classList.remove('hidden');
+            const modal = document.getElementById('archivedSchoolIdsModal');
+            modal.classList.remove('hidden');
+            modal.style.display = '';
             loadArchivedSchoolIds();
         }
         function closeArchivedSchoolIdsModal() {
-            document.getElementById('archivedSchoolIdsModal').classList.add('hidden');
+            const modal = document.getElementById('archivedSchoolIdsModal');
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
         }
         function loadArchivedSchoolIds() {
             fetch('/api/school-ids/archived')
@@ -2930,11 +2942,15 @@
 
         // ===== ARCHIVED USERS =====
         function openArchivedUsersModal() {
-            document.getElementById('archivedUsersModal').classList.remove('hidden');
+            const modal = document.getElementById('archivedUsersModal');
+            modal.classList.remove('hidden');
+            modal.style.display = '';
             loadArchivedUsers();
         }
         function closeArchivedUsersModal() {
-            document.getElementById('archivedUsersModal').classList.add('hidden');
+            const modal = document.getElementById('archivedUsersModal');
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
         }
         function loadArchivedUsers() {
             fetch('/api/users/archived')
