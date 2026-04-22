@@ -22,7 +22,7 @@
         input[type="password"]::-webkit-contacts-auto-fill-button,
         input[type="password"]::-webkit-credentials-auto-fill-button { visibility: hidden; display: none !important; pointer-events: none; }
         /* LIGHT MODE */
-        body.light { background: linear-gradient(135deg, #b8cef0 0%, #a0bce8 40%, #b8d4f5 70%, #cce0fa 100%); color: #0f2460; }
+        body.light { background: #ffffff; color: #0f2460; }
         body.light .text-white,body.light .text-gray-100,body.light .text-gray-200 { color: #0f2460 !important; }
         body.light .text-gray-300 { color: #1e3a5f !important; }
         body.light .text-gray-400 { color: #2d4f7a !important; }
@@ -47,7 +47,7 @@
         body.light .text-purple-300\/60 { color: #5b21b6 !important; }
         body.light .text-orange-300\/60 { color: #9a3412 !important; }
         body.light .text-red-300\/60 { color: #991b1b !important; }
-        body.light .card { background: rgba(220,235,255,0.95) !important; border-color: #6a9fd0 !important; }
+        body.light .card { background: #ffffff !important; border-color: #d1d5db !important; box-shadow: 0 4px 24px rgba(0,0,0,0.08) !important; }
         body.light .input-field { background: rgba(255,255,255,0.95) !important; border-color: #6a9fd0 !important; color: #0f2460 !important; }
         body.light .input-field::placeholder { color: #7aaad4 !important; }
         body.light .input-field option { background: #fff; color: #0f2460; }
@@ -62,7 +62,7 @@
         body.light .border-orange-700\/40 { border-color: rgba(194,65,12,0.5) !important; }
         body.light .border-red-700\/40 { border-color: rgba(185,28,28,0.5) !important; }
         /* Navbar light mode */
-        body.light nav { background: rgba(220,235,255,0.97) !important; border-color: #7aaad4 !important; }
+        body.light nav { background: #ffffff !important; border-color: #e5e7eb !important; box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; }
         body.light nav span,body.light nav a,body.light nav p,body.light nav button { color: #0f2460 !important; }
         body.light nav .text-blue-400 { color: #1d4ed8 !important; }
         body.light nav a[class*="bg-blue-6"] { color: #fff !important; }
@@ -122,8 +122,14 @@
                     <svg id="iconSun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
                 </button>
                 <!-- Desktop auth buttons -->
-                <a href="{{ route('login') }}" class="hidden sm:inline-flex px-4 py-1.5 border border-blue-500 text-blue-300 hover:text-white hover:border-blue-400 rounded-full text-sm font-semibold transition-all">Log in</a>
-                <a href="{{ route('register') }}" class="hidden sm:inline-flex px-4 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-full text-sm font-semibold transition-all">Register</a>
+                <a href="{{ route('login') }}" class="hidden sm:flex items-center gap-1 px-3 py-1 border-2 border-blue-500/60 text-blue-300 hover:text-white hover:border-blue-400 hover:bg-blue-500/10 rounded-full text-xs font-semibold transition-all">
+                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+                    Log in
+                </a>
+                <a href="{{ route('register') }}" class="hidden sm:flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 rounded-full text-xs font-semibold text-white transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-105 transform">
+                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                    Register
+                </a>
                 <!-- Mobile hamburger -->
                 <button id="mobileMenuBtn" onclick="toggleMobileMenu()" class="md:hidden w-8 h-8 flex items-center justify-center text-blue-300 hover:text-white transition-colors">
                     <svg id="hamburgerIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -138,8 +144,14 @@
             <a href="/#features" class="block px-3 py-2 rounded-lg text-sm text-blue-200 hover:text-white hover:bg-blue-800/40 transition-colors">Features</a>
             <a href="/#contact" class="block px-3 py-2 rounded-lg text-sm text-blue-200 hover:text-white hover:bg-blue-800/40 transition-colors">Contact</a>
             <div class="flex gap-2 pt-2 border-t border-blue-900/50">
-                <a href="{{ route('login') }}" class="flex-1 text-center px-4 py-2 border border-blue-500 text-blue-300 hover:text-white rounded-full text-sm font-semibold transition-all">Log in</a>
-                <a href="{{ route('register') }}" class="flex-1 text-center px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-full text-sm font-semibold transition-all">Register</a>
+                <a href="{{ route('login') }}" class="flex-1 flex items-center justify-center gap-2 px-4 py-2 border-2 border-blue-500/60 text-blue-300 hover:text-white hover:bg-blue-500/10 rounded-full text-sm font-semibold transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+                    Log in
+                </a>
+                <a href="{{ route('register') }}" class="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white rounded-full text-sm font-semibold transition-all shadow-lg shadow-blue-500/30">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                    Register
+                </a>
             </div>
         </div>
     </nav>
@@ -413,8 +425,10 @@
                 </div>
 
 
-                <button type="submit" class="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 text-white font-bold rounded-xl transition-all glow-btn transform hover:scale-[1.02] active:scale-[0.98]">
+                <button type="submit" class="group relative w-full inline-flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-500 hover:via-blue-600 hover:to-blue-700 text-white font-bold rounded-xl transition-all shadow-xl shadow-blue-500/30 hover:shadow-blue-500/50 transform hover:scale-[1.02] active:scale-[0.98]">
+                    <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
                     Create Account
+                    <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
                 </button>
 
                 <div class="text-center">

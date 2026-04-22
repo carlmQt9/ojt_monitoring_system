@@ -27,7 +27,7 @@
         .screen-bar { background: linear-gradient(90deg, #1e3a8a, #1d4ed8); }
 
         /* LIGHT MODE */
-        body.light { background: linear-gradient(135deg, #b8cef0 0%, #a0bce8 40%, #b8d4f5 70%, #cce0fa 100%); color: #0f2460; }
+        body.light { background: #ffffff; color: #0f2460; }
         body.light .hero-bg { background: linear-gradient(135deg, #a8c4e8 0%, #93b8e0 50%, #bdd4f0 100%); }
         body.light nav { background: rgba(220,235,255,0.97) !important; border-color: #7aaad4 !important; }
         body.light nav span, body.light nav a { color: #0f2460 !important; }
@@ -108,74 +108,92 @@
             </div>
 
             <!-- Auth + Theme Toggle -->
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 sm:gap-3">
                 <!-- Theme Toggle -->
                 <button id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode"
-                    class="w-9 h-9 rounded-full flex items-center justify-center border border-blue-500/50 text-blue-300 hover:text-white hover:border-blue-400 transition-all">
+                    class="w-9 h-9 rounded-full flex items-center justify-center border border-blue-500/50 text-blue-300 hover:text-white hover:border-blue-400 hover:bg-blue-500/10 transition-all">
                     <svg id="iconMoon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
                     <svg id="iconSun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
                 </button>
                 @auth
-                    <a href="{{ url('/dashboard') }}" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-full text-sm font-semibold transition-all glow-btn">Dashboard</a>
+                    <a href="{{ url('/dashboard') }}" class="group relative px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 rounded-full text-sm font-semibold text-white transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-105 transform">
+                        <span class="flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                            Dashboard
+                        </span>
+                    </a>
                 @else
-                    <a href="{{ route('login') }}" class="px-5 py-2 border border-blue-500 text-blue-300 hover:text-white hover:border-blue-400 rounded-full text-sm font-semibold transition-all">Log in</a>
-                    <a href="{{ route('register') }}" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-full text-sm font-semibold transition-all glow-btn">Register</a>
+                    <a href="{{ route('login') }}" class="hidden sm:flex items-center gap-2 px-4 py-2 border-2 border-blue-500/60 text-blue-300 hover:text-white hover:border-blue-400 hover:bg-blue-500/10 rounded-full text-sm font-semibold transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+                        Log in
+                    </a>
+                    <a href="{{ route('register') }}" class="group relative px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 rounded-full text-sm font-semibold text-white transition-all shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-105 transform">
+                        <span class="flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                            <span class="hidden sm:inline">Register</span>
+                            <span class="sm:hidden">Sign Up</span>
+                        </span>
+                    </a>
                 @endauth
             </div>
         </div>
     </nav>
 
     <!-- HERO -->
-    <section class="hero-bg relative overflow-hidden sm:min-h-screen flex items-center">
+    <section class="hero-bg relative overflow-hidden min-h-screen flex items-center">
         <!-- dot pattern -->
         <div class="dot-pattern absolute inset-0 opacity-40"></div>
         <!-- glow orbs -->
         <div class="absolute top-20 left-10 w-72 h-72 bg-blue-600 rounded-full blur-3xl opacity-20"></div>
         <div class="absolute bottom-10 right-10 w-96 h-96 bg-blue-800 rounded-full blur-3xl opacity-25"></div>
 
-        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center w-full">
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center w-full">
 
             <!-- Left -->
-            <div class="space-y-6">
+            <div class="space-y-5">
                 <div class="inline-flex items-center gap-2 bg-blue-900/50 border border-blue-700/50 rounded-full px-4 py-1.5 text-xs text-blue-300 fade-up">
                     <span class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
                     PRMSU Sta. Cruz Campus — BSCS Program
                 </div>
 
-                <h1 class="text-4xl sm:text-5xl font-extrabold leading-tight fade-up delay-1">
+                <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold leading-tight fade-up delay-1">
                     Track Your OJT<br>
                     <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-600">Progress With Us</span>
                 </h1>
 
-                <p class="text-blue-200 text-lg leading-relaxed max-w-md fade-up delay-2">
+                <p class="text-blue-200 text-base sm:text-lg leading-relaxed max-w-md fade-up delay-2">
                     A complete On-the-Job Training monitoring platform for students, supervisors, coordinators, and CCIT Head — with camera time-in/out, DTR generation, and real-time progress tracking.
                 </p>
 
-                <div class="flex flex-wrap gap-4 fade-up delay-3">
-                    <a href="{{ route('register') }}" class="px-7 py-3 bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 rounded-full font-semibold text-white transition-all glow-btn transform hover:scale-105">
-                        Get Started
+                <div class="flex flex-wrap gap-3 fade-up delay-3">
+                    <a href="{{ route('register') }}" class="group relative inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-500 hover:via-blue-600 hover:to-blue-700 rounded-2xl font-bold text-white transition-all shadow-2xl shadow-blue-500/40 hover:shadow-blue-500/60 transform hover:scale-105 hover:-translate-y-1">
+                        <svg class="w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        Get Started Free
+                        <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
                     </a>
-                    <a href="#features" class="px-7 py-3 border border-blue-500/60 text-blue-200 hover:text-white hover:border-blue-400 rounded-full font-semibold transition-all">
+                    <a href="#features" class="group inline-flex items-center gap-2 px-6 py-3 border-2 border-blue-500/60 bg-blue-500/5 hover:bg-blue-500/10 text-blue-200 hover:text-white hover:border-blue-400 rounded-2xl font-semibold transition-all backdrop-blur-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         Learn More
+                        <svg class="w-5 h-5 group-hover:translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </a>
                 </div>
 
                 <!-- Stats -->
-                <div class="grid grid-cols-2 sm:flex sm:gap-8 gap-4 pt-4 fade-up delay-3">
+                <div class="grid grid-cols-2 sm:flex sm:gap-6 gap-3 pt-3 fade-up delay-3">
                     <div>
-                        <div class="text-2xl font-bold text-white">4</div>
+                        <div class="text-xl sm:text-2xl font-bold text-white">4</div>
                         <div class="text-xs text-blue-400">User Roles</div>
                     </div>
-                    <div class="sm:border-l sm:border-blue-800 sm:pl-8">
-                        <div class="text-2xl font-bold text-white">600</div>
+                    <div class="sm:border-l sm:border-blue-800 sm:pl-6">
+                        <div class="text-xl sm:text-2xl font-bold text-white">600</div>
                         <div class="text-xs text-blue-400">Required Hours</div>
                     </div>
-                    <div class="sm:border-l sm:border-blue-800 sm:pl-8">
-                        <div class="text-2xl font-bold text-white">DTR</div>
+                    <div class="sm:border-l sm:border-blue-800 sm:pl-6">
+                        <div class="text-xl sm:text-2xl font-bold text-white">DTR</div>
                         <div class="text-xs text-blue-400">Auto-Generated</div>
                     </div>
-                    <div class="sm:border-l sm:border-blue-800 sm:pl-8">
-                        <div class="text-2xl font-bold text-white">📷</div>
+                    <div class="sm:border-l sm:border-blue-800 sm:pl-6">
+                        <div class="text-xl sm:text-2xl font-bold text-white">📷</div>
                         <div class="text-xs text-blue-400">Camera Time-In</div>
                     </div>
                 </div>
@@ -241,8 +259,8 @@
     </section>
 
     <!-- ABOUT -->
-    <section id="about" class="py-20 border-t border-blue-900/40" style="background:linear-gradient(180deg,#0a1a5c,#050d2e)">
-        <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+    <section id="about" class="min-h-screen py-16 border-t border-blue-900/40 flex items-center" style="background:linear-gradient(180deg,#0a1a5c,#050d2e)">
+        <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-10 items-center w-full">
             <div>
                 <div class="text-blue-400 text-sm font-semibold uppercase tracking-widest mb-3">About the System</div>
                 <h2 class="text-3xl font-bold text-white mb-4">Built for PRMSU Sta. Cruz<br>CCIT OJT Program</h2>
@@ -282,9 +300,9 @@
     </section>
 
     <!-- FEATURES -->
-    <section id="features" class="py-20 border-t border-blue-900/40" style="background:#050d2e">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="text-center mb-14">
+    <section id="features" class="min-h-screen py-16 border-t border-blue-900/40 flex items-center" style="background:#050d2e">
+        <div class="max-w-7xl mx-auto px-6 w-full">
+            <div class="text-center mb-10">
                 <div class="text-blue-400 text-sm font-semibold uppercase tracking-widest mb-3">Features</div>
                 <h2 class="text-3xl font-bold text-white">Everything You Need</h2>
                 <p class="text-blue-300 mt-2">Manage the full OJT lifecycle in one platform</p>
@@ -319,55 +337,132 @@
 
    
     <!-- CONTACT -->
-    <section id="contact" class="py-20 border-t border-blue-900/40" style="background:linear-gradient(180deg,#050d2e,#030a1e)">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="text-center mb-12">
-                <div class="text-blue-400 text-sm font-semibold uppercase tracking-widest mb-3">Contact</div>
-                <h2 class="text-3xl font-bold text-white">Get in Touch</h2>
-                <p class="text-blue-300 mt-2">For concerns, issues, or inquiries about the OJT Monitoring System</p>
+    <section id="contact" class="min-h-screen py-16 border-t border-blue-900/40 relative overflow-hidden flex items-center" style="background:linear-gradient(180deg,#050d2e,#030a1e)">
+        <!-- Background elements -->
+        <div class="dot-pattern absolute inset-0 opacity-20"></div>
+        
+        <div class="relative max-w-6xl mx-auto px-6">
+            <!-- Header -->
+            <div class="text-center mb-10">
+                <div class="text-blue-400 text-xs font-semibold uppercase tracking-widest mb-2">Contact</div>
+                <h2 class="text-2xl sm:text-3xl font-bold text-white mb-2">Get in Touch</h2>
+                <p class="text-blue-300 text-sm">For concerns, issues, or inquiries about the OJT Monitoring System</p>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-                <div class="bg-blue-900/20 border border-blue-800/40 rounded-xl p-6 text-center hover:border-blue-500/60 transition-all">
-                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center mx-auto mb-4">
+
+            <!-- Contact Cards Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+                <!-- Location Card -->
+                <div class="group relative bg-gradient-to-br from-blue-900/40 to-blue-800/20 border border-blue-700/40 rounded-xl p-5 text-center hover:border-blue-500/60 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 hover:-translate-y-1">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     </div>
-                    <h3 class="text-white font-semibold mb-2">Location</h3>
-                    <p class="text-blue-300 text-sm leading-relaxed">PRMSU Sta. Cruz Campus<br>Sta. Cruz, Zambales<br>Philippines</p>
+                    <h3 class="text-base font-bold text-white mb-2">📍 Location</h3>
+                    <div class="space-y-0.5 text-sm">
+                        <p class="text-blue-200 font-medium">PRMSU Sta. Cruz Campus</p>
+                        <p class="text-blue-300">Sta. Cruz, Zambales</p>
+                        <p class="text-blue-400">Philippines</p>
+                    </div>
                 </div>
-                <div class="bg-blue-900/20 border border-blue-800/40 rounded-xl p-6 text-center hover:border-blue-500/60 transition-all">
-                    <div class="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
+
+                <!-- Department Card -->
+                <div class="group relative bg-gradient-to-br from-cyan-900/40 to-cyan-800/20 border border-cyan-700/40 rounded-xl p-5 text-center hover:border-cyan-500/60 hover:shadow-xl hover:shadow-cyan-500/10 transition-all duration-300 hover:-translate-y-1">
+                    <div class="w-12 h-12 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-cyan-500/20 group-hover:scale-105 transition-transform">
                         <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
-                    <h3 class="text-white font-semibold mb-2">Department</h3>
-                    <p class="text-blue-300 text-sm leading-relaxed">College of Communication &amp;<br>Information Technology<br><span class="text-blue-400 font-medium">(CCIT Department)</span></p>
-                </div>
-                <div class="bg-blue-900/20 border border-blue-800/40 rounded-xl p-6 text-center hover:border-blue-500/60 transition-all">
-                    <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <h3 class="text-base font-bold text-white mb-2">🏢 Department</h3>
+                    <div class="space-y-0.5 text-sm">
+                        <p class="text-cyan-200 font-medium">College of Communication &</p>
+                        <p class="text-cyan-200 font-medium">Information Technology</p>
+                        <p class="text-cyan-400 font-medium mt-1">(CCIT Department)</p>
                     </div>
-                    <h3 class="text-white font-semibold mb-2">System Support</h3>
-                    <p class="text-blue-300 text-sm leading-relaxed">For account issues &amp; technical concerns, contact your<br><span class="text-blue-400 font-medium">OJT Coordinator</span> or<br><span class="text-blue-400 font-medium">CCIT Head</span></p>
+                </div>
+
+                <!-- System Support Card -->
+                <div class="group relative bg-gradient-to-br from-purple-900/40 to-purple-800/20 border border-purple-700/40 rounded-xl p-5 text-center hover:border-purple-500/60 hover:shadow-xl hover:shadow-purple-500/10 transition-all duration-300 hover:-translate-y-1">
+                    <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-600 rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-purple-500/20 group-hover:scale-105 transition-transform">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                    </div>
+                    <h3 class="text-base font-bold text-white mb-2">💬 System Support</h3>
+                    <div class="space-y-1 text-sm">
+                        <p class="text-purple-200">For account issues &</p>
+                        <p class="text-purple-200">technical concerns, contact:</p>
+                        <div class="mt-2 space-y-0.5">
+                            <p class="text-purple-300 font-semibold">OJT Coordinator</p>
+                            <p class="text-purple-400 text-xs">or</p>
+                            <p class="text-purple-300 font-semibold">CCIT Head</p>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="mt-10 max-w-2xl mx-auto bg-blue-900/20 border border-blue-800/40 rounded-xl p-5 text-center">
-                <p class="text-blue-300 text-sm">📌 This system is exclusively for <span class="text-white font-semibold">PRMSU Sta. Cruz Campus — CCIT students and faculty</span>. Registration requires a valid school-issued ID number provided by the CCIT department.</p>
+
+            <!-- Important Notice -->
+            <div class="max-w-3xl mx-auto">
+                <div class="relative bg-gradient-to-r from-blue-900/50 via-blue-800/40 to-blue-900/50 border border-blue-600/40 rounded-xl p-4 backdrop-blur-sm">
+                    <div class="flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+                        <div class="shrink-0">
+                            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                            </div>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-blue-200 text-sm leading-relaxed">
+                                📌 This system is exclusively for <span class="text-white font-semibold">PRMSU Sta. Cruz Campus — CCIT students and faculty</span>. Registration requires a valid school-issued ID number.
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
     <!-- CTA -->
-    <section class="py-20 border-t border-blue-900/40 relative overflow-hidden" style="background:linear-gradient(135deg,#0a1a5c,#0d2d8a)">
+    <section class="min-h-screen py-20 border-t border-blue-900/40 relative overflow-hidden flex items-center" style="background:linear-gradient(135deg,#0a1a5c,#0d2d8a)">
         <div class="dot-pattern absolute inset-0 opacity-30"></div>
-        <div class="relative max-w-3xl mx-auto px-6 text-center">
-            <h2 class="text-3xl font-bold text-white mb-4">Ready to Get Started?</h2>
-            <p class="text-blue-200 mb-8">Register with your school-issued ID number, select your role, and start tracking your OJT journey. Accounts require CCIT Head approval. Secured with strong password protection.</p>
-            <div class="flex flex-wrap gap-4 justify-center">
-                <a href="{{ route('register') }}" class="px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 rounded-full font-semibold text-white transition-all glow-btn transform hover:scale-105">
-                    Create Account
+        <!-- Glow orbs -->
+        <div class="absolute top-0 left-1/4 w-96 h-96 bg-blue-600 rounded-full blur-3xl opacity-20"></div>
+        <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-cyan-600 rounded-full blur-3xl opacity-20"></div>
+        
+        <div class="relative max-w-4xl mx-auto px-6 text-center">
+            <!-- Badge -->
+            <div class="inline-flex items-center gap-2 bg-blue-900/50 border border-blue-700/50 rounded-full px-5 py-2 text-sm text-blue-300 mb-6">
+                <svg class="w-4 h-4 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                Free for PRMSU CCIT Students
+            </div>
+            
+            <h2 class="text-4xl sm:text-5xl font-extrabold text-white mb-5 leading-tight">
+                Ready to Track Your<br>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-500">OJT Journey?</span>
+            </h2>
+            <p class="text-blue-200 text-lg leading-relaxed mb-10 max-w-2xl mx-auto">
+                Register with your school-issued ID number, select your role, and start tracking your OJT journey. Accounts require CCIT Head approval. Secured with strong password protection.
+            </p>
+            
+            <div class="flex flex-col sm:flex-row flex-wrap gap-4 justify-center items-center">
+                <a href="{{ route('register') }}" class="group relative inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 hover:from-blue-500 hover:via-blue-600 hover:to-blue-700 rounded-2xl font-bold text-lg text-white transition-all shadow-2xl shadow-blue-500/40 hover:shadow-blue-500/60 transform hover:scale-105 hover:-translate-y-1">
+                    <svg class="w-6 h-6 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+                    Create Your Account
+                    <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
                 </a>
-                <a href="{{ route('login') }}" class="px-8 py-3 border border-blue-400/60 text-blue-200 hover:text-white hover:border-blue-300 rounded-full font-semibold transition-all">
-                    Sign In
+                <a href="{{ route('login') }}" class="group inline-flex items-center gap-2 px-10 py-5 border-2 border-blue-400/60 bg-blue-500/5 hover:bg-blue-500/10 text-blue-200 hover:text-white hover:border-blue-300 rounded-2xl font-semibold text-lg transition-all backdrop-blur-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+                    Already Have an Account? Sign In
                 </a>
+            </div>
+            
+            <!-- Trust indicators -->
+            <div class="mt-12 flex flex-wrap items-center justify-center gap-8 text-sm text-blue-300">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                    <span>Secure & Encrypted</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+                    <span>Real-time Updates</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                    <span>CCIT Approved</span>
+                </div>
             </div>
         </div>
     </section>

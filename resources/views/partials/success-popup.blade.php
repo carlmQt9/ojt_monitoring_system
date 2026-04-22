@@ -2,16 +2,16 @@
 {{-- Usage: include this at the top of the <body> on any view that may show a success message. --}}
 
 <!-- markup (kept hidden by default) -->
-<div id="successPopup" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 popup-container">
-    <div class="popup-content bg-slate-800 border border-green-500 rounded-xl p-8 max-w-sm mx-auto backdrop-blur">
-        <div class="flex items-center justify-center w-12 h-12 bg-green-500/20 rounded-full mx-auto mb-4">
-            <svg class="w-6 h-6 checkmark-svg" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+<div id="successPopup" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 popup-container">
+    <div class="popup-content bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-green-500/50 rounded-2xl p-8 max-w-sm mx-auto shadow-2xl">
+        <div class="flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-full mx-auto mb-5 ring-4 ring-green-500/30">
+            <svg class="w-10 h-10 checkmark-svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                 <polyline points="20 6 9 17 4 12" class="text-green-400" stroke="currentColor"></polyline>
             </svg>
         </div>
-        <h3 class="success-title text-xl font-bold text-white text-center mb-2">Success!</h3>
-        <p class="success-message text-gray-300 text-center mb-6"></p>
-        <button onclick="closeSuccessPopup()" class="success-button w-full px-4 py-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95">
+        <h3 class="success-title text-2xl font-bold text-white text-center mb-3">Success!</h3>
+        <p class="success-message text-gray-300 text-center mb-6 text-sm leading-relaxed"></p>
+        <button onclick="closeSuccessPopup()" class="success-button w-full px-5 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg shadow-green-500/30 hover:shadow-green-500/50">
             Got it
         </button>
     </div>
@@ -22,7 +22,7 @@
     @keyframes popupSlideIn {
         from {
             opacity: 0;
-            transform: scale(0.8) translateY(20px);
+            transform: scale(0.85) translateY(30px);
         }
         to {
             opacity: 1;
@@ -47,7 +47,7 @@
     @keyframes fadeInUp {
         from {
             opacity: 0;
-            transform: translateY(10px);
+            transform: translateY(15px);
         }
         to {
             opacity: 1;
@@ -64,30 +64,41 @@
         }
     }
 
+    @keyframes ringPulse {
+        0%, 100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+        50% {
+            transform: scale(1.1);
+            opacity: 0.8;
+        }
+    }
+
     .popup-container {
-        animation: backgroundFadeIn 0.4s ease-in-out;
+        animation: backgroundFadeIn 0.3s ease-in-out;
     }
 
     .popup-content {
-        animation: popupSlideIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        animation: popupSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     .checkmark-svg {
         stroke-dasharray: 60;
         stroke-dashoffset: 60;
-        animation: checkmarkDraw 1s ease-in-out 0.3s forwards;
+        animation: checkmarkDraw 0.8s ease-in-out 0.2s forwards;
     }
 
     .success-title {
-        animation: fadeInUp 0.6s ease-out 0.8s both;
+        animation: fadeInUp 0.5s ease-out 0.6s both;
     }
 
     .success-message {
-        animation: fadeInUp 0.6s ease-out 1s both;
+        animation: fadeInUp 0.5s ease-out 0.8s both;
     }
 
     .success-button {
-        animation: fadeInUp 0.6s ease-out 1.2s both;
+        animation: fadeInUp 0.5s ease-out 1s both;
     }
 </style>
 
@@ -100,7 +111,7 @@
         if (!popup) return;
         popup.querySelector('.success-message').textContent = message;
         popup.classList.remove('hidden');
-        popup.style.animation = 'backgroundFadeIn 0.4s ease-in-out';
+        popup.style.animation = 'backgroundFadeIn 0.3s ease-in-out';
         _successReload = reloadOnClose;
 
         // auto close after 3s then reload if needed
@@ -114,7 +125,7 @@
     function closeSuccessPopup() {
         const popup = document.getElementById('successPopup');
         if (!popup) return;
-        popup.style.animation = 'backgroundFadeIn 0.4s ease-in-out reverse';
+        popup.style.animation = 'backgroundFadeIn 0.3s ease-in-out reverse';
         setTimeout(() => {
             popup.classList.add('hidden');
             if (_successReload) {
@@ -122,7 +133,7 @@
                 if (typeof _allowLeave !== 'undefined') _allowLeave = true;
                 window.location.reload();
             }
-        }, 400);
+        }, 300);
     }
 
     // close when clicking on backdrop

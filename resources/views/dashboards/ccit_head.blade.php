@@ -12,26 +12,35 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.min.js"></script>
     <style>
-        /* LIGHT MODE */
-        body.light { background: linear-gradient(135deg,#dde8f5,#c8daf0,#d8eaf8) !important; color: #1a2a4a !important; }
-        body.light nav:not(#sidebar nav) { background: rgba(220,235,255,0.97) !important; border-color: #7aaad4 !important; }
-        body.light nav:not(#sidebar nav) span, body.light nav:not(#sidebar nav) a, body.light nav:not(#sidebar nav) p { color: #1a2a4a !important; }
+        /* LIGHT MODE - Beautiful soft design */
+        /* ===== SECTION VISIBILITY CONTROL ===== */
+        .dash-section.hidden {
+            display: none !important;
+        }
+        .dash-section:not(.hidden) {
+            display: block !important;
+        }
+        /* ===== END SECTION VISIBILITY ===== */
+
+        body.light { background: #ffffff !important; color: #1e3a5f !important; }
+        body.light nav:not(#sidebar nav) { background: rgba(255,255,255,0.95) !important; border-color: #fecaca !important; box-shadow: 0 2px 8px rgba(220,38,38,0.08) !important; }
+        body.light nav:not(#sidebar nav) span, body.light nav:not(#sidebar nav) a, body.light nav:not(#sidebar nav) p { color: #1e3a5f !important; }
         body.light nav:not(#sidebar nav) a[class*="bg-red"] { color: #fff !important; }
         body.light h1,body.light h2,body.light h3,body.light h4,
         body.light p,body.light span,body.light label,body.light div,
-        body.light td,body.light th,body.light li,body.light small { color: #1a2a4a; }
-        body.light .text-white,body.light .text-gray-100,body.light .text-gray-200 { color: #1a2a4a !important; }
-        body.light .text-gray-300 { color: #2d3f5a !important; }
-        body.light .text-gray-400 { color: #3d5070 !important; }
-        body.light .text-gray-500 { color: #4a6080 !important; }
-        body.light .text-green-100,body.light .text-green-200,body.light .text-green-300,body.light .text-green-400 { color: #15803d !important; }
-        body.light .text-blue-100,body.light .text-blue-200,body.light .text-blue-300,body.light .text-blue-400 { color: #1d4ed8 !important; }
-        body.light .text-orange-100,body.light .text-orange-200,body.light .text-orange-300,body.light .text-orange-400 { color: #c2410c !important; }
-        body.light .text-yellow-100,body.light .text-yellow-200,body.light .text-yellow-300,body.light .text-yellow-400 { color: #92400e !important; }
-        body.light .text-red-100,body.light .text-red-200,body.light .text-red-300,body.light .text-red-400 { color: #b91c1c !important; }
-        body.light .text-purple-100,body.light .text-purple-200,body.light .text-purple-300,body.light .text-purple-400 { color: #6d28d9 !important; }
-        body.light .text-indigo-100,body.light .text-indigo-200,body.light .text-indigo-300,body.light .text-indigo-400 { color: #4338ca !important; }
-        body.light .text-cyan-200,body.light .text-cyan-300,body.light .text-cyan-400 { color: #0369a1 !important; }
+        body.light td,body.light th,body.light li,body.light small { color: #2d4a6f; }
+        body.light .text-white,body.light .text-gray-100,body.light .text-gray-200 { color: #1e3a5f !important; }
+        body.light .text-gray-300 { color: #3d5a7f !important; }
+        body.light .text-gray-400 { color: #4a6a8f !important; }
+        body.light .text-gray-500 { color: #5a7a9f !important; }
+        body.light .text-green-100,body.light .text-green-200,body.light .text-green-300,body.light .text-green-400 { color: #16a34a !important; }
+        body.light .text-blue-100,body.light .text-blue-200,body.light .text-blue-300,body.light .text-blue-400 { color: #2563eb !important; }
+        body.light .text-orange-100,body.light .text-orange-200,body.light .text-orange-300,body.light .text-orange-400 { color: #ea580c !important; }
+        body.light .text-yellow-100,body.light .text-yellow-200,body.light .text-yellow-300,body.light .text-yellow-400 { color: #ca8a04 !important; }
+        body.light .text-red-100,body.light .text-red-200,body.light .text-red-300,body.light .text-red-400 { color: #dc2626 !important; }
+        body.light .text-purple-100,body.light .text-purple-200,body.light .text-purple-300,body.light .text-purple-400 { color: #7c3aed !important; }
+        body.light .text-indigo-100,body.light .text-indigo-200,body.light .text-indigo-300,body.light .text-indigo-400 { color: #4f46e5 !important; }
+        body.light .text-cyan-200,body.light .text-cyan-300,body.light .text-cyan-400 { color: #0891b2 !important; }
         body.light button[class*="bg-green-6"],body.light button[class*="bg-blue-6"],
         body.light button[class*="bg-red-6"],body.light button[class*="bg-orange-6"],
         body.light button[class*="bg-yellow-6"],body.light button[class*="bg-indigo-6"],
@@ -42,7 +51,6 @@
         body.light button[class*="bg-red-6"] span,body.light button[class*="bg-orange-6"] span,
         body.light button[class*="bg-yellow-6"] span,body.light button[class*="bg-indigo-6"] span,
         body.light button[class*="bg-purple-6"] span { color: #fff !important; }
-        /* Ensure small action buttons keep white text */
         body.light button.bg-indigo-600,body.light button.bg-indigo-700,
         body.light button.bg-red-600,body.light button.bg-red-700,
         body.light button.bg-red-800,body.light button.bg-red-900,
@@ -50,27 +58,28 @@
         body.light button.bg-green-600,body.light button.bg-green-700,
         body.light button.bg-orange-600,body.light button.bg-orange-700,
         body.light button.bg-purple-600,body.light button.bg-purple-700 { color: #fff !important; }
-        body.light [class*="bg-slate-900"] { background: #c8daf0 !important; }
-        body.light [class*="bg-slate-800"] { background: #d0e4f8 !important; }
-        body.light [class*="bg-slate-700"] { background: #bdd4ec !important; }
-        body.light [class*="bg-slate-6"] { background: #aac4e0 !important; }
-        body.light [class*="bg-gray-9"] { background: #c8daf0 !important; }
-        body.light [class*="border-slate-7"] { border-color: #7aaad4 !important; }
-        body.light [class*="border-slate-6"] { border-color: #8ab8dc !important; }
-        body.light [class*="divide-slate-7"] > * { border-color: #7aaad4 !important; }
-        body.light .bg-red-900 { background: rgba(254,202,202,0.5) !important; }
-        body.light .bg-green-900 { background: rgba(187,247,208,0.5) !important; }
-        body.light .bg-blue-900 { background: rgba(219,234,254,0.5) !important; }
-        body.light input,body.light textarea,body.light select { background: rgba(255,255,255,0.9) !important; border-color: #7aaad4 !important; color: #1a2a4a !important; }
-        body.light input::placeholder,body.light textarea::placeholder { color: #5a7a9a !important; }
+        body.light [class*="bg-slate-900"] { background: linear-gradient(135deg, #fffafa 0%, #fef2f2 100%) !important; }
+        body.light [class*="bg-slate-800"] { background: rgba(255,255,255,0.85) !important; box-shadow: 0 1px 3px rgba(220,38,38,0.08) !important; }
+        body.light [class*="bg-slate-700"] { background: rgba(255,250,250,0.9) !important; }
+        body.light [class*="bg-slate-6"] { background: #fef2f2 !important; }
+        body.light [class*="bg-gray-9"] { background: #fef2f2 !important; }
+        body.light [class*="border-slate-7"] { border-color: #fecaca !important; }
+        body.light [class*="border-slate-6"] { border-color: #fecaca !important; }
+        body.light [class*="divide-slate-7"] > * { border-color: #fecaca !important; }
+        body.light .bg-red-900 { background: rgba(254,226,226,0.6) !important; }
+        body.light .bg-green-900 { background: rgba(220,252,231,0.6) !important; }
+        body.light .bg-blue-900 { background: rgba(224,242,254,0.6) !important; }
+        body.light input,body.light textarea,body.light select { background: rgba(255,255,255,0.95) !important; border-color: #fca5a5 !important; color: #1e3a5f !important; box-shadow: 0 1px 2px rgba(220,38,38,0.05) !important; }
+        body.light input::placeholder,body.light textarea::placeholder { color: #b87a7a !important; }
+        body.light input:focus,body.light textarea:focus,body.light select:focus { border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220,38,38,0.1) !important; }
         /* Header info card in light mode */
-        body.light .header-info-card { background: #fff !important; border-color: #b91c1c !important; border-left: 4px solid #b91c1c !important; }
-        body.light .header-info-card h1 { color: #1a2a4a !important; }
-        body.light .header-info-card .subtitle { color: #4a6080 !important; }
-        body.light .header-info-card .stat-label { color: #4a6080 !important; }
-        body.light .header-info-card .stat-value-white { color: #1a2a4a !important; }
-        body.light .header-info-card .stat-value-red { color: #b91c1c !important; }
-        body.light .header-info-card .divider { background: #cbd5e1 !important; }
+        body.light .header-info-card { background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(254,242,242,0.8) 100%) !important; border-color: #fca5a5 !important; border-left: 4px solid #dc2626 !important; box-shadow: 0 4px 12px rgba(220,38,38,0.08) !important; }
+        body.light .header-info-card h1 { color: #1e3a5f !important; }
+        body.light .header-info-card .subtitle { color: #5a7a9f !important; }
+        body.light .header-info-card .stat-label { color: #5a7a9f !important; }
+        body.light .header-info-card .stat-value-white { color: #1e3a5f !important; }
+        body.light .header-info-card .stat-value-red { color: #dc2626 !important; }
+        body.light .header-info-card .divider { background: #fecaca !important; }
 
         /* SIDEBAR */
         #sidebar { position:fixed; top:0; left:0; height:100%; min-height:100vh; width:16rem; background:#1e3a5f; z-index:40; display:flex; flex-direction:column; transition:width .3s,transform .3s; overflow:hidden; }
@@ -116,29 +125,84 @@
         body.light #studentDropdownList { background: #fff !important; border-color: #c0d4ec !important; box-shadow: 0 8px 32px rgba(30,58,138,0.12) !important; }
         body.light #studentDropdownOptions button { color: #1a2a4a !important; }
         body.light #studentDropdownOptions button:hover { background: rgba(185,28,28,0.07) !important; }
-        /* Archive/Trash modals — always dark (handled via inline styles on modal panels) */
         @keyframes slideInRight { from{opacity:0;transform:translateX(60px)} to{opacity:1;transform:translateX(0)} }
         @keyframes slideOutRight { from{opacity:1;transform:translateX(0)} to{opacity:0;transform:translateX(60px)} }
 
-        /* PIXEL LOADING */
-        @font-face {
-            font-family: 'Press Start 2P';
-            src: url('https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2') format('woff2');
+        /* MODERN LOADING SYSTEM */
+        @keyframes spinGlow {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
-        #pixelLoader { font-family: 'Press Start 2P', monospace; }
-        .pixel-bar-wrap { display:flex; gap:4px; align-items:center; }
-        .pixel-cell { width:28px; height:28px; border:3px solid #1a1a1a; image-rendering:pixelated; transition:background .1s; }
-        .pixel-cell.filled { background:#4ade80; box-shadow:inset -4px -4px 0 #16a34a, inset 4px 4px 0 #86efac; }
-        .pixel-cell.empty  { background:#d1d5db; box-shadow:inset -4px -4px 0 #9ca3af, inset 4px 4px 0 #f3f4f6; }
-        .pixel-cell.cap-l  { border-radius:6px 0 0 6px; }
-        .pixel-cell.cap-r  { border-radius:0 6px 6px 0; }
-        @keyframes pixelDots { 0%{content:'.'} 25%{content:'..'} 50%{content:'...'} 75%{content:'....'} 100%{content:'.'} }
-        #pixelDots::after { content:'.'; animation:pixelDots 1s steps(1) infinite; }
-        /* SUCCESS CHECKMARK */
-        @keyframes popIn { 0%{transform:scale(0) rotate(-20deg);opacity:0} 70%{transform:scale(1.2) rotate(5deg)} 100%{transform:scale(1) rotate(0);opacity:1} }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-        .pixel-check { image-rendering:pixelated; font-size:3rem; animation:popIn .5s cubic-bezier(.36,.07,.19,.97) forwards; }
-        .pixel-success-text { animation:fadeUp .4s .3s ease forwards; opacity:0; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.95); }
+        }
+        @keyframes dotPulse {
+            0%, 80%, 100% { opacity: 0; }
+            40% { opacity: 1; }
+        }
+        
+        /* PIXEL LOADING - Modernized */
+        #pixelLoader { font-family: system-ui, -apple-system, sans-serif; }
+        .pixel-bar-wrap { display:flex; gap:6px; align-items:center; }
+        .pixel-cell { 
+            width:32px; height:32px; 
+            border-radius:8px;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border:2px solid #334155;
+            transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .pixel-cell::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .pixel-cell.filled::before { opacity: 1; }
+        .pixel-cell.filled { 
+            border-color: #22c55e;
+            box-shadow: 0 0 20px rgba(74,222,128,0.4), inset 0 2px 4px rgba(255,255,255,0.2);
+        }
+        
+        @keyframes pixelDots { 
+            0%{content:'.'} 
+            33%{content:'..'} 
+            66%{content:'...'} 
+            100%{content:'.'} 
+        }
+        #pixelDots::after { content:'.'; animation:pixelDots 1.2s steps(1) infinite; }
+        
+        /* SUCCESS CHECKMARK - Modernized */
+        @keyframes popIn { 
+            0%{transform:scale(0) rotate(-20deg);opacity:0} 
+            70%{transform:scale(1.15) rotate(5deg)} 
+            100%{transform:scale(1) rotate(0);opacity:1} 
+        }
+        @keyframes fadeUp { 
+            from{opacity:0;transform:translateY(15px)} 
+            to{opacity:1;transform:translateY(0)} 
+        }
+        @keyframes checkGlow {
+            0%, 100% { filter: drop-shadow(0 0 8px rgba(74,222,128,0.6)); }
+            50% { filter: drop-shadow(0 0 16px rgba(74,222,128,0.9)); }
+        }
+        
+        .pixel-check { 
+            font-size:4rem; 
+            animation:popIn .6s cubic-bezier(.36,.07,.19,.97) forwards, checkGlow 2s ease-in-out infinite;
+            filter: drop-shadow(0 0 12px rgba(74,222,128,0.7));
+        }
+        .pixel-success-text { 
+            animation:fadeUp .5s .3s ease forwards; 
+            opacity:0;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+        }
+        
         /* Hide browser native password reveal icons (Edge, IE, Chrome) */
         .hide-pwd-reveal::-ms-reveal,
         .hide-pwd-reveal::-ms-clear { display: none !important; }
@@ -191,8 +255,11 @@
         </nav>
         <!-- Footer — always visible at bottom -->
         <div class="px-2 py-3 border-t border-white/10 shrink-0">
-            <button class="nav-item text-red-400 hover:bg-red-500/10" onclick="showConfirm('logout')">
-                <span class="nav-icon">🚪</span><span class="nav-label font-semibold">Logout</span>
+            <button class="nav-item group text-red-400 hover:text-white hover:bg-gradient-to-r hover:from-red-600 hover:to-red-700 font-semibold shadow-lg hover:shadow-red-500/30 transform hover:scale-[1.02]" onclick="showConfirm('logout')">
+                <svg class="nav-icon w-5 h-5 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
+                <span class="nav-label">Logout</span>
             </button>
         </div>
     </aside>
@@ -392,23 +459,15 @@
                                 class="flex-1 bg-transparent text-white text-sm placeholder-slate-400 focus:outline-none font-medium"
                                 autocomplete="off"
                                 oninput="filterStudentDropdown()"
-                                onfocus="openStudentDropdown()"
-                            >
+                                onfocus="openStudentDropdown()">
                             <button type="button" id="clearStudentBtn" onclick="clearStudentFilter()" class="hidden w-5 h-5 rounded-full bg-slate-500 hover:bg-slate-400 text-white flex items-center justify-center text-xs transition-colors shrink-0">✕</button>
                         </div>
-                        <!-- Dropdown list -->
-                        <div id="studentDropdownList"
-                            class="hidden absolute z-30 w-full mt-2 bg-slate-800 border border-slate-600/80 rounded-2xl shadow-2xl max-h-60 overflow-y-auto"
-                            style="backdrop-filter:blur(8px)">
+                        <div id="studentDropdownList" class="hidden absolute z-30 w-full mt-2 bg-slate-800 border border-slate-600/80 rounded-2xl shadow-2xl max-h-60 overflow-y-auto" style="backdrop-filter:blur(8px)">
                             <div id="studentDropdownOptions"></div>
                         </div>
                     </div>
-                    <!-- Hidden real select for JS compatibility -->
-                    <select id="analyticsStudentSelect" class="hidden">
-                        <option value="">All Students</option>
-                    </select>
+                    <select id="analyticsStudentSelect" class="hidden"><option value="">All Students</option></select>
                 </div>
-
                 <div class="hidden md:block overflow-x-auto">
                     <table class="w-full text-sm text-left text-gray-300">
                         <thead class="text-xs text-gray-400 bg-slate-700/50">
@@ -464,26 +523,23 @@
             </div>
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
                 <p class="text-gray-400 text-sm mb-4">Only students with an approved School ID (e.g. <span class="text-red-300 font-mono">23-1-2-0001</span>) can register.</p>
-                <!-- Single add -->
                 <div class="flex flex-wrap gap-2 mb-2">
                     <input id="newSchoolIdInput" type="text" placeholder="e.g. 23-1-2-0001"
                         class="flex-1 min-w-[160px] px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded-lg focus:outline-none focus:border-red-500 text-sm font-mono">
                     <button onclick="addSchoolId()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm">Add</button>
                 </div>
                 <p id="sidError" class="text-red-400 text-xs mb-3 hidden"></p>
-                <!-- Bulk import -->
                 <details class="mb-4">
                     <summary class="text-sm text-gray-400 hover:text-white cursor-pointer select-none mb-2">📋 Bulk Import (paste multiple IDs)</summary>
                     <div class="mt-3 space-y-2">
-                        <textarea id="bulkSchoolIdInput" rows="6"
+                        <textarea id="bulkSchoolIdInput" rows="5"
                             class="w-full px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded-lg focus:outline-none focus:border-red-500 text-sm font-mono resize-y"
-                            placeholder="Paste one ID per line, e.g.:&#10;22-1-2-0500&#10;22-1-2-0401&#10;22-1-2-0009"></textarea>
+                            placeholder="Paste one ID per line, e.g.:&#10;22-1-2-0500&#10;22-1-2-0401"></textarea>
                         <p class="text-gray-500 text-xs">One ID per line. Duplicates and invalid formats are skipped automatically.</p>
                         <p id="bulkSidError" class="text-red-400 text-xs hidden"></p>
                         <button onclick="bulkAddSchoolIds()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold">Import All</button>
                     </div>
                 </details>
-                <!-- Search school IDs -->
                 <div class="flex items-center gap-2 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg mb-3 focus-within:border-red-500 transition-colors">
                     <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
                     <input type="text" id="schoolIdSearch" placeholder="Search school IDs…"
@@ -719,117 +775,53 @@
     </div><!-- /main-content -->
 
     <!-- Archived School Years Modal -->
-    <div id="archivedSchoolYearsModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" style="backdrop-filter:blur(4px)">
-        <div class="rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col" style="background:#1e293b;border:1px solid #334155">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
-                <h3 class="text-lg font-bold text-yellow-400">🗑 Archived School Years</h3>
-                <button onclick="closeArchivedSchoolYearsModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
-            </div>
-            <div class="px-4 pt-3 shrink-0">
-                <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-600 focus-within:border-yellow-500 transition-colors" style="background:#0f172a">
-                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
-                    <input type="text" placeholder="Search school years…" class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none"
-                        oninput="filterArchiveList('archivedSchoolYearsList', this.value)">
+    <div id="archivedSchoolYearsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-lg w-full max-w-lg max-h-[80vh] flex flex-col shadow-xl border border-gray-200 dark:border-slate-700">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">🗑</span>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Archived School Years</h3>
                 </div>
+                <button onclick="closeArchivedSchoolYearsModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl font-light">×</button>
             </div>
-            <div class="overflow-auto flex-1 p-4">
-                <div id="archivedSchoolYearsList"><p class="text-gray-400 text-center py-8">Loading...</p></div>
+            <div class="overflow-auto flex-1 p-6">
+                <div id="archivedSchoolYearsList"><p class="text-gray-500 dark:text-gray-400 text-center py-8">Loading...</p></div>
             </div>
         </div>
     </div>
 
     <!-- Archived School IDs Modal -->
-    <div id="archivedSchoolIdsModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" style="backdrop-filter:blur(4px)">
-        <div class="rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col" style="background:#1e293b;border:1px solid #334155">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
-                <h3 class="text-lg font-bold text-yellow-400">🗑 Archived School IDs</h3>
-                <button onclick="closeArchivedSchoolIdsModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
-            </div>
-            <div class="px-4 pt-3 shrink-0">
-                <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-600 focus-within:border-yellow-500 transition-colors" style="background:#0f172a">
-                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
-                    <input type="text" placeholder="Search school IDs…" class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none font-mono"
-                        oninput="filterArchiveList('archivedSchoolIdsList', this.value)">
+    <div id="archivedSchoolIdsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col shadow-xl border border-gray-200 dark:border-slate-700">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">🗑</span>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Archived School IDs</h3>
                 </div>
+                <button onclick="closeArchivedSchoolIdsModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl font-light">×</button>
             </div>
-            <div class="overflow-auto flex-1 p-4">
-                <div id="archivedSchoolIdsList"><p class="text-gray-400 text-center py-8">Loading...</p></div>
+            <div class="overflow-auto flex-1 p-6">
+                <div id="archivedSchoolIdsList"><p class="text-gray-500 dark:text-gray-400 text-center py-8">Loading...</p></div>
             </div>
         </div>
     </div>
 
     <!-- Archived Requirements Modal -->
-    <div id="archivedTemplatesModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" style="backdrop-filter:blur(4px)">
-        <div class="rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col" style="background:#1e293b;border:1px solid #334155">
-            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700 shrink-0">
-                <h3 class="text-lg font-bold text-yellow-400">🗑 Archived Requirements</h3>
-                <button onclick="closeArchivedTemplatesModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+    <div id="archivedTemplatesModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-lg w-full max-w-3xl max-h-[85vh] flex flex-col shadow-xl border border-gray-200 dark:border-slate-700">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">🗑</span>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Archived Requirements</h3>
+                </div>
+                <button onclick="closeArchivedTemplatesModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl font-light">×</button>
             </div>
-            <div class="px-4 pt-3 shrink-0">
-                <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-600 focus-within:border-yellow-500 transition-colors" style="background:#0f172a">
-                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
-                    <input type="text" id="archivedTemplatesSearch" placeholder="Search requirements…" class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none"
-                        oninput="filterBladeArchive('archivedTemplatesSearch', '.archived-tpl-row', '.archived-tpl-card')">
-                </div>
-            </div>
-            <div class="overflow-auto flex-1 p-4">
-                @if($archivedTemplates->isNotEmpty())
-                {{-- Desktop table --}}
-                <div class="hidden sm:block">
-                    <table class="w-full">
-                        <thead>
-                            <tr class="border-b border-slate-700">
-                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Name</th>
-                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Category</th>
-                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Archived On</th>
-                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($archivedTemplates as $tpl)
-                            <tr class="archived-tpl-row border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80" data-search="{{ strtolower($tpl->name . ' ' . $tpl->category) }}">
-                                <td class="py-3 px-3 text-gray-400 line-through">{{ $tpl->name }}</td>
-                                <td class="py-3 px-3 text-gray-500 text-sm capitalize">{{ $tpl->category }}</td>
-                                <td class="py-3 px-3 text-center text-gray-500 text-sm">{{ $tpl->deleted_at->format('M d, Y') }}</td>
-                                <td class="py-3 px-3 text-center">
-                                    <div class="flex items-center justify-center gap-2">
-                                        <form action="{{ route('requirement-templates.restore', $tpl->id) }}" method="POST" class="inline">
-                                            @csrf
-                                            <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm">Restore</button>
-                                        </form>
-                                        <button onclick="showForceDeleteTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-sm">Delete</button>
-                                    </div>
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-                {{-- Mobile cards --}}
-                <div class="sm:hidden space-y-3">
-                    @foreach($archivedTemplates as $tpl)
-                    <div class="archived-tpl-card bg-slate-700/30 border border-slate-600/50 rounded-xl p-4 opacity-90" data-search="{{ strtolower($tpl->name . ' ' . $tpl->category) }}">
-                        <p class="text-gray-400 line-through font-semibold text-sm mb-0.5">{{ $tpl->name }}</p>
-                        <p class="text-gray-500 text-xs capitalize mb-1">{{ $tpl->category }}</p>
-                        <p class="text-gray-500 text-xs mb-3">Archived: {{ $tpl->deleted_at->format('M d, Y') }}</p>
-                        <div class="flex gap-2">
-                            <form action="{{ route('requirement-templates.restore', $tpl->id) }}" method="POST" class="flex-1">
-                                @csrf
-                                <button type="submit" class="w-full py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold">♻️ Restore</button>
-                            </form>
-                            <button onclick="showForceDeleteTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')"
-                                class="flex-1 py-1.5 bg-red-800 hover:bg-red-900 text-white rounded-lg text-xs font-semibold">🗑 Delete</button>
-                        </div>
-                    </div>
-                    @endforeach
-                </div>
-                @else
-                <p class="text-gray-400 text-center py-10">No archived requirements.</p>
-                @endif
+            <div class="overflow-auto flex-1 p-6">
+                <div id="archivedTemplatesList"><p class="text-gray-500 dark:text-gray-400 text-center py-8">Loading...</p></div>
             </div>
         </div>
     </div>
-
+            </div>
     <!-- Add Requirement Template Modal -->
     <div id="addTemplateModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div class="bg-slate-800 rounded-xl max-w-md w-full border border-slate-700">
@@ -1225,18 +1217,18 @@
     </div>
 
     <!-- Pixel Loader Overlay -->
-    <div id="pixelLoader" class="hidden fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black/80">
-        <div class="bg-slate-900 border-4 border-slate-600 rounded-2xl px-10 py-8 flex flex-col items-center gap-5" style="box-shadow:0 0 40px rgba(74,222,128,0.3)">
+    <div id="pixelLoader" class="hidden fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div class="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-600/50 rounded-2xl px-12 py-10 flex flex-col items-center gap-6 shadow-2xl">
             <div class="pixel-bar-wrap" id="pixelBarCells"></div>
-            <div class="text-green-400 text-sm tracking-widest" id="pixelLoaderLabel">LOADING<span id="pixelDots"></span></div>
+            <div class="text-green-400 text-base font-semibold tracking-wider" id="pixelLoaderLabel">LOADING<span id="pixelDots"></span></div>
         </div>
     </div>
 
     <!-- Pixel Success Overlay -->
-    <div id="pixelSuccess" class="hidden fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black/80">
-        <div class="bg-slate-900 border-4 border-green-500 rounded-2xl px-12 py-8 flex flex-col items-center gap-4" style="box-shadow:0 0 40px rgba(74,222,128,0.4)">
+    <div id="pixelSuccess" class="hidden fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div class="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-green-500/50 rounded-2xl px-14 py-10 flex flex-col items-center gap-5 shadow-2xl" style="box-shadow:0 0 60px rgba(74,222,128,0.3)">
             <div class="pixel-check">✅</div>
-            <div class="pixel-success-text text-green-400 text-sm tracking-widest text-center" id="pixelSuccessMsg">SUCCESS!</div>
+            <div class="pixel-success-text text-green-400 text-base tracking-wider text-center" id="pixelSuccessMsg">SUCCESS!</div>
         </div>
     </div>
 
@@ -1269,6 +1261,12 @@
     </div>
 
     <script>
+        // Global error handler to prevent navigation breaking
+        window.addEventListener('error', function(e) {
+            console.error('Global error caught:', e.error);
+            return false;
+        });
+
         // Global: ensure all fetch calls to /api/* include Accept: application/json
         // so Laravel returns JSON errors instead of HTML redirects
         const _origFetch = window.fetch;
@@ -2568,10 +2566,12 @@
             const msg = document.getElementById('confirmMsg');
             const btn = document.getElementById('confirmBtn');
             if (type === 'logout') {
-                icon.textContent = '🚪'; title.textContent = 'Logout?';
+                icon.innerHTML = '<svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>';
+                icon.className = 'inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/20 mb-4';
+                title.textContent = 'Logout?';
                 msg.textContent = 'You will be signed out of your account.';
                 btn.textContent = 'Yes, Logout'; btn.href = '/logout';
-                btn.className = 'flex-1 px-4 py-2.5 text-center text-white rounded-xl font-semibold transition-all bg-red-600 hover:bg-red-700';
+                btn.className = 'flex-1 px-5 py-3 text-center text-white rounded-xl font-semibold transition-all bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 shadow-lg shadow-red-500/30 hover:shadow-red-500/50 hover:scale-105 transform';
                 btn.onclick = function() { _allowLeave = true; sessionStorage.clear(); showPageLoader('Signing out…'); };
             } else {
                 icon.textContent = '🏠'; title.textContent = 'Go to Home?';
@@ -2587,24 +2587,41 @@
 
         // ── Sidebar JS ───────────────────────────────────────────────
         function toggleSidebar() {
-            const sb = document.getElementById('sidebar');
-            const ov = document.getElementById('sidebarOverlay');
-            sb.classList.toggle('mobile-hidden');
-            ov.classList.toggle('active');
+            try {
+                const sb = document.getElementById('sidebar');
+                const ov = document.getElementById('sidebarOverlay');
+                if (sb && ov) {
+                    sb.classList.toggle('mobile-hidden');
+                    ov.classList.toggle('active');
+                }
+            } catch (error) {
+                console.error('Error toggling sidebar:', error);
+            }
         }
         function closeSidebar() {
-            document.getElementById('sidebar').classList.add('mobile-hidden');
-            document.getElementById('sidebarOverlay').classList.remove('active');
+            try {
+                const sb = document.getElementById('sidebar');
+                const ov = document.getElementById('sidebarOverlay');
+                if (sb) sb.classList.add('mobile-hidden');
+                if (ov) ov.classList.remove('active');
+            } catch (error) {
+                console.error('Error closing sidebar:', error);
+            }
         }
         function toggleSidebarCollapse() {
-            const sb = document.getElementById('sidebar');
-            const collapsed = sb.classList.toggle('collapsed');
-            document.body.classList.toggle('sidebar-collapsed', collapsed);
-            const mc = document.getElementById('main-content');
-            if (mc) mc.style.marginLeft = collapsed ? '4rem' : '16rem';
-            const th = document.getElementById('top-header');
-            if (th) th.style.left = collapsed ? '4rem' : '16rem';
-            localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+            try {
+                const sb = document.getElementById('sidebar');
+                if (!sb) return;
+                const collapsed = sb.classList.toggle('collapsed');
+                document.body.classList.toggle('sidebar-collapsed', collapsed);
+                const mc = document.getElementById('main-content');
+                if (mc) mc.style.marginLeft = collapsed ? '4rem' : '16rem';
+                const th = document.getElementById('top-header');
+                if (th) th.style.left = collapsed ? '4rem' : '16rem';
+                localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+            } catch (error) {
+                console.error('Error toggling sidebar collapse:', error);
+            }
         }
         const sectionTitles = {
             overview: 'Overview', users: 'User Management', analytics: 'Analytics',
@@ -2613,43 +2630,107 @@
             'manage-requirements': '📝 Manage Requirements'
         };
         function showSection(name) {
-            document.querySelectorAll('.dash-section').forEach(s => s.classList.add('hidden'));
-            const target = document.getElementById('section-' + name);
-            if (target) target.classList.remove('hidden');
-            document.querySelectorAll('.nav-item[data-section]').forEach(b => {
-                b.classList.toggle('active', b.getAttribute('data-section') === name);
-            });
-            const ht = document.getElementById('headerTitle');
-            if (ht) ht.textContent = sectionTitles[name] || name;
-            sessionStorage.setItem('ccitSection', name);
-            closeSidebar();
-            /* load data for section */
-            if (name === 'users') loadUsers();
-            if (name === 'analytics') loadAnalytics();
-            if (name === 'schoolyears') loadSchoolYearList();
-            if (name === 'schoolids') {
-                loadSchoolIdList();
-            }
-            if (name === 'settings') {
-                fetch('/api/settings').then(r=>r.json()).then(json=>{
-                    const form = document.getElementById('settingsForm');
-                    if(form){ form.required_hours.value=json.required_hours||''; form.email_notifications.checked=!!json.email_notifications; }
-                }).catch(()=>{});
+            try {
+                // Hide ALL sections first
+                document.querySelectorAll('.dash-section').forEach(s => {
+                    s.classList.add('hidden');
+                    s.style.display = 'none';
+                });
+                
+                // Force hide all archived modals
+                ['archivedSchoolYearsModal','archivedSchoolIdsModal','archivedUsersModal','archivedTemplatesModal'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) { el.classList.add('hidden'); el.style.display = 'none'; }
+                });
+                
+                // Show target section
+                const target = document.getElementById('section-' + name);
+                if (target) {
+                    target.classList.remove('hidden');
+                    target.style.display = 'block';
+                } else {
+                    console.warn('Section not found:', 'section-' + name);
+                    return;
+                }
+                
+                // Update active nav
+                document.querySelectorAll('.nav-item[data-section]').forEach(b => {
+                    b.classList.toggle('active', b.getAttribute('data-section') === name);
+                });
+                
+                // Update header title
+                const ht = document.getElementById('headerTitle');
+                if (ht) ht.textContent = sectionTitles[name] || name;
+                
+                // Persist
+                sessionStorage.setItem('ccitSection', name);
+                
+                if (typeof closeSidebar === 'function') closeSidebar();
+                
+                // Load section data
+                setTimeout(() => {
+                    try {
+                        if (name === 'users' && typeof loadUsers === 'function') loadUsers();
+                        else if (name === 'analytics' && typeof loadAnalytics === 'function') loadAnalytics();
+                        else if (name === 'schoolyears' && typeof loadSchoolYearList === 'function') loadSchoolYearList();
+                        else if (name === 'schoolids' && typeof loadSchoolIdList === 'function') loadSchoolIdList();
+                        else if (name === 'settings') {
+                            fetch('/api/settings').then(r => r.json()).then(json => {
+                                const form = document.getElementById('settingsForm');
+                                if (form) {
+                                    if (form.required_hours) form.required_hours.value = json.required_hours || '';
+                                    if (form.email_notifications) form.email_notifications.checked = !!json.email_notifications;
+                                }
+                            }).catch(() => {});
+                        }
+                    } catch (e) { console.error('Section data load error:', e); }
+                }, 100);
+                
+            } catch (error) {
+                console.error('showSection error:', error);
+                setTimeout(() => {
+                    const overview = document.getElementById('section-overview');
+                    if (overview) {
+                        document.querySelectorAll('.dash-section').forEach(s => { s.classList.add('hidden'); s.style.display = 'none'; });
+                        overview.classList.remove('hidden');
+                        overview.style.display = 'block';
+                    }
+                }, 100);
             }
         }
         document.addEventListener('DOMContentLoaded', function() {
-            /* restore sidebar collapse */
-            if (localStorage.getItem('sidebarCollapsed') === '1') {
-                document.getElementById('sidebar').classList.add('collapsed');
-                document.body.classList.add('sidebar-collapsed');
-                const mc = document.getElementById('main-content');
-                if (mc) mc.style.marginLeft = '4rem';
-                const th = document.getElementById('top-header');
-                if (th) th.style.left = '4rem';
+            try {
+                // Hide all sections first
+                document.querySelectorAll('.dash-section').forEach(section => {
+                    section.classList.add('hidden');
+                    section.style.display = 'none';
+                });
+                
+                // Force hide all archived modals
+                ['archivedSchoolYearsModal','archivedSchoolIdsModal','archivedUsersModal','archivedTemplatesModal'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) { el.classList.add('hidden'); el.style.display = 'none'; }
+                });
+                
+                /* restore sidebar collapse */
+                if (localStorage.getItem('sidebarCollapsed') === '1') {
+                    const sidebar = document.getElementById('sidebar');
+                    if (sidebar) sidebar.classList.add('collapsed');
+                    document.body.classList.add('sidebar-collapsed');
+                    const mc = document.getElementById('main-content');
+                    if (mc) mc.style.marginLeft = '4rem';
+                    const th = document.getElementById('top-header');
+                    if (th) th.style.left = '4rem';
+                }
+                
+                /* restore section */
+                const saved = sessionStorage.getItem('ccitSection') || 'overview';
+                setTimeout(() => { showSection(saved); }, 50);
+                
+            } catch (error) {
+                console.error('CCIT init error:', error);
+                setTimeout(() => { showSection('overview'); }, 200);
             }
-            /* restore section — sessionStorage clears on logout/new session */
-            const saved = sessionStorage.getItem('ccitSection') || 'overview';
-            if (saved) showSection(saved);
         });
 
         // ===== LEAVE PAGE CONFIRMATION =====
@@ -2991,21 +3072,26 @@
     </div>
 
     <!-- Archived Users Modal -->
-    <div id="archivedUsersModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[110] p-4" style="backdrop-filter:blur(4px)">
-        <div class="rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col" style="background:#1e293b;border:1px solid #334155">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
-                <h3 class="text-lg font-bold text-yellow-400">🗑 Archived Users</h3>
-                <button onclick="closeArchivedUsersModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+    <div id="archivedUsersModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-[110] p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-lg w-full max-w-3xl max-h-[80vh] flex flex-col shadow-xl border border-gray-200 dark:border-slate-700">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">🗑</span>
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Archived Users</h3>
+                </div>
+                <button onclick="closeArchivedUsersModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl font-light">×</button>
             </div>
-            <div class="px-4 pt-3 shrink-0">
-                <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-600 focus-within:border-yellow-500 transition-colors" style="background:#0f172a">
-                    <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
-                    <input type="text" placeholder="Search users…" class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none"
+            <div class="px-6 py-3 border-b border-gray-100 dark:border-slate-700">
+                <div class="relative">
+                    <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+                    </svg>
+                    <input type="text" placeholder="Search users..." class="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                         oninput="filterArchiveList('archivedUsersList', this.value)">
                 </div>
             </div>
-            <div class="overflow-auto flex-1 p-4">
-                <div id="archivedUsersList"><p class="text-gray-400 text-center py-8">Loading...</p></div>
+            <div class="overflow-auto flex-1 p-6">
+                <div id="archivedUsersList"><p class="text-gray-500 dark:text-gray-400 text-center py-8">Loading...</p></div>
             </div>
         </div>
     </div>
@@ -3029,13 +3115,18 @@
         </div>
     </div>
     <!-- Page loader overlay -->
-    <div id="pageLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5"
-         style="background:rgba(5,13,46,0.92);backdrop-filter:blur(6px);">
-        <svg class="animate-spin" style="width:52px;height:52px;" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="rgba(239,68,68,0.25)" stroke-width="4"/>
-            <path d="M4 12a8 8 0 018-8" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>
-        </svg>
-        <p id="pageLoaderMsg" style="color:#fca5a5;font-size:15px;font-weight:600;font-family:sans-serif;letter-spacing:.03em;">Please wait…</p>
+    <div id="pageLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-6"
+         style="background:rgba(5,13,46,0.95);backdrop-filter:blur(8px);">
+        <div class="relative">
+            <svg class="animate-spin" style="width:64px;height:64px;" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="rgba(239,68,68,0.2)" stroke-width="3"/>
+                <path d="M4 12a8 8 0 018-8" stroke="#f87171" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-8 h-8 bg-red-500/30 rounded-full animate-pulse"></div>
+            </div>
+        </div>
+        <p id="pageLoaderMsg" style="color:#fca5a5;font-size:16px;font-weight:600;font-family:sans-serif;letter-spacing:.05em;">Please wait…</p>
     </div>
 
 </body>

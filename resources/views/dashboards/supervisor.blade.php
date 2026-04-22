@@ -129,26 +129,26 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
-        /* LIGHT MODE */
-        body.light { background: linear-gradient(135deg,#dde8f5,#c8daf0,#d8eaf8) !important; color: #1a2a4a !important; }
-        body.light nav:not(#sidebar nav) { background: rgba(220,235,255,0.97) !important; border-color: #7aaad4 !important; }
-        body.light nav:not(#sidebar nav) span, body.light nav:not(#sidebar nav) a, body.light nav:not(#sidebar nav) p { color: #1a2a4a !important; }
+        /* LIGHT MODE - Beautiful soft design */
+        body.light { background: #ffffff !important; color: #1e3a5f !important; }
+        body.light nav:not(#sidebar nav) { background: rgba(255,255,255,0.95) !important; border-color: #d8d0f0 !important; box-shadow: 0 2px 8px rgba(124,58,237,0.08) !important; }
+        body.light nav:not(#sidebar nav) span, body.light nav:not(#sidebar nav) a, body.light nav:not(#sidebar nav) p { color: #1e3a5f !important; }
         body.light nav:not(#sidebar nav) a[class*="bg-purple"] { color: #fff !important; }
         body.light h1,body.light h2,body.light h3,body.light h4,
         body.light p,body.light span,body.light label,body.light div,
-        body.light td,body.light th,body.light li,body.light small { color: #1a2a4a; }
-        body.light .text-white,body.light .text-gray-100,body.light .text-gray-200 { color: #1a2a4a !important; }
-        body.light .text-gray-300 { color: #2d3f5a !important; }
-        body.light .text-gray-400 { color: #3d5070 !important; }
-        body.light .text-gray-500 { color: #4a6080 !important; }
-        body.light .text-green-100,body.light .text-green-200,body.light .text-green-300,body.light .text-green-400 { color: #15803d !important; }
-        body.light .text-blue-100,body.light .text-blue-200,body.light .text-blue-300,body.light .text-blue-400 { color: #1d4ed8 !important; }
-        body.light .text-orange-100,body.light .text-orange-200,body.light .text-orange-300,body.light .text-orange-400 { color: #c2410c !important; }
-        body.light .text-yellow-100,body.light .text-yellow-200,body.light .text-yellow-300,body.light .text-yellow-400 { color: #92400e !important; }
-        body.light .text-red-100,body.light .text-red-200,body.light .text-red-300,body.light .text-red-400 { color: #b91c1c !important; }
-        body.light .text-purple-100,body.light .text-purple-200,body.light .text-purple-300,body.light .text-purple-400 { color: #6d28d9 !important; }
-        body.light .text-indigo-100,body.light .text-indigo-200,body.light .text-indigo-300,body.light .text-indigo-400 { color: #4338ca !important; }
-        body.light .text-cyan-200,body.light .text-cyan-300,body.light .text-cyan-400 { color: #0369a1 !important; }
+        body.light td,body.light th,body.light li,body.light small { color: #2d4a6f; }
+        body.light .text-white,body.light .text-gray-100,body.light .text-gray-200 { color: #1e3a5f !important; }
+        body.light .text-gray-300 { color: #3d5a7f !important; }
+        body.light .text-gray-400 { color: #4a6a8f !important; }
+        body.light .text-gray-500 { color: #5a7a9f !important; }
+        body.light .text-green-100,body.light .text-green-200,body.light .text-green-300,body.light .text-green-400 { color: #16a34a !important; }
+        body.light .text-blue-100,body.light .text-blue-200,body.light .text-blue-300,body.light .text-blue-400 { color: #2563eb !important; }
+        body.light .text-orange-100,body.light .text-orange-200,body.light .text-orange-300,body.light .text-orange-400 { color: #ea580c !important; }
+        body.light .text-yellow-100,body.light .text-yellow-200,body.light .text-yellow-300,body.light .text-yellow-400 { color: #ca8a04 !important; }
+        body.light .text-red-100,body.light .text-red-200,body.light .text-red-300,body.light .text-red-400 { color: #dc2626 !important; }
+        body.light .text-purple-100,body.light .text-purple-200,body.light .text-purple-300,body.light .text-purple-400 { color: #7c3aed !important; }
+        body.light .text-indigo-100,body.light .text-indigo-200,body.light .text-indigo-300,body.light .text-indigo-400 { color: #4f46e5 !important; }
+        body.light .text-cyan-200,body.light .text-cyan-300,body.light .text-cyan-400 { color: #0891b2 !important; }
         body.light button[class*="bg-green-6"],body.light button[class*="bg-blue-6"],
         body.light button[class*="bg-red-6"],body.light button[class*="bg-orange-6"],
         body.light button[class*="bg-yellow-6"],body.light button[class*="bg-indigo-6"],
@@ -160,23 +160,25 @@
         body.light button.bg-green-600,body.light button.bg-green-700,
         body.light button.bg-orange-600,body.light button.bg-orange-700,
         body.light button.bg-purple-600,body.light button.bg-purple-700 { color: #fff !important; }
-        body.light [class*="bg-slate-900"] { background: #c8daf0 !important; }
-        body.light [class*="bg-slate-800"] { background: #d0e4f8 !important; }
-        body.light [class*="bg-slate-700"] { background: #bdd4ec !important; }
-        body.light [class*="bg-slate-6"] { background: #aac4e0 !important; }
-        body.light [class*="border-slate-7"] { border-color: #7aaad4 !important; }
-        body.light [class*="border-slate-6"] { border-color: #8ab8dc !important; }
-        body.light input,body.light textarea,body.light select { background: rgba(255,255,255,0.9) !important; border-color: #7aaad4 !important; color: #1a2a4a !important; }
-        body.light input::placeholder,body.light textarea::placeholder { color: #5a7a9a !important; }
+        body.light [class*="bg-slate-900"] { background: linear-gradient(135deg, #faf9fc 0%, #f5f3f9 100%) !important; }
+        body.light [class*="bg-slate-800"] { background: rgba(255,255,255,0.85) !important; box-shadow: 0 1px 3px rgba(124,58,237,0.08) !important; }
+        body.light [class*="bg-slate-700"] { background: rgba(250,249,252,0.9) !important; }
+        body.light [class*="bg-slate-6"] { background: #f5f3f9 !important; }
+        body.light [class*="border-slate-7"] { border-color: #d8d0f0 !important; }
+        body.light [class*="border-slate-6"] { border-color: #d8d0f0 !important; }
+        body.light [class*="divide-slate-7"] > * { border-color: #d8d0f0 !important; }
+        body.light input,body.light textarea,body.light select { background: rgba(255,255,255,0.95) !important; border-color: #c4b5e8 !important; color: #1e3a5f !important; box-shadow: 0 1px 2px rgba(124,58,237,0.05) !important; }
+        body.light input::placeholder,body.light textarea::placeholder { color: #8a7ab8 !important; }
+        body.light input:focus,body.light textarea:focus,body.light select:focus { border-color: #7c3aed !important; box-shadow: 0 0 0 3px rgba(124,58,237,0.1) !important; }
         /* Header info card in light mode */
-        body.light .header-info-card { background: #fff !important; border-color: #7c3aed !important; border-left: 4px solid #7c3aed !important; }
-        body.light .header-info-card h1 { color: #1a2a4a !important; }
-        body.light .header-info-card .subtitle { color: #4a6080 !important; }
-        body.light .header-info-card .stat-label { color: #4a6080 !important; }
-        body.light .header-info-card .stat-value-white { color: #1a2a4a !important; }
-        body.light .header-info-card .stat-value-purple { color: #6d28d9 !important; }
-        body.light .header-info-card .stat-value-indigo { color: #4338ca !important; }
-        body.light .header-info-card .divider { background: #cbd5e1 !important; }
+        body.light .header-info-card { background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(245,243,255,0.8) 100%) !important; border-color: #c4b5fd !important; border-left: 4px solid #7c3aed !important; box-shadow: 0 4px 12px rgba(124,58,237,0.08) !important; }
+        body.light .header-info-card h1 { color: #1e3a5f !important; }
+        body.light .header-info-card .subtitle { color: #5a7a9f !important; }
+        body.light .header-info-card .stat-label { color: #5a7a9f !important; }
+        body.light .header-info-card .stat-value-white { color: #1e3a5f !important; }
+        body.light .header-info-card .stat-value-purple { color: #7c3aed !important; }
+        body.light .header-info-card .stat-value-indigo { color: #4f46e5 !important; }
+        body.light .header-info-card .divider { background: #d8d0f0 !important; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-gray-100">
@@ -234,8 +236,10 @@
         <!-- Sidebar Footer -->
         <div class="px-2 py-3 border-t border-slate-700/60 space-y-1 shrink-0">
             <button onclick="showConfirm('logout')"
-                class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition-all cursor-pointer">
-                <span class="nav-icon text-lg shrink-0">🚪</span>
+                class="nav-item group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-400 hover:text-white hover:bg-gradient-to-r hover:from-red-600 hover:to-red-700 transition-all cursor-pointer shadow-lg hover:shadow-red-500/30 transform hover:scale-[1.02]">
+                <svg class="nav-icon w-5 h-5 shrink-0 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
                 <span class="nav-label">Logout</span>
             </button>
         </div>
@@ -1393,6 +1397,12 @@
     </div>
 
     <script>
+        // Global error handler to prevent navigation breaking
+        window.addEventListener('error', function(e) {
+            console.error('Global error caught:', e.error);
+            return false;
+        });
+
         // ===== FILE SIZE VALIDATION =====
         function checkFileSize(input, maxMB) {
             if (input.files && input.files[0]) {
@@ -1511,19 +1521,31 @@
         let sidebarCollapsed = false;
 
         function toggleSidebar() {
-            sidebar.classList.toggle('open');
-            backdrop.classList.toggle('show');
+            try {
+                sidebar.classList.toggle('open');
+                backdrop.classList.toggle('show');
+            } catch (error) {
+                console.error('Error toggling sidebar:', error);
+            }
         }
         function closeSidebar() {
-            sidebar.classList.remove('open');
-            backdrop.classList.remove('show');
+            try {
+                sidebar.classList.remove('open');
+                backdrop.classList.remove('show');
+            } catch (error) {
+                console.error('Error closing sidebar:', error);
+            }
         }
         function toggleSidebarCollapse() {
-            sidebarCollapsed = !sidebarCollapsed;
-            sidebar.classList.toggle('collapsed', sidebarCollapsed);
-            mainContent.classList.toggle('sidebar-collapsed', sidebarCollapsed);
-            topHeader.style.left = sidebarCollapsed ? '64px' : '256px';
-            localStorage.setItem('sidebarCollapsed', sidebarCollapsed ? '1' : '0');
+            try {
+                sidebarCollapsed = !sidebarCollapsed;
+                sidebar.classList.toggle('collapsed', sidebarCollapsed);
+                mainContent.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+                topHeader.style.left = sidebarCollapsed ? '64px' : '256px';
+                localStorage.setItem('sidebarCollapsed', sidebarCollapsed ? '1' : '0');
+            } catch (error) {
+                console.error('Error toggling sidebar collapse:', error);
+            }
         }
 
         const sectionTitles = {
@@ -1533,25 +1555,79 @@
         };
 
         function showSection(name) {
-            document.querySelectorAll('.dash-section').forEach(s => s.classList.add('hidden'));
-            const target = document.getElementById('section-' + name);
-            if (target) target.classList.remove('hidden');
-            document.querySelectorAll('.nav-item[data-section]').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.section === name);
-            });
-            const titleEl = document.getElementById('header-section-title');
-            if (titleEl) titleEl.textContent = sectionTitles[name] || name;
-            closeSidebar();
-            sessionStorage.setItem('supervisor_activeSection', name);
+            try {
+                // hide all sections
+                document.querySelectorAll('.dash-section').forEach(s => s.classList.add('hidden'));
+                
+                // show target section
+                const target = document.getElementById('section-' + name);
+                if (target) {
+                    target.classList.remove('hidden');
+                } else {
+                    console.warn('Section not found:', 'section-' + name);
+                    return;
+                }
+                
+                // update active nav state
+                document.querySelectorAll('.nav-item[data-section]').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.section === name);
+                });
+                
+                // update header title
+                const titleEl = document.getElementById('header-section-title');
+                if (titleEl) titleEl.textContent = sectionTitles[name] || name;
+                
+                // close mobile sidebar
+                if (typeof closeSidebar === 'function') {
+                    closeSidebar();
+                }
+                
+                // persist active section
+                sessionStorage.setItem('supervisor_activeSection', name);
+                
+                // trigger section-specific initialization
+                if (name === 'interns') {
+                    setTimeout(() => {
+                        if (typeof loadInternData === 'function') {
+                            loadInternData();
+                        }
+                    }, 100);
+                } else if (name === 'certificates') {
+                    setTimeout(() => {
+                        if (typeof loadCertificateData === 'function') {
+                            loadCertificateData();
+                        }
+                    }, 100);
+                }
+                
+                // Debug logging
+                console.log('Supervisor section switched to:', name, 'Target found:', !!target);
+            } catch (error) {
+                console.error('Error in showSection:', error);
+                // Try to recover by showing overview
+                setTimeout(() => {
+                    const overview = document.getElementById('section-overview');
+                    if (overview) {
+                        overview.classList.remove('hidden');
+                        console.log('Supervisor recovered to overview section');
+                    }
+                }, 100);
+            }
         }
 
         (function() {
-            showSection(sessionStorage.getItem('supervisor_activeSection') || 'overview');
-            if (localStorage.getItem('sidebarCollapsed') === '1' && window.innerWidth >= 1024) {
-                sidebarCollapsed = true;
-                sidebar.classList.add('collapsed');
-                mainContent.classList.add('sidebar-collapsed');
-                topHeader.style.left = '64px';
+            try {
+                showSection(sessionStorage.getItem('supervisor_activeSection') || 'overview');
+                if (localStorage.getItem('sidebarCollapsed') === '1' && window.innerWidth >= 1024) {
+                    sidebarCollapsed = true;
+                    if (sidebar) sidebar.classList.add('collapsed');
+                    if (mainContent) mainContent.classList.add('sidebar-collapsed');
+                    if (topHeader) topHeader.style.left = '64px';
+                }
+            } catch (error) {
+                console.error('Error during supervisor initialization:', error);
+                // Fallback to overview section
+                showSection('overview');
             }
         })();
         // ===== END SIDEBAR LOGIC =====
@@ -1915,10 +1991,12 @@
             const msg = document.getElementById('confirmMsg');
             const btn = document.getElementById('confirmBtn');
             if (type === 'logout') {
-                icon.textContent = '🚪'; title.textContent = 'Logout?';
+                icon.innerHTML = '<svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>';
+                icon.className = 'inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/20 mb-4';
+                title.textContent = 'Logout?';
                 msg.textContent = 'You will be signed out of your account.';
                 btn.textContent = 'Yes, Logout'; btn.href = '/logout';
-                btn.className = 'flex-1 px-4 py-2.5 text-center text-white rounded-xl font-semibold transition-all bg-purple-600 hover:bg-purple-700';
+                btn.className = 'flex-1 px-5 py-3 text-center text-white rounded-xl font-semibold transition-all bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 shadow-lg shadow-red-500/30 hover:shadow-red-500/50 hover:scale-105 transform';
                 btn.onclick = function() { _allowLeave = true; sessionStorage.clear(); showPageLoader('Signing out…'); };
             } else {
                 icon.textContent = '🏠'; title.textContent = 'Go to Home?';
@@ -2168,13 +2246,18 @@
     </script>
 
     <!-- Page loader overlay -->
-    <div id="pageLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-5"
-         style="background:rgba(5,13,46,0.92);backdrop-filter:blur(6px);">
-        <svg class="animate-spin" style="width:52px;height:52px;" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="rgba(139,92,246,0.25)" stroke-width="4"/>
-            <path d="M4 12a8 8 0 018-8" stroke="#a78bfa" stroke-width="4" stroke-linecap="round"/>
-        </svg>
-        <p id="pageLoaderMsg" style="color:#c4b5fd;font-size:15px;font-weight:600;font-family:sans-serif;letter-spacing:.03em;">Please wait…</p>
+    <div id="pageLoader" class="hidden fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-6"
+         style="background:rgba(5,13,46,0.95);backdrop-filter:blur(8px);">
+        <div class="relative">
+            <svg class="animate-spin" style="width:64px;height:64px;" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="rgba(139,92,246,0.2)" stroke-width="3"/>
+                <path d="M4 12a8 8 0 018-8" stroke="#a78bfa" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-8 h-8 bg-purple-500/30 rounded-full animate-pulse"></div>
+            </div>
+        </div>
+        <p id="pageLoaderMsg" style="color:#c4b5fd;font-size:16px;font-weight:600;font-family:sans-serif;letter-spacing:.05em;">Please wait…</p>
     </div>
 
 </body>
