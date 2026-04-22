@@ -609,7 +609,7 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
             } elseif ($otHours > 0 && !$otLetterApproved) {
                 $session->update(['ot_status' => 'pending']);
             }
-            $session->update(['verified' => true, 'status' => 'approved', 'approved_by' => $reviewer->id, 'approved_at' => now()]);
+            $session->update(['verified' => true, 'status' => 'approved', 'approved_by' => $reviewer->id, 'approved_at' => now(), 'denial_reason' => null]);
         }
 
         if ($totalToCredit > 0) {
@@ -645,6 +645,50 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
 
     return back()->with('success', $msg);
 })->name('approve-time-in')->middleware(['auth.custom', 'role:coordinator,supervisor']);
+
+// Undo approval — revert approved record back to pending and deduct hours
+Route::post('/api/time-records/{recordId}/undo-approval', function ($recordId) {
+    $record = \App\Models\TimeInRecord::findOrFail($recordId);
+
+    if ($record->status !== 'approved') {
+        return response()->json(['success' => false, 'message' => 'Record is not approved.'], 422);
+    }
+
+    // Calculate hours to deduct
+    $regularToDeduct = floatval($record->regular_hours ?? 0);
+    $otToDeduct = ($record->ot_status === 'approved') ? floatval($record->ot_hours ?? 0) : 0;
+    $totalToDeduct = $regularToDeduct + $otToDeduct;
+
+    // Revert record to pending with undone marker
+    $record->update([
+        'status'       => 'pending',
+        'verified'     => false,
+        'approved_by'  => null,
+        'approved_at'  => null,
+        'ot_status'    => $record->ot_hours > 0 ? 'pending' : null,
+        'denial_reason'=> 'undone',
+    ]);
+
+    // Deduct hours from student progress
+    if ($totalToDeduct > 0) {
+        $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)->first();
+        if ($studentHours) {
+            $newCompleted = round(max(0, $studentHours->hours_completed - $totalToDeduct), 2);
+            $studentHours->update([
+                'hours_completed' => $newCompleted,
+                'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
+            ]);
+        }
+    }
+
+    // Revert daily log entries for this date back to pending
+    \App\Models\DailyHourLog::where('student_id', $record->student_id)
+        ->whereDate('log_date', $record->date)
+        ->where('status', 'approved')
+        ->update(['status' => 'pending']);
+
+    return response()->json(['success' => true, 'deducted' => $totalToDeduct]);
+})->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
 Route::post('/deny-time-in/{recordId}', function ($recordId) {
     $validated = request()->validate(['reason' => 'required|string']);
@@ -717,12 +761,11 @@ Route::post('/approve-all-time-in/{studentId}', function ($studentId) {
     $pendingRecords = \App\Models\TimeInRecord::where('student_id', $studentId)
         ->where('status', 'pending')
         ->whereNotNull('time_out')
-        ->whereDoesntHave('student', fn($q) => $q->whereRaw('0=1')) // always true
         ->get()
         ->filter(function($r) use ($studentId) {
-            // Only approve if no active session on that date
-            return !\App\Models\TimeInRecord::where('student_id', $studentId)
-                ->whereDate('date', $r->date)->whereNull('time_out')->exists();
+            // Only block if THIS specific record has no time_out
+            // Morning can be approved even if afternoon is still open
+            return !is_null($r->time_out);
         });
 
     $otLetterCache = [];

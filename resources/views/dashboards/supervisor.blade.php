@@ -534,8 +534,11 @@
                         }
                     }
                     $taskLogs = \App\Models\TimeInRecord::where('student_id', $student->id)
-                        ->whereNotNull('photo_path')
+                        ->where(function($q) {
+                            $q->whereNotNull('photo_path')->orWhereNotNull('time_out_photo_path');
+                        })
                         ->orderBy('date', 'desc')
+                        ->orderBy('session', 'asc')
                         ->get();
                     $canEvaluate = $studentHours->hours_completed >= ($studentHours->total_hours_required ?? 600);
                     ?>
@@ -610,51 +613,21 @@
 
                         <!-- Expandable Details Section -->
                         <div class="student-details">
-                            <!-- Action Buttons -->
-                            <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mb-6">
-                                <button onclick="showTimeEditsModal({{ $student->id }}, '{{ $student->name }}')" class="px-3 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded text-sm transition-colors text-center">
-                                    ⏱️ Time Edits ({{ $pendingTimeEdits }})
-                                </button>
-                                <button onclick="showTaskLogsModal({{ $student->id }}, '{{ $student->name }}')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors text-center">
-                                    📸 Task Logs
-                                </button>
-                                <button onclick="showRequirementsModal({{ $student->id }}, '{{ $student->name }}')" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm transition-colors text-center">
-                                    📋 Requirements ({{ count($requirements) }})
-                                </button>
-                                @if($canEvaluate)
-                                    @if($evaluation)
-                                    @php $hasNewEval = !empty($evaluation->quality_of_work_rating); @endphp
-                                    <button
-                                        data-student-id="{{ $student->id }}"
-                                        data-student-name="{{ addslashes($student->name) }}"
-                                        data-is-evaluated="{{ $hasNewEval ? '1' : '0' }}"
-                                        data-eval='{!! json_encode(['evaluation_date'=>$evaluation->evaluation_date,'period_from'=>$evaluation->period_from,'period_to'=>$evaluation->period_to,'job_title'=>$evaluation->job_title,'quality_of_work_rating'=>$evaluation->quality_of_work_rating,'quality_of_work_comment'=>$evaluation->quality_of_work_comment,'quantity_of_work_rating'=>$evaluation->quantity_of_work_rating,'quantity_of_work_comment'=>$evaluation->quantity_of_work_comment,'job_knowledge_rating'=>$evaluation->job_knowledge_rating,'job_knowledge_comment'=>$evaluation->job_knowledge_comment,'working_relationships_rating'=>$evaluation->working_relationships_rating,'working_relationships_comment'=>$evaluation->working_relationships_comment,'attendance_dependability_rating'=>$evaluation->attendance_dependability_rating,'attendance_dependability_comment'=>$evaluation->attendance_dependability_comment,'specific_achievements_rating'=>$evaluation->specific_achievements_rating,'specific_achievements_comment'=>$evaluation->specific_achievements_comment]) !!}'
-                                        onclick="openEvalFromBtn(this)"
-                                        class="px-3 py-2 bg-green-700 hover:bg-green-800 text-white rounded text-sm transition-colors text-center">
-                                        ✅ View Evaluation
+                            <!-- Tabs — single navigation, no redundant buttons -->
+                            <div class="border-b border-slate-600 mb-4 mt-4">
+                                <div class="flex flex-wrap gap-1">
+                                    <button class="tab-button px-3 py-2 border-b-2 border-purple-500 text-purple-400 font-semibold text-xs sm:text-sm" data-tab="daily-logs-{{ $student->id }}">📅 Daily Logs</button>
+                                    <button class="tab-button px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-white text-xs sm:text-sm" data-tab="time-records-{{ $student->id }}">
+                                        ⏱️ Time Edits @if($pendingTimeEdits > 0)<span class="ml-1 px-1.5 py-0.5 bg-orange-500 text-white text-[10px] rounded-full">{{ $pendingTimeEdits }}</span>@endif
                                     </button>
-                                    @else
-                                    <button onclick="showEvaluationModal({{ $student->id }}, '{{ $student->name }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-sm transition-colors text-center">
-                                        ⭐ Evaluate Student
+                                    <button class="tab-button px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-white text-xs sm:text-sm" data-tab="task-logs-{{ $student->id }}">📸 Task Logs</button>
+                                    <button class="tab-button px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-white text-xs sm:text-sm" data-tab="requirements-{{ $student->id }}">
+                                        📋 Requirements @if($pendingRequirements > 0)<span class="ml-1 px-1.5 py-0.5 bg-indigo-500 text-white text-[10px] rounded-full">{{ $pendingRequirements }}</span>@endif
                                     </button>
-                                    @endif
-                                @else
-                                <button disabled title="Student must complete {{ $studentHours->total_hours_required ?? 600 }} hours before evaluation" class="px-3 py-2 bg-slate-600 text-slate-400 rounded text-sm cursor-not-allowed opacity-60 text-center">
-                                    ⭐ Evaluate Student
-                                </button>
-                                @endif                                <button onclick="openSupDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="col-span-2 sm:col-span-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors text-center">
-                                    📄DTR Report
-                                </button>
-                            </div>
-
-                            <!-- Tabs -->
-                            <div class="border-b border-slate-600 mb-4">
-                                <div class="grid grid-cols-3 sm:flex sm:space-x-4">
-                                    <button class="tab-button px-3 py-2 border-b-2 border-purple-500 text-purple-400 font-semibold text-xs sm:text-sm text-center" data-tab="daily-logs-{{ $student->id }}">Daily Logs</button>
-                                    <button class="tab-button px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-white text-xs sm:text-sm text-center" data-tab="time-records-{{ $student->id }}">Time Edits</button>
-                                    <button class="tab-button px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-white text-xs sm:text-sm text-center" data-tab="task-logs-{{ $student->id }}">Task Logs</button>
-                                    <button class="tab-button px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-white text-xs sm:text-sm text-center" data-tab="requirements-{{ $student->id }}">Requirements</button>
-                                    <button class="tab-button px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-white text-xs sm:text-sm text-center col-span-2 sm:col-span-1" data-tab="evaluation-{{ $student->id }}">Evaluation</button>
+                                    <button class="tab-button px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-white text-xs sm:text-sm" data-tab="evaluation-{{ $student->id }}">⭐ Evaluation</button>
+                                    <button onclick="openSupDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="ml-auto px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold transition-colors">
+                                        📄 DTR
+                                    </button>
                                 </div>
                             </div>
 
@@ -708,7 +681,8 @@
                             <div id="time-records-{{ $student->id }}" class="tab-content hidden">
                                 @if($timeInRecords->isNotEmpty())
                                 @php
-                                    $_pendingTimedOut = $timeInRecords->filter(fn($r) => $r->status === 'pending' && $r->time_out && !\App\Models\TimeInRecord::where('student_id',$student->id)->whereDate('date',$r->date)->whereNull('time_out')->exists());
+                                    // Show approve all if there are pending records that have timed out
+                                    $_pendingTimedOut = $timeInRecords->filter(fn($r) => $r->status === 'pending' && $r->time_out);
                                 @endphp
                                 @if($_pendingTimedOut->count() >= 2)
                                 <div class="flex gap-2 mb-3">
@@ -719,8 +693,15 @@
                                     <button onclick="showDenyAllTimeEditModal({{ $student->id }})" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold">❌ Deny All ({{ $_pendingTimedOut->count() }})</button>
                                 </div>
                                 @endif
+                                <!-- Date search filter -->
+                                <div class="flex items-center gap-2 px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg mb-2 focus-within:border-purple-500 transition-colors">
+                                    <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    <input type="text" placeholder="Filter by date (e.g. Apr 22)…"
+                                        class="flex-1 bg-transparent text-white text-xs placeholder-gray-400 focus:outline-none"
+                                        oninput="filterTimeEdits(this, {{ $student->id }})">
+                                </div>
                                 <div class="overflow-y-auto rounded-lg border border-slate-700/50" style="max-height:260px">
-                                    <table class="w-full text-sm">
+                                    <table class="w-full text-sm" id="timeEditsTable-{{ $student->id }}">
                                         <thead class="sticky top-0 bg-slate-800 z-10">
                                             <tr class="text-xs text-gray-400 border-b border-slate-700/50">
                                                 <th class="py-2 px-3 text-left font-semibold">Date / Session</th>
@@ -733,9 +714,13 @@
                                         @foreach($timeInRecords as $record)
                                         @php
                                             $_hasActiveSession = \App\Models\TimeInRecord::where('student_id', $student->id)
-                                                ->whereDate('date', $record->date)->whereNull('time_out')->exists();
+                                                ->whereDate('date', $record->date)
+                                                ->where('session', $record->session) // only block same session
+                                                ->whereNull('time_out')
+                                                ->where('id', '!=', $record->id)
+                                                ->exists();
                                         @endphp
-                                        <tr class="hover:bg-slate-700/20 transition-colors">
+                                        <tr class="hover:bg-slate-700/20 transition-colors time-edit-row" data-date="{{ strtolower($record->date->format('M d, Y')) }}">
                                             <td class="py-2 px-3">
                                                 <p class="text-gray-200 text-xs font-medium whitespace-nowrap">{{ $record->date->format('M d, Y') }}</p>
                                                 @if($record->session)
@@ -756,11 +741,20 @@
                                                     @else bg-yellow-500/20 text-yellow-300 @endif">
                                                     {{ ucfirst($record->status) }}
                                                 </span>
+                                                @if($record->status === 'denied' && $record->denial_reason && str_contains($record->denial_reason, 'did not time out'))
+                                                <p class="text-red-400 text-[10px] mt-0.5">⚠️ No time-out</p>
+                                                @endif
                                             </td>
                                             <td class="py-2 px-2 text-right">
                                                 @if($record->status === 'pending')
                                                     @if(!$record->time_out || $_hasActiveSession)
                                                     <span class="text-blue-300 text-xs">⏳</span>
+                                                    @elseif($record->denial_reason === 'undone')
+                                                    {{-- Was undone — show Redo only --}}
+                                                    <form method="POST" action="{{ route('approve-time-in', $record->id) }}" style="display:inline;">
+                                                        @csrf
+                                                        <button type="submit" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded font-semibold">↻ Redo</button>
+                                                    </form>
                                                     @else
                                                     <div class="flex items-center justify-end gap-1">
                                                         <form method="POST" action="{{ route('approve-time-in', $record->id) }}" style="display:inline;">
@@ -770,6 +764,11 @@
                                                         <button onclick="showDenyTimeEditModal({{ $record->id }})" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">✕</button>
                                                     </div>
                                                     @endif
+                                                @elseif($record->status === 'approved')
+                                                    <button onclick="confirmUndoApproval({{ $record->id }}, '{{ $record->date->format('M d, Y') }}', '{{ ucfirst($record->session ?? '') }}')"
+                                                        class="px-2 py-1 bg-slate-600 hover:bg-orange-600 text-gray-300 hover:text-white text-xs rounded transition-colors" title="Undo approval">
+                                                        ↩ Undo
+                                                    </button>
                                                 @endif
                                             </td>
                                         </tr>
@@ -784,28 +783,100 @@
 
                             <!-- Task Logs Tab -->
                             <div id="task-logs-{{ $student->id }}" class="tab-content hidden">
-                                @if($taskLogs->isNotEmpty())
-                                <div class="overflow-y-auto rounded-lg" style="max-height:260px">
-                                    <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                                        @foreach($taskLogs as $record)
-                                        <div class="bg-slate-700/30 rounded-lg overflow-hidden">
-                                            <button type="button" onclick="openMediaPopup('{{ asset('storage/' . $record->photo_path) }}','{{ $record->date->format('M d, Y') }}')" class="relative group block w-full">
-                                                <img src="{{ asset('storage/' . $record->photo_path) }}" alt="Time-in photo"
-                                                    class="w-full h-20 object-cover hover:opacity-80 transition-opacity rounded-t-lg">
-                                                <span class="absolute inset-0 flex items-center justify-center bg-black/40 rounded-t-lg opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white font-semibold">View</span>
-                                            </button>
-                                            <div class="p-1.5">
-                                                <p class="text-gray-200 text-xs font-semibold truncate">{{ $record->date->format('M d') }}</p>
-                                                <span class="inline-block mt-0.5 px-1.5 py-0.5 text-xs rounded-full
-                                                    @if($record->status === 'approved') bg-green-500/20 text-green-300
-                                                    @elseif($record->status === 'denied') bg-red-500/20 text-red-300
-                                                    @else bg-yellow-500/20 text-yellow-300 @endif">
-                                                    {{ ucfirst($record->status ?? 'pending') }}
-                                                </span>
+                                @php
+                                    // Group task logs by date
+                                    $taskLogsByDate = $taskLogs->groupBy(fn($r) => $r->date->format('Y-m-d'));
+                                @endphp
+                                @if($taskLogsByDate->isNotEmpty())
+                                <div class="space-y-4 overflow-y-auto" style="max-height:300px">
+                                    @foreach($taskLogsByDate as $logDate => $dayLogs)
+                                    @php
+                                        $displayLogDate = \Carbon\Carbon::parse($logDate)->format('M d, Y');
+                                        $dayStatus = $dayLogs->first()->status ?? 'pending';
+                                        // Check if afternoon session has no time_out (forgot to time out)
+                                        $hasIncomplete = \App\Models\TimeInRecord::where('student_id', $student->id)
+                                            ->whereDate('date', $logDate)
+                                            ->where('session', 'afternoon')
+                                            ->whereNull('time_out')
+                                            ->exists();
+                                        $allApproved = $dayLogs->every(fn($r) => $r->status === 'approved');
+                                        $allDenied   = $dayLogs->every(fn($r) => $r->status === 'denied');
+                                        $anyPending  = $dayLogs->contains(fn($r) => $r->status === 'pending');
+                                    @endphp
+                                    <div class="bg-slate-700/20 rounded-xl border border-slate-700/50 overflow-hidden">
+                                        {{-- Day header --}}
+                                        <div class="flex items-center justify-between px-3 py-2 bg-slate-700/40 border-b border-slate-700/50">
+                                            <div class="flex items-center gap-2">
+                                                <p class="text-gray-200 text-xs font-semibold">{{ $displayLogDate }}</p>
+                                                @if($hasIncomplete)
+                                                <span class="px-1.5 py-0.5 bg-red-500/20 text-red-400 text-[10px] rounded-full font-semibold">⚠️ Not Finished</span>
+                                                @endif
+                                            </div>
+                                            <div class="flex items-center gap-1.5">
+                                                @if($allApproved)
+                                                <span class="px-2 py-0.5 bg-green-500/20 text-green-300 text-[10px] rounded-full">Approved</span>
+                                                @elseif($allDenied)
+                                                <span class="px-2 py-0.5 bg-red-500/20 text-red-300 text-[10px] rounded-full">Denied</span>
+                                                @elseif($hasIncomplete)
+                                                {{-- Afternoon not finished — auto-deny it and show denied --}}
+                                                @php
+                                                    // Auto-deny the incomplete afternoon record now
+                                                    \App\Models\TimeInRecord::where('student_id', $student->id)
+                                                        ->whereDate('date', $logDate)
+                                                        ->where('session', 'afternoon')
+                                                        ->whereNull('time_out')
+                                                        ->update([
+                                                            'time_out'      => '00:00',
+                                                            'regular_hours' => 0,
+                                                            'ot_hours'      => 0,
+                                                            'ot_status'     => null,
+                                                            'status'        => 'denied',
+                                                            'denial_reason' => 'Auto-denied: student did not time out.',
+                                                        ]);
+                                                @endphp
+                                                <span class="px-2 py-0.5 bg-red-500/20 text-red-300 text-[10px] rounded-full font-semibold">Denied (incomplete)</span>
+                                                @elseif($anyPending)
+                                                {{-- All sessions timed out and pending — show approve/deny --}}
+                                                <form method="POST" action="{{ url('/approve-all-time-in/'.$student->id) }}" class="inline">
+                                                    @csrf
+                                                    <input type="hidden" name="date" value="{{ $logDate }}">
+                                                    <button type="submit" class="px-2 py-0.5 bg-green-600 hover:bg-green-700 text-white text-[10px] rounded font-semibold">✓ Approve Day</button>
+                                                </form>
+                                                <button onclick="showDenyAllTimeEditModal({{ $student->id }})" class="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white text-[10px] rounded font-semibold">✕ Deny Day</button>
+                                                @endif
                                             </div>
                                         </div>
-                                        @endforeach
+                                        {{-- Photos grid --}}
+                                        <div class="grid grid-cols-3 sm:grid-cols-4 gap-2 p-2">
+                                            @foreach($dayLogs as $record)
+                                            @if($record->photo_path)
+                                            <div class="relative rounded-lg overflow-hidden">
+                                                <button type="button" onclick="openMediaPopup('{{ asset('storage/' . $record->photo_path) }}','{{ $displayLogDate }} — {{ ucfirst($record->session ?? '') }}')" class="relative group block w-full">
+                                                    <img src="{{ asset('storage/' . $record->photo_path) }}" alt="Photo"
+                                                        class="w-full h-20 object-cover hover:opacity-80 transition-opacity rounded-lg">
+                                                    <span class="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white font-semibold">View</span>
+                                                </button>
+                                                <div class="absolute bottom-0 left-0 right-0 px-1 py-0.5 bg-black/60 text-center">
+                                                    <span class="text-[9px] text-gray-300">{{ ucfirst($record->session ?? 'in') }}</span>
+                                                </div>
+                                            </div>
+                                            @endif
+                                            @if($record->time_out_photo_path)
+                                            <div class="relative rounded-lg overflow-hidden">
+                                                <button type="button" onclick="openMediaPopup('{{ asset('storage/' . $record->time_out_photo_path) }}','{{ $displayLogDate }} — {{ ucfirst($record->session ?? '') }} Out')" class="relative group block w-full">
+                                                    <img src="{{ asset('storage/' . $record->time_out_photo_path) }}" alt="Out Photo"
+                                                        class="w-full h-20 object-cover hover:opacity-80 transition-opacity rounded-lg border-2 border-orange-500/40">
+                                                    <span class="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white font-semibold">View</span>
+                                                </button>
+                                                <div class="absolute bottom-0 left-0 right-0 px-1 py-0.5 bg-black/60 text-center">
+                                                    <span class="text-[9px] text-orange-300">{{ ucfirst($record->session ?? 'out') }} out</span>
+                                                </div>
+                                            </div>
+                                            @endif
+                                            @endforeach
+                                        </div>
                                     </div>
+                                    @endforeach
                                 </div>
                                 @else
                                 <p class="text-gray-400 text-sm">No time-in photos yet</p>
@@ -1492,6 +1563,58 @@
                 const match = (card.dataset.intern || '').includes(q);
                 card.style.display = match ? '' : 'none';
             });
+        }
+
+        function filterTimeEdits(input, studentId) {
+            const q = input.value.toLowerCase();
+            document.querySelectorAll(`#timeEditsTable-${studentId} .time-edit-row`).forEach(row => {
+                row.style.display = (row.dataset.date || '').includes(q) ? '' : 'none';
+            });
+        }
+
+        function confirmUndoApproval(recordId, date, session) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4';
+            modal.innerHTML = `
+                <div class="bg-slate-800 border border-orange-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+                    <div class="text-center mb-4">
+                        <div class="text-4xl mb-3">↩️</div>
+                        <h3 class="text-lg font-bold text-white mb-2">Undo Approval?</h3>
+                        <p class="text-gray-300 text-sm">This will <strong class="text-orange-400">revert the approval</strong> for:</p>
+                        <p class="text-white font-semibold mt-1">${date} ${session ? '— ' + session : ''}</p>
+                        <div class="mt-3 bg-orange-500/10 border border-orange-500/30 rounded-lg px-4 py-3 text-left">
+                            <p class="text-orange-300 text-xs font-semibold">⚠️ Hours will be deducted</p>
+                            <p class="text-gray-400 text-xs mt-1">The credited hours for this session will be removed from the student's progress and the record will return to Pending status.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-3 mt-5">
+                        <button onclick="this.closest('.fixed').remove()" class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">Cancel</button>
+                        <button onclick="submitUndoApproval(${recordId}, this)" class="flex-1 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition-all">Yes, Undo</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+        }
+
+        async function submitUndoApproval(recordId, btn) {
+            btn.disabled = true;
+            btn.textContent = 'Undoing…';
+            try {
+                const res = await fetch(`/api/time-records/${recordId}/undo-approval`, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+                });
+                const data = await res.json();
+                btn.closest('.fixed').remove();
+                if (data.success) {
+                    showToast('Approval Undone', 'Hours deducted and record set back to Pending.', 'orange');
+                    setTimeout(() => location.reload(), 1200);
+                } else {
+                    showToast('Error', data.message || 'Failed to undo approval.', 'red');
+                }
+            } catch(e) {
+                btn.closest('.fixed').remove();
+                showToast('Error', 'Network error. Please try again.', 'red');
+            }
         }
 
         function toggleStudentExpand(element) {
