@@ -1470,13 +1470,17 @@
     <div id="timeoutOptionsModal" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
         <div class="bg-slate-900 rounded-xl max-w-lg w-full p-6 border border-slate-700">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-white">Time Out Options</h3>
+                <h3 class="text-lg font-semibold text-white">🕐 Time Out</h3>
                 <button type="button" id="closeTimeoutOptions" onclick="closeTimeoutOptionsModal(); return false;" class="text-gray-400 hover:text-white">✕</button>
             </div>
- 
+            <p class="text-gray-400 text-sm mb-4">Take a photo to confirm your time-out.</p>
             <div class="flex flex-col gap-3">
-                <button type="button" id="quickTimeoutBtn" onclick="handleQuickTimeout(); return false;" class="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold">Quick Time-out</button>
-                <button type="button" id="cancelTimeoutOptions" onclick="closeTimeoutOptionsModal(); return false;" class="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">Cancel</button>
+                <button type="button" id="photoTimeoutBtn" onclick="handleTimeoutWithPhoto(); return false;"
+                    class="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold text-lg">
+                    📷 Capture Photo &amp; Time Out
+                </button>
+                <button type="button" id="cancelTimeoutOptions" onclick="closeTimeoutOptionsModal(); return false;"
+                    class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Cancel</button>
             </div>
         </div>
     </div>
