@@ -1486,31 +1486,59 @@
     </div>
 
     <!-- Camera Modal (shared for Time In / Time Out) -->
-    <div id="cameraModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div class="bg-slate-900 rounded-xl max-w-2xl w-full p-6 border border-slate-700">
-            <div class="flex justify-between items-center mb-4">
+    <div id="cameraModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4">
+        <div class="bg-slate-900 rounded-xl w-full max-w-xl sm:max-w-2xl p-4 sm:p-6 border border-slate-700 flex flex-col" style="max-height:95vh">
+            <div class="flex justify-between items-center mb-3 shrink-0">
                 <h3 class="text-lg font-semibold text-white" id="cameraModalTitle">Capture Photo</h3>
-                <button type="button" id="closeCameraModal" class="text-gray-400 hover:text-white">✕</button>
+                <button type="button" id="closeCameraModal" class="text-gray-400 hover:text-white text-xl leading-none">✕</button>
             </div>
 
-            <!-- Fixed-size media container so capture/preview do not change layout -->
-            <div class="relative mb-4 rounded-lg overflow-hidden border-2 border-dashed border-slate-600 h-64">
-                <video id="cameraModalVideo" class="w-full h-full object-cover camera-video" playsinline webkit-playsinline autoplay muted></video>
-                <img id="cameraModalImage" src="" alt="Preview" class="hidden absolute inset-0 w-full h-full object-cover">
+            <!-- Face guide status bar -->
+            <div id="faceGuideStatus" class="flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-sm font-semibold transition-all duration-300 shrink-0" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4)">
+                <span id="faceGuideIcon">🔴</span>
+                <span id="faceGuideText" class="text-red-300">Position your face inside the oval frame</span>
             </div>
 
-            <!-- Capture control only -->
-            <div class="flex gap-2 mb-4">
-                <button type="button" id="cameraModalCaptureBtn" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">📸 Capture</button>
+            <!-- Video container — fills available space, no stretch -->
+            <div class="relative rounded-lg overflow-hidden mb-3 transition-all duration-300 flex-1 min-h-0" id="cameraVideoContainer"
+                style="border:4px solid #ef4444;background:#000;aspect-ratio:4/3;max-height:60vh">
+                <video id="cameraModalVideo" class="w-full h-full camera-video" style="object-fit:contain;display:block" playsinline webkit-playsinline autoplay muted></video>
+                <img id="cameraModalImage" src="" alt="Preview" class="hidden absolute inset-0 w-full h-full" style="object-fit:contain">
+
+                <!-- Oval face guide frame — guide only, full photo is captured -->
+                <div id="faceGuideOverlay" class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <!-- Oval border only — no dark overlay, full background visible in capture -->
+                    <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <ellipse id="faceOvalBorder" cx="50" cy="46" rx="22" ry="28" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4 2"/>
+                    </svg>
+                    <div class="absolute bottom-2 left-0 right-0 text-center">
+                        <span id="faceGuideLabel" class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:rgba(0,0,0,0.6);color:#fca5a5">👤 Align face here</span>
+                    </div>
+                </div>
             </div>
 
-            <!-- Preview area with Retake + Use Photo below the image -->
-            <div id="cameraModalPreview" class="hidden">
+            <!-- Capture button -->
+            <div class="flex gap-2 mb-3 shrink-0" id="cameraCaptureRow">
+                <button type="button" id="cameraModalCaptureBtn" disabled
+                    class="flex-1 px-4 py-3 rounded-lg font-semibold transition-all duration-300 bg-slate-600 text-slate-400 cursor-not-allowed text-base">
+                    📸 Capture
+                </button>
+            </div>
+
+            <!-- Preview area -->
+            <div id="cameraModalPreview" class="hidden shrink-0">
                 <p class="text-xs text-gray-400 mb-2">Captured:</p>
                 <div class="flex gap-2 mt-2">
-                    <button type="button" id="cameraModalRetakeBtn" class="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold hidden">Retake</button>
-                    <button type="button" id="cameraModalUseBtn" class="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold hidden">Use Photo</button>
+                    <button type="button" id="cameraModalRetakeBtn" class="flex-1 px-4 py-2.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold hidden">Retake</button>
+                    <button type="button" id="cameraModalUseBtn" class="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold hidden">Use Photo</button>
                 </div>
+            </div>
+
+            <!-- Fallback: upload photo from device -->
+            <div id="cameraFallback" class="hidden mt-3 border-t border-slate-700 pt-3 shrink-0">
+                <p class="text-gray-400 text-xs mb-2">📁 Or upload a photo from your device:</p>
+                <input type="file" id="cameraFallbackInput" accept="image/*" capture="user"
+                    class="w-full text-sm text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white file:font-semibold file:cursor-pointer cursor-pointer bg-slate-800 rounded-lg px-3 py-2 border border-slate-600">
             </div>
         </div>
     </div>
@@ -1601,6 +1629,153 @@
         let cameraPhoto = null;
         let captureTarget = null; // 'timein' | 'timeout'
         const cameraCanvas = document.createElement('canvas');
+        let faceDetectLoop = null;
+        let faceInFrame = false;
+
+        // ===== FACE DETECTION =====
+        function setFaceGuide(detected) {
+            faceInFrame = detected;
+            const container = document.getElementById('cameraVideoContainer');
+            const statusBar = document.getElementById('faceGuideStatus');
+            const icon = document.getElementById('faceGuideIcon');
+            const text = document.getElementById('faceGuideText');
+            const oval = document.getElementById('faceOvalBorder');
+            const label = document.getElementById('faceGuideLabel');
+            const captureBtn = document.getElementById('cameraModalCaptureBtn');
+
+            if (detected) {
+                // Green — face in frame
+                if (container) container.style.borderColor = '#22c55e';
+                if (statusBar) { statusBar.style.background = 'rgba(34,197,94,0.15)'; statusBar.style.borderColor = 'rgba(34,197,94,0.4)'; }
+                if (icon) icon.textContent = '🟢';
+                if (text) { text.textContent = 'Face detected — ready to capture!'; text.className = 'text-green-300'; }
+                if (oval) { oval.setAttribute('stroke', '#22c55e'); oval.setAttribute('stroke-dasharray', '0'); }
+                if (label) { label.style.color = '#86efac'; label.textContent = '✓ Face aligned'; }
+                if (captureBtn) {
+                    captureBtn.disabled = false;
+                    captureBtn.className = 'flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all duration-300 bg-green-600 hover:bg-green-700 text-white cursor-pointer';
+                    captureBtn.textContent = '📸 Capture';
+                }
+            } else {
+                // Red — no face
+                if (container) container.style.borderColor = '#ef4444';
+                if (statusBar) { statusBar.style.background = 'rgba(239,68,68,0.15)'; statusBar.style.borderColor = 'rgba(239,68,68,0.4)'; }
+                if (icon) icon.textContent = '🔴';
+                if (text) { text.textContent = 'Position your face inside the oval frame'; text.className = 'text-red-300'; }
+                if (oval) { oval.setAttribute('stroke', '#ef4444'); oval.setAttribute('stroke-dasharray', '4 2'); }
+                if (label) { label.style.color = '#fca5a5'; label.textContent = '👤 Align face here'; }
+                if (captureBtn) {
+                    captureBtn.disabled = true;
+                    captureBtn.className = 'flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all duration-300 bg-slate-600 text-slate-400 cursor-not-allowed';
+                    captureBtn.textContent = '📸 Capture';
+                }
+            }
+        }
+
+        async function startFaceDetection(videoEl) {
+            const host = location.hostname;
+            const isLocalhost = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.dev') || host.endsWith('.local') || host.endsWith('.test');
+            const isInsecureRemote = location.protocol === 'http:' && !isLocalhost;
+
+            // On remote HTTP: canvas is tainted — just turn green when camera is live
+            if (isInsecureRemote) {
+                setFaceGuide(false);
+                let waited = 0;
+                const waitForVideo = setInterval(() => {
+                    waited += 200;
+                    if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+                        clearInterval(waitForVideo);
+                        setFaceGuide(true);
+                    }
+                    if (waited > 5000) { clearInterval(waitForVideo); setFaceGuide(true); }
+                }, 200);
+                return;
+            }
+
+            // Localhost / HTTPS: try native FaceDetector first
+            if ('FaceDetector' in window) {
+                const detector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+                const detectCanvas = document.createElement('canvas');
+                let lastCheck = 0;
+                async function detectLoop(ts) {
+                    faceDetectLoop = requestAnimationFrame(detectLoop);
+                    if (ts - lastCheck < 400) return;
+                    lastCheck = ts;
+                    if (!cameraStream || videoEl.readyState < 2) return;
+                    try {
+                        detectCanvas.width = videoEl.videoWidth || 320;
+                        detectCanvas.height = videoEl.videoHeight || 240;
+                        const ctx = detectCanvas.getContext('2d');
+                        ctx.drawImage(videoEl, 0, 0);
+                        const faces = await detector.detect(detectCanvas);
+                        if (faces.length === 0) { setFaceGuide(false); return; }
+                        const face = faces[0].boundingBox;
+                        const vw = detectCanvas.width, vh = detectCanvas.height;
+                        // Oval guide center and size (matches SVG: cx=50%, cy=46%, rx=22%, ry=28%)
+                        const ovalCX = vw * 0.50, ovalCY = vh * 0.46;
+                        const ovalRX = vw * 0.22, ovalRY = vh * 0.28;
+                        // Face center
+                        const faceCX = face.x + face.width / 2;
+                        const faceCY = face.y + face.height / 2;
+                        // Check if face center is inside the oval (with 30% tolerance)
+                        const dx = (faceCX - ovalCX) / (ovalRX * 1.3);
+                        const dy = (faceCY - ovalCY) / (ovalRY * 1.3);
+                        const inOval = (dx * dx + dy * dy) <= 1.0;
+                        // Face must also be a reasonable size (not too far/close)
+                        const faceW = face.width / vw;
+                        const sizeOk = faceW > 0.10 && faceW < 0.80;
+                        setFaceGuide(inOval && sizeOk);
+                    } catch(e) { setFaceGuide(false); }
+                }
+                faceDetectLoop = requestAnimationFrame(detectLoop);
+                return;
+            }
+
+            // Localhost / HTTPS fallback: skin-tone pixel sampling IN the oval region only
+            const detectCanvas2 = document.createElement('canvas');
+            let lastSkinCheck = 0;
+            function skinDetectLoop(ts) {
+                faceDetectLoop = requestAnimationFrame(skinDetectLoop);
+                if (ts - lastSkinCheck < 400) return;
+                lastSkinCheck = ts;
+                if (!cameraStream || videoEl.readyState < 2) return;
+                try {
+                    detectCanvas2.width = 160; detectCanvas2.height = 120;
+                    const ctx = detectCanvas2.getContext('2d');
+                    ctx.drawImage(videoEl, 0, 0, 160, 120);
+                    // Sample ONLY inside the oval (cx=80,cy=55,rx=28,ry=34 in 160x120 space)
+                    // This matches the SVG oval guide position
+                    const ovalCX = 80, ovalCY = 55, ovalRX = 28, ovalRY = 34;
+                    let skinPixels = 0, total = 0;
+                    // Sample a grid of points inside the oval
+                    for (let y = ovalCY - ovalRY; y <= ovalCY + ovalRY; y += 3) {
+                        for (let x = ovalCX - ovalRX; x <= ovalCX + ovalRX; x += 3) {
+                            // Check if point is inside oval
+                            const dx = (x - ovalCX) / ovalRX;
+                            const dy = (y - ovalCY) / ovalRY;
+                            if (dx*dx + dy*dy > 1) continue;
+                            const px = Math.round(x), py = Math.round(y);
+                            if (px < 0 || py < 0 || px >= 160 || py >= 120) continue;
+                            const idx = (py * 160 + px) * 4;
+                            const imgData = ctx.getImageData(px, py, 1, 1).data;
+                            const r = imgData[0], g = imgData[1], b = imgData[2];
+                            total++;
+                            // Skin tone detection
+                            const isSkin = r > 50 && g > 30 && b > 10
+                                && r > b + 10 && r > g * 0.7
+                                && r < 240 && g < 210;
+                            if (isSkin) skinPixels++;
+                        }
+                    }
+                    const ratio = total > 0 ? skinPixels / total : 0;
+                    setFaceGuide(ratio > 0.15);
+                } catch(e) {
+                    setFaceGuide(false);
+                }
+            }
+            faceDetectLoop = requestAnimationFrame(skinDetectLoop);
+        }
+        // ===== END FACE DETECTION =====
 
         async function startCamera() {
             const cameraModalVideo = document.getElementById('cameraModalVideo');
@@ -1691,6 +1866,8 @@
                     cameraModalCaptureBtn.textContent = '📸 Capture';
                     cameraModalCaptureBtn.onclick = null;
                 }
+                // Start face detection
+                startFaceDetection(cameraModalVideo);
             } catch (err) {
                 // Some browsers (iOS) need explicit user gesture to play
                 if (cameraModalCaptureBtn) {
@@ -1716,6 +1893,8 @@
             }
             const cameraModalCaptureBtn = document.getElementById('cameraModalCaptureBtn');
             if (cameraModalCaptureBtn) cameraModalCaptureBtn.disabled = true;
+            // Stop face detection loop
+            if (faceDetectLoop) { cancelAnimationFrame(faceDetectLoop); faceDetectLoop = null; }
         }
 
         function openCameraModal(target) {
@@ -1802,6 +1981,8 @@
             cameraModalVideo?.classList.remove('hidden');
             cameraModalPreview?.classList.add('hidden');
             cameraModalRetakeBtn?.classList.add('hidden');
+            // reset face guide to red
+            setFaceGuide(false);
             cameraModalUseBtn?.classList.add('hidden');
             cameraModalCaptureBtn?.classList.remove('hidden');
             cameraPhoto = null;
@@ -2157,7 +2338,9 @@
                     cameraModalUseBtn.classList.add('hidden');
                     cameraModalCaptureBtn.classList.remove('hidden');
                     cameraModalVideo.classList.remove('hidden');
-                    // restart camera feed
+                    // reset face guide to red before restarting
+                    setFaceGuide(false);
+                    // restart camera feed + face detection
                     startCamera();
                 });
             }
