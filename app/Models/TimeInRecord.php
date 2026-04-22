@@ -18,6 +18,7 @@ class TimeInRecord extends Model
         'time_in',
         'time_out',
         'photo_path',
+        'time_out_photo_path',
         'verified',
         'notes',
         'status',

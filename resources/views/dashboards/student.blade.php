@@ -1087,35 +1087,125 @@
             <?php 
             $timeInRecords = \App\Models\TimeInRecord::where('student_id', $user->id)
                 ->orderBy('date', 'desc')
-                ->limit(10)
+                ->orderBy('session', 'asc')
+                ->limit(20)
                 ->get();
+            // Group by date
+            $groupedRecords = $timeInRecords->groupBy(fn($r) => $r->date->format('Y-m-d'));
             ?>
 
-            @if($timeInRecords->isNotEmpty())
-            <div class="space-y-3">
-                @foreach($timeInRecords as $record)
-                <div class="flex items-center justify-between bg-slate-700/30 p-4 rounded-lg hover:bg-slate-700/50 transition-colors">
-                    <div class="flex items-center gap-4">
-                        @if($record->photo_path)
-                        <img src="{{ url('storage/' . $record->photo_path) }}" alt="Time-in photo"
-                            class="w-12 h-12 rounded-lg object-cover cursor-pointer hover:ring-2 hover:ring-green-400 transition-all"
-                            onerror="this.onerror=null;this.src='';this.closest('div').innerHTML='<div class=\'w-12 h-12 bg-slate-600 rounded-lg flex items-center justify-center\'><span class=\'text-gray-400\'>📸</span></div>';"
-                            onclick="openFileViewer('{{ url('storage/' . $record->photo_path) }}','{{ $record->date->format('M d, Y') }} — Time-in Photo')">
-                        @else
-                        <div class="w-12 h-12 bg-slate-600 rounded-lg flex items-center justify-center">
-                            <span class="text-gray-400">📸</span>
-                        </div>
-                        @endif
-                        <div>
-                            <p class="text-gray-300 font-semibold">{{ $record->date->format('M d, Y') }}</p>
-                            <p class="text-gray-400 text-sm">{{ \Carbon\Carbon::parse($record->time_in)->format('h:i A') }} @if($record->time_out) - {{ \Carbon\Carbon::parse($record->time_out)->format('h:i A') }} @endif</p>
+            @if($groupedRecords->isNotEmpty())
+            <div class="space-y-4">
+                @foreach($groupedRecords as $date => $sessions)
+                @php
+                    $morning   = $sessions->firstWhere('session', 'morning');
+                    $afternoon = $sessions->firstWhere('session', 'afternoon');
+                    $anyVerified = $sessions->contains('verified', true);
+                    $anyPending  = $sessions->contains(fn($r) => !$r->verified);
+                    $displayDate = \Carbon\Carbon::parse($date)->format('M d, Y');
+                @endphp
+                <div class="bg-slate-700/30 rounded-xl p-4 hover:bg-slate-700/50 transition-colors">
+                    {{-- Date header + status --}}
+                    <div class="flex items-center justify-between mb-3">
+                        <p class="text-gray-200 font-semibold text-sm">{{ $displayDate }}</p>
+                        <div class="flex gap-1.5">
+                            @if($anyVerified)
+                            <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full font-semibold">Verified</span>
+                            @endif
+                            @if($anyPending)
+                            <span class="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full font-semibold">Pending</span>
+                            @endif
                         </div>
                     </div>
-                    @if($record->verified)
-                    <span class="px-3 py-1 bg-green-500/20 text-green-400 text-xs rounded-full font-semibold">Verified</span>
-                    @else
-                    <span class="px-3 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full font-semibold">Pending</span>
-                    @endif
+
+                    {{-- Sessions row --}}
+                    <div class="grid grid-cols-2 gap-3">
+                        {{-- Morning session --}}
+                        <div class="bg-slate-800/50 rounded-lg p-3">
+                            <p class="text-xs font-semibold text-blue-400 mb-2">🌅 Morning</p>
+                            @if($morning)
+                            <p class="text-gray-400 text-xs mb-2">
+                                {{ \Carbon\Carbon::parse($morning->time_in)->format('h:i A') }}
+                                @if($morning->time_out) → {{ \Carbon\Carbon::parse($morning->time_out)->format('h:i A') }} @endif
+                            </p>
+                            <div class="flex gap-2">
+                                {{-- Morning time-in photo --}}
+                                <div class="flex flex-col items-center gap-1 flex-1">
+                                    @if($morning->photo_path)
+                                    <img src="{{ url('storage/' . $morning->photo_path) }}" alt="In"
+                                        class="w-full h-16 rounded-lg object-cover cursor-pointer hover:ring-2 hover:ring-green-400 transition-all"
+                                        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                                        onclick="openFileViewer('{{ url('storage/' . $morning->photo_path) }}','{{ $displayDate }} Morning — Time-in')">
+                                    <div class="w-full h-16 bg-slate-600 rounded-lg items-center justify-center hidden"><span class="text-gray-400 text-xs">📸</span></div>
+                                    @else
+                                    <div class="w-full h-16 bg-slate-600/40 rounded-lg flex items-center justify-center border border-dashed border-slate-500"><span class="text-gray-500 text-xs">📸</span></div>
+                                    @endif
+                                    <span class="text-gray-500 text-[10px]">In</span>
+                                </div>
+                                {{-- Morning time-out photo --}}
+                                <div class="flex flex-col items-center gap-1 flex-1">
+                                    @if($morning->time_out_photo_path)
+                                    <img src="{{ url('storage/' . $morning->time_out_photo_path) }}" alt="Out"
+                                        class="w-full h-16 rounded-lg object-cover cursor-pointer hover:ring-2 hover:ring-orange-400 transition-all"
+                                        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                                        onclick="openFileViewer('{{ url('storage/' . $morning->time_out_photo_path) }}','{{ $displayDate }} Morning — Time-out')">
+                                    <div class="w-full h-16 bg-slate-600 rounded-lg items-center justify-center hidden"><span class="text-gray-400 text-xs">📸</span></div>
+                                    @elseif($morning->time_out)
+                                    <div class="w-full h-16 bg-slate-600/30 rounded-lg flex items-center justify-center border border-dashed border-slate-500"><span class="text-gray-500 text-xs">—</span></div>
+                                    @else
+                                    <div class="w-full h-16 bg-slate-600/20 rounded-lg flex items-center justify-center border border-dashed border-slate-600"><span class="text-gray-500 text-xs">⏳</span></div>
+                                    @endif
+                                    <span class="text-gray-500 text-[10px]">Out</span>
+                                </div>
+                            </div>
+                            @else
+                            <div class="flex items-center justify-center h-20 text-gray-600 text-xs">No morning session</div>
+                            @endif
+                        </div>
+
+                        {{-- Afternoon session --}}
+                        <div class="bg-slate-800/50 rounded-lg p-3">
+                            <p class="text-xs font-semibold text-orange-400 mb-2">🌇 Afternoon</p>
+                            @if($afternoon)
+                            <p class="text-gray-400 text-xs mb-2">
+                                {{ \Carbon\Carbon::parse($afternoon->time_in)->format('h:i A') }}
+                                @if($afternoon->time_out) → {{ \Carbon\Carbon::parse($afternoon->time_out)->format('h:i A') }} @endif
+                            </p>
+                            <div class="flex gap-2">
+                                {{-- Afternoon time-in photo --}}
+                                <div class="flex flex-col items-center gap-1 flex-1">
+                                    @if($afternoon->photo_path)
+                                    <img src="{{ url('storage/' . $afternoon->photo_path) }}" alt="In"
+                                        class="w-full h-16 rounded-lg object-cover cursor-pointer hover:ring-2 hover:ring-green-400 transition-all"
+                                        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                                        onclick="openFileViewer('{{ url('storage/' . $afternoon->photo_path) }}','{{ $displayDate }} Afternoon — Time-in')">
+                                    <div class="w-full h-16 bg-slate-600 rounded-lg items-center justify-center hidden"><span class="text-gray-400 text-xs">📸</span></div>
+                                    @else
+                                    <div class="w-full h-16 bg-slate-600/40 rounded-lg flex items-center justify-center border border-dashed border-slate-500"><span class="text-gray-500 text-xs">📸</span></div>
+                                    @endif
+                                    <span class="text-gray-500 text-[10px]">In</span>
+                                </div>
+                                {{-- Afternoon time-out photo --}}
+                                <div class="flex flex-col items-center gap-1 flex-1">
+                                    @if($afternoon->time_out_photo_path)
+                                    <img src="{{ url('storage/' . $afternoon->time_out_photo_path) }}" alt="Out"
+                                        class="w-full h-16 rounded-lg object-cover cursor-pointer hover:ring-2 hover:ring-orange-400 transition-all"
+                                        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                                        onclick="openFileViewer('{{ url('storage/' . $afternoon->time_out_photo_path) }}','{{ $displayDate }} Afternoon — Time-out')">
+                                    <div class="w-full h-16 bg-slate-600 rounded-lg items-center justify-center hidden"><span class="text-gray-400 text-xs">📸</span></div>
+                                    @elseif($afternoon->time_out)
+                                    <div class="w-full h-16 bg-slate-600/30 rounded-lg flex items-center justify-center border border-dashed border-slate-500"><span class="text-gray-500 text-xs">—</span></div>
+                                    @else
+                                    <div class="w-full h-16 bg-slate-600/20 rounded-lg flex items-center justify-center border border-dashed border-slate-600"><span class="text-gray-500 text-xs">⏳</span></div>
+                                    @endif
+                                    <span class="text-gray-500 text-[10px]">Out</span>
+                                </div>
+                            </div>
+                            @else
+                            <div class="flex items-center justify-center h-20 text-gray-600 text-xs">No afternoon session</div>
+                            @endif
+                        </div>
+                    </div>
                 </div>
                 @endforeach
             </div>

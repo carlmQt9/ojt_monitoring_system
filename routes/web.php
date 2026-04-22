@@ -301,8 +301,8 @@ Route::post('/time-out', function () {
         return back()->withErrors(['date' => 'No open time-in record found for this date.']);
     }
 
-    // Store the timeout photo if provided
-    $timeOutPhotoPath = $record->photo_path; // Keep existing time-in photo
+    // Store the timeout photo if provided — save to time_out_photo_path, keep original time-in photo
+    $timeOutPhotoPath = null;
     
     if (request()->filled('photo_base64')) {
         $base64Image = request()->input('photo_base64');
@@ -325,13 +325,11 @@ Route::post('/time-out', function () {
     // Use server time for time-out to prevent tampering
     $serverTimeOut = now()->format('H:i');
     
-    // Add a new field to store timeout photo or update existing record
-    // Since we can't modify the schema, we'll store both time-in and time-out photos in the same record
-    // by creating the timeout photo path separately
-    $record->update([
-        'time_out' => $serverTimeOut,
-        'photo_path' => $timeOutPhotoPath // Update with timeout photo if captured
-    ]);
+    $updateData = ['time_out' => $serverTimeOut];
+    if ($timeOutPhotoPath) {
+        $updateData['time_out_photo_path'] = $timeOutPhotoPath;
+    }
+    $record->update($updateData);
 
     // Calculate hours for THIS session
     $timeInParts  = explode(':', $record->time_in);
@@ -436,7 +434,7 @@ Route::post('/time-out-ajax', function () {
         return response()->json(['error' => 'No time-in record found for this date.'], 422);
     }
 
-    $timeOutPhotoPath = $record->photo_path;
+    $timeOutPhotoPath = null;
     if (request()->filled('photo_base64')) {
         $base64Image = request()->input('photo_base64');
         if (strpos($base64Image, 'data:image') === 0) {
@@ -453,10 +451,9 @@ Route::post('/time-out-ajax', function () {
 
     $serverTimeOut = now()->format('H:i');
 
-    $record->update([
-        'time_out' => $serverTimeOut,
-        'photo_path' => $timeOutPhotoPath,
-    ]);
+    $updateData = ['time_out' => $serverTimeOut];
+    if ($timeOutPhotoPath) $updateData['time_out_photo_path'] = $timeOutPhotoPath;
+    $record->update($updateData);
 
     $timeInParts = explode(':', $record->time_in);
     $timeOutParts = explode(':', $serverTimeOut);
