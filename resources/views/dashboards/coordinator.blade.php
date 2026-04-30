@@ -442,7 +442,10 @@
             <div class="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
                 <h3 class="text-lg font-bold text-white mb-4">All Companies Overview</h3>
                 <?php 
-                $allCompanies = \App\Models\Company::withCount('students')
+                $activeSYLabel = $activeSY ? $activeSY->label : null;
+                $allCompanies = \App\Models\Company::withCount(['students' => function($q) use ($activeSYLabel) {
+                        if ($activeSYLabel) $q->where('school_year', $activeSYLabel);
+                    }])
                     ->orderBy('name', 'asc')
                     ->get();
                 $totalCompanies = $allCompanies->count();
@@ -552,7 +555,9 @@
                         <span class="text-2xl mr-2">📈</span> Most Interns
                     </h3>
                     <?php 
-                    $companiesWithMost = \App\Models\Company::withCount('students')
+                    $companiesWithMost = \App\Models\Company::withCount(['students' => function($q) use ($activeSYLabel) {
+                            if ($activeSYLabel) $q->where('school_year', $activeSYLabel);
+                        }])
                         ->orderBy('students_count', 'desc')
                         ->limit(5)
                         ->get();
@@ -588,7 +593,9 @@
                         <span class="text-2xl mr-2">📉</span> Least Interns
                     </h3>
                     <?php 
-                    $companiesWithLeast = \App\Models\Company::withCount('students')
+                    $companiesWithLeast = \App\Models\Company::withCount(['students' => function($q) use ($activeSYLabel) {
+                            if ($activeSYLabel) $q->where('school_year', $activeSYLabel);
+                        }])
                         ->orderBy('students_count', 'asc')
                         ->limit(5)
                         ->get();
@@ -647,9 +654,9 @@
                     <p class="text-gray-400">No students found. Start by registering students.</p>
                 </div>
             @else
-                <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 flex flex-col flex-1 min-h-0">
-                    <!-- Desktop table (hidden on mobile) -->
-                    <div class="hidden md:flex md:flex-col students-table-wrapper flex-1 min-h-0">
+                <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 flex-col flex-1 min-h-0 hidden md:flex">
+                    <!-- Desktop table only -->
+                    <div class="flex flex-col students-table-wrapper flex-1 min-h-0">
                         <table id="studentsTable" class="w-full">
                             <thead class="text-gray-400 text-sm border-b border-slate-700/50">
                                 <tr>
@@ -795,9 +802,10 @@
                             </tbody>
                         </table>
                     </div>
+                </div><!-- end desktop container -->
 
                     <!-- Mobile card list (visible only on mobile) -->
-                    <div class="md:hidden space-y-3" id="studentsTable">
+                    <div class="md:hidden space-y-3 mt-2" id="studentsTable">
                         <?php foreach($students as $student): ?>
                         <?php
                             $studentHours2 = \App\Models\StudentHours::where('student_id', $student->id)->firstOrCreate(
@@ -814,7 +822,7 @@
                                 + \App\Models\TimeInRecord::where('student_id',$student->id)->where('status','pending')->count()
                                 + \App\Models\StudentRequirement::where('student_id',$student->id)->where('status','pending')->count();
                         ?>
-                        <div class="bg-slate-700/40 rounded-xl p-4 border border-slate-600" data-student-name="{{ strtolower($student->name) }}">
+                        <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/60" data-student-name="{{ strtolower($student->name) }}">
                             <!-- Name + company row -->
                             <div class="flex justify-between items-start mb-3">
                                 <div>
@@ -840,15 +848,15 @@
                                     <span>{{ number_format(max(0,$required2-$displayCompleted2),1) }} hrs left</span>
                                 </div>
                             </div>
-                            <!-- Actions side by side -->
-                            <div class="grid grid-cols-2 gap-2 mb-2">
-                                <button onclick="toggleStudentDetails({{ $student->id }})" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold">View Details</button>
-                                <button onclick="showLogsModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold">Logs</button>
-                                <button onclick="openDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-semibold">DTR</button>
+                            <!-- Actions -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="toggleStudentDetails({{ $student->id }})" class="h-10 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold">View Details</button>
+                                <button onclick="showLogsModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">Logs</button>
+                                <button onclick="openDtrModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="h-10 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-xs font-semibold">View DTR</button>
                                 @if($displayCompleted2 >= $required2)
-                                    <button onclick="showEvalModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs font-semibold">Evaluation Rating</button>
+                                    <button onclick="showEvalModal({{ $student->id }}, '{{ addslashes($student->name) }}')" class="h-10 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs font-semibold">Evaluation Rating</button>
                                 @else
-                                    <button disabled title="Student must complete {{ $required2 }} hours first" class="px-3 py-2 bg-slate-600 text-slate-400 rounded text-xs font-semibold cursor-not-allowed opacity-60">🔒 Evaluation Rating</button>
+                                    <button disabled class="h-10 bg-slate-700 text-slate-500 rounded-lg text-xs font-semibold cursor-not-allowed">🔒 Evaluation</button>
                                 @endif
                             </div>
                             <!-- Expandable details -->
@@ -897,9 +905,7 @@
                             </div>
                         </div>
                         <?php endforeach; ?>
-                    </div>
-                </div>
-                </div>
+                    </div><!-- end mobile cards -->
             @endif
         </section><!-- end students -->
 
@@ -1255,7 +1261,7 @@
     </div>
 
     <!-- Force Delete Company Modal -->
-    <div id="forceDeleteCompanyModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div id="forceDeleteCompanyModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[200] p-4">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
             <h3 class="text-xl font-bold text-white mb-4">Permanently Delete Company</h3>
             <p class="text-gray-300 mb-6">This will <span class="text-red-400 font-semibold">permanently delete</span> <span id="forceDeleteCompanyName" class="text-red-400 font-semibold"></span>. This action cannot be undone.</p>
