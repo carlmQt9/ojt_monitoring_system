@@ -103,7 +103,8 @@
         }
 
         /* New: compact tables and cabinet styles */
-        .min-table-wrapper { max-height: 24rem; overflow-y: auto; }
+        .student-tracking-section { height: calc(100vh - 8rem); display: flex; flex-direction: column; }
+        .student-tracking-section .students-table-wrapper { flex: 1; overflow-y: auto; }
         .compact-row td { padding: .5rem .75rem; }
         .cabinet-card { cursor: pointer; }
         .cabinet-body { transition: all .2s ease; }
@@ -622,8 +623,8 @@
         </section><!-- end companies -->
 
         <!-- Display all students with progress (REPLACED with compact table + search) -->
-        <section id="section-students" class="dash-section hidden">
-        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+        <section id="section-students" class="dash-section hidden student-tracking-section">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 shrink-0">
                 <h2 class="text-2xl font-bold text-white">Student Hours Tracking</h2>
                 <div class="w-full sm:max-w-sm">
                     <div class="flex items-center gap-2 px-3 py-2.5 bg-slate-700/50 border border-slate-600 rounded-xl focus-within:border-indigo-500 transition-colors">
@@ -646,9 +647,9 @@
                     <p class="text-gray-400">No students found. Start by registering students.</p>
                 </div>
             @else
-                <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4">
+                <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 flex flex-col flex-1 min-h-0">
                     <!-- Desktop table (hidden on mobile) -->
-                    <div class="hidden md:block min-table-wrapper">
+                    <div class="hidden md:flex md:flex-col students-table-wrapper flex-1 min-h-0">
                         <table id="studentsTable" class="w-full">
                             <thead class="text-gray-400 text-sm border-b border-slate-700/50">
                                 <tr>
