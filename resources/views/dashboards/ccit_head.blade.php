@@ -416,22 +416,22 @@
                     <input type="text" id="userSearch" placeholder="Search users..." oninput="applyFilters()" class="col-span-2 sm:col-span-auto flex-1 min-w-[160px] px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500 text-sm">
                 </div>
                 <!-- Desktop table -->
-                <div class="hidden md:block overflow-x-auto">
+                <div class="hidden md:block">
                     <table class="w-full text-sm text-left text-gray-300">
-                        <thead class="text-xs text-gray-400 bg-slate-700/50">
+                        <thead class="text-xs text-gray-400 bg-slate-700/50 uppercase tracking-wide">
                             <tr>
-                                <th class="px-4 py-2">Name</th>
-                                <th class="px-4 py-2">Email</th>
-                                <th class="px-4 py-2">Role</th>
-                                <th class="px-4 py-2">School ID</th>
-                                <th class="px-4 py-2">Company</th>
-                                <th class="px-4 py-2">School Year</th>
-                                <th class="px-4 py-2">Status</th>
-                                <th class="px-4 py-2">Actions</th>
+                                <th class="px-3 py-3">Name</th>
+                                <th class="px-3 py-3">Email</th>
+                                <th class="px-3 py-3">Role</th>
+                                <th class="px-3 py-3">School ID</th>
+                                <th class="px-3 py-3">Company</th>
+                                <th class="px-3 py-3 whitespace-nowrap">School Year</th>
+                                <th class="px-3 py-3">Status</th>
+                                <th class="px-3 py-3">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="userTable" class="divide-y divide-slate-700">
-                            <tr class="bg-slate-800/50"><td colspan="8" class="px-4 py-4 text-center text-gray-400">Loading users...</td></tr>
+                        <tbody id="userTable" class="divide-y divide-slate-700/50">
+                            <tr><td colspan="8" class="px-4 py-4 text-center text-gray-400">Loading users...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1635,28 +1635,28 @@
                 sorted.forEach(user => {
                     const isPending = !user.is_approved && user.role !== 'student';
                     const statusBadge = isPending
-                        ? '<span class="px-2 py-0.5 bg-yellow-600/30 text-yellow-300 text-xs rounded-full font-semibold">⏳ Pending</span>'
-                        : '<span class="px-2 py-0.5 bg-green-600/30 text-green-300 text-xs rounded-full">✓ Approved</span>';
+                        ? '<span class="inline-flex items-center gap-1 px-2.5 py-1 bg-yellow-500/15 text-yellow-300 text-xs rounded-full font-semibold border border-yellow-500/30 whitespace-nowrap">⏳ Pending</span>'
+                        : '<span class="inline-flex items-center gap-1 px-2.5 py-1 bg-green-500/15 text-green-400 text-xs rounded-full font-semibold border border-green-500/30 whitespace-nowrap">✓ Approved</span>';
                     const actions = isPending
                         ? `<div class="flex gap-1">
-                               <button onclick="approveUser(${user.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold">Approve</button>
-                               <button onclick="denyUser(${user.id}, '${user.name}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Deny</button>
+                               <button onclick="approveUser(${user.id})" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold whitespace-nowrap">Approve</button>
+                               <button onclick="denyUser(${user.id}, '${user.name}')" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold whitespace-nowrap">Deny</button>
                            </div>`
                         : `<div class="flex gap-1">
-                               <button onclick="editUser(${user.id})" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">Edit</button>
-                               <button onclick="removeUser(${user.id})" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs">Archive</button>
+                               <button onclick="editUser(${user.id})" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs whitespace-nowrap">Edit</button>
+                               <button onclick="removeUser(${user.id})" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs whitespace-nowrap">Archive</button>
                            </div>`;
                     // Desktop table row
                     tableBody.innerHTML += `
-                        <tr class="${isPending ? 'bg-yellow-900/10 border-l-2 border-yellow-500/50' : 'bg-slate-800/50'} hover:bg-slate-700/50">
-                            <td class="px-4 py-2 font-medium">${user.name}</td>
-                            <td class="px-4 py-2 text-gray-300">${user.email}</td>
-                            <td class="px-4 py-2"><span class="px-2 py-1 bg-red-900 text-red-200 rounded text-xs">${user.role}</span></td>
-                            <td class="px-4 py-2 font-mono text-xs">${user.school_id_number || '<span class="text-gray-500">—</span>'}</td>
-                            <td class="px-4 py-2">${user.company || '<span class="text-gray-500">—</span>'}</td>
-                            <td class="px-4 py-2">${user.school_year || '<span class="text-gray-500">—</span>'}</td>
-                            <td class="px-4 py-2">${statusBadge}</td>
-                            <td class="px-4 py-2">${actions}</td>
+                        <tr class="${isPending ? 'bg-yellow-900/10 border-l-2 border-yellow-500/50' : ''} hover:bg-slate-700/30 border-b border-slate-700/40">
+                            <td class="px-3 py-2.5 font-medium text-white max-w-[120px]"><div class="truncate" title="${user.name}">${user.name}</div></td>
+                            <td class="px-3 py-2.5 text-gray-300 max-w-[160px]"><div class="truncate text-xs" title="${user.email}">${user.email}</div></td>
+                            <td class="px-3 py-2.5"><span class="inline-flex items-center px-2 py-0.5 bg-red-500/20 text-red-300 rounded-full text-xs font-semibold whitespace-nowrap">${user.role}</span></td>
+                            <td class="px-3 py-2.5 font-mono text-xs text-gray-300 whitespace-nowrap">${user.school_id_number || '<span class="text-gray-500">—</span>'}</td>
+                            <td class="px-3 py-2.5 max-w-[110px]"><div class="truncate text-gray-300 text-xs" title="${user.company || ''}">${user.company || '<span class="text-gray-500">—</span>'}</div></td>
+                            <td class="px-3 py-2.5 text-gray-300 text-xs whitespace-nowrap">${user.school_year || '<span class="text-gray-500">—</span>'}</td>
+                            <td class="px-3 py-2.5">${statusBadge}</td>
+                            <td class="px-3 py-2.5">${actions}</td>
                         </tr>
                     `;
                     // Mobile card
