@@ -11,6 +11,27 @@ Route::get('/', function () {
     return view('landing');
 });
 
+// Storage file serve route — fallback for hosts without symlink support (e.g. InfinityFree)
+Route::get('/storage/{path}', function ($path) {
+    // Only allow serving from safe directories
+    $allowed = ['certificates', 'time-in-photos', 'time-out-photos'];
+    $dir = explode('/', $path)[0];
+    if (!in_array($dir, $allowed)) {
+        abort(404);
+    }
+    // Prevent path traversal
+    $fullPath = realpath(storage_path('app/public/' . $path));
+    $basePath = realpath(storage_path('app/public'));
+    if (!$fullPath || !str_starts_with($fullPath, $basePath)) {
+        abort(404);
+    }
+    if (!file_exists($fullPath)) {
+        abort(404);
+    }
+    $mime = mime_content_type($fullPath);
+    return response()->file($fullPath, ['Content-Type' => $mime]);
+})->where('path', '.*');
+
 // Authentication Routes
 Route::get('/login', function () {
     return view('auth.login');
@@ -39,7 +60,7 @@ Route::post('/login', function () {
     ]);
 
     return redirect()->route('dashboard');
-})->name('login.post')->middleware('throttle:login');
+})->name('login.post')->middleware('throttle:5,1');
 
 // Registration Routes
 Route::get('/register', function () {
@@ -103,7 +124,7 @@ Route::post('/register', function () {
         : 'Registration successful! Please wait for the CCIT Head to approve your account before logging in.';
 
     return redirect()->route('login')->with('success', $message);
-})->name('register.post')->middleware(['guest', 'throttle:register']);
+})->name('register.post')->middleware(['guest', 'throttle:10,1']);
 // Student Hours Routes: Log Hours feature removed
 
 Route::get('/dashboard', function () {
@@ -274,7 +295,7 @@ Route::post('/time-in', function () {
     ]);
 
     return back()->with('success', 'Successfully timed in (' . ucfirst($session) . ' session)!');
-})->name('time-in')->middleware(['auth.custom', 'role:student', 'throttle:time-in-out']);
+})->name('time-in')->middleware(['auth.custom', 'role:student', 'throttle:20,1']);
 
 Route::post('/time-out', function () {
     $rules = [
@@ -411,7 +432,7 @@ Route::post('/time-out', function () {
         : sprintf('Time-out recorded! %.2f hrs — awaiting approval.', $regularThisSession);
 
     return back()->with('success', $msg);
-})->name('time-out')->middleware(['auth.custom', 'role:student', 'throttle:time-in-out']);
+})->name('time-out')->middleware(['auth.custom', 'role:student', 'throttle:20,1']);
 
 // AJAX time-out endpoint: returns JSON with updated student hours
 Route::post('/time-out-ajax', function () {
@@ -1297,7 +1318,7 @@ Route::post('/forgot-password', function () {
     }
 
     return back()->with('success', 'If an account with that email exists, a password reset link has been sent.');
-})->name('forgot-password')->middleware(['guest', 'throttle:password-reset']);
+})->name('forgot-password')->middleware(['guest', 'throttle:3,15']);
 
 // Reset Password GET (token link from email)
 Route::get('/reset-password', function () {
