@@ -39,7 +39,7 @@ Route::post('/login', function () {
     ]);
 
     return redirect()->route('dashboard');
-})->name('login.post');
+})->name('login.post')->middleware('throttle:login');
 
 // Registration Routes
 Route::get('/register', function () {
@@ -103,7 +103,7 @@ Route::post('/register', function () {
         : 'Registration successful! Please wait for the CCIT Head to approve your account before logging in.';
 
     return redirect()->route('login')->with('success', $message);
-})->name('register.post')->middleware('guest');
+})->name('register.post')->middleware(['guest', 'throttle:register']);
 // Student Hours Routes: Log Hours feature removed
 
 Route::get('/dashboard', function () {
@@ -274,7 +274,7 @@ Route::post('/time-in', function () {
     ]);
 
     return back()->with('success', 'Successfully timed in (' . ucfirst($session) . ' session)!');
-})->name('time-in')->middleware(['auth.custom', 'role:student']);
+})->name('time-in')->middleware(['auth.custom', 'role:student', 'throttle:time-in-out']);
 
 Route::post('/time-out', function () {
     $rules = [
@@ -411,7 +411,7 @@ Route::post('/time-out', function () {
         : sprintf('Time-out recorded! %.2f hrs — awaiting approval.', $regularThisSession);
 
     return back()->with('success', $msg);
-})->name('time-out')->middleware(['auth.custom', 'role:student']);
+})->name('time-out')->middleware(['auth.custom', 'role:student', 'throttle:time-in-out']);
 
 // AJAX time-out endpoint: returns JSON with updated student hours
 Route::post('/time-out-ajax', function () {
@@ -1038,7 +1038,8 @@ Route::post('/save-evaluation/{studentId}', function ($studentId) {
     } catch (\Illuminate\Validation\ValidationException $e) {
         return response()->json(['success' => false, 'message' => 'Validation failed: ' . implode(', ', array_merge(...array_values($e->errors())))], 422);
     } catch (\Throwable $e) {
-        return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
+        \Illuminate\Support\Facades\Log::error('Evaluation save error: ' . $e->getMessage());
+        return response()->json(['success' => false, 'message' => 'An error occurred. Please try again.'], 500);
     }
 })->name('save-evaluation')->middleware(['auth.custom', 'role:supervisor']);
 
@@ -1296,7 +1297,7 @@ Route::post('/forgot-password', function () {
     }
 
     return back()->with('success', 'If an account with that email exists, a password reset link has been sent.');
-})->name('forgot-password')->middleware('guest');
+})->name('forgot-password')->middleware(['guest', 'throttle:password-reset']);
 
 // Reset Password GET (token link from email)
 Route::get('/reset-password', function () {
