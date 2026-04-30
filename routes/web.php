@@ -326,7 +326,7 @@ Route::post('/time-out', function () {
     $serverTimeOut = now()->format('H:i');
     
     $updateData = ['time_out' => $serverTimeOut];
-    if ($timeOutPhotoPath) {
+    if ($timeOutPhotoPath && \Illuminate\Support\Facades\Schema::hasColumn('time_in_records', 'time_out_photo_path')) {
         $updateData['time_out_photo_path'] = $timeOutPhotoPath;
     }
     $record->update($updateData);
@@ -452,7 +452,7 @@ Route::post('/time-out-ajax', function () {
     $serverTimeOut = now()->format('H:i');
 
     $updateData = ['time_out' => $serverTimeOut];
-    if ($timeOutPhotoPath) $updateData['time_out_photo_path'] = $timeOutPhotoPath;
+    if ($timeOutPhotoPath && \Illuminate\Support\Facades\Schema::hasColumn('time_in_records', 'time_out_photo_path')) $updateData['time_out_photo_path'] = $timeOutPhotoPath;
     $record->update($updateData);
 
     $timeInParts = explode(':', $record->time_in);

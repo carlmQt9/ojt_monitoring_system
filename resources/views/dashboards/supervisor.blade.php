@@ -537,9 +537,13 @@
                             $studentFeedback = $evaluation->feedback ?? '';
                         }
                     }
+                    $hasTimeOutPhotoCol = \Illuminate\Support\Facades\Schema::hasColumn('time_in_records', 'time_out_photo_path');
                     $taskLogs = \App\Models\TimeInRecord::where('student_id', $student->id)
-                        ->where(function($q) {
-                            $q->whereNotNull('photo_path')->orWhereNotNull('time_out_photo_path');
+                        ->where(function($q) use ($hasTimeOutPhotoCol) {
+                            $q->whereNotNull('photo_path');
+                            if ($hasTimeOutPhotoCol) {
+                                $q->orWhereNotNull('time_out_photo_path');
+                            }
                         })
                         ->orderBy('date', 'desc')
                         ->orderBy('session', 'asc')
@@ -770,7 +774,7 @@
                                                     @endif
                                                 @elseif($record->status === 'approved')
                                                     <button onclick="confirmUndoApproval({{ $record->id }}, '{{ $record->date->format('M d, Y') }}', '{{ ucfirst($record->session ?? '') }}')"
-                                                        class="px-2 py-1 bg-slate-600 hover:bg-orange-600 text-gray-300 hover:text-white text-xs rounded transition-colors" title="Undo approval">
+                                                        class="px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded transition-colors" title="Undo approval">
                                                         ↩ Undo
                                                     </button>
                                                 @endif
@@ -865,7 +869,7 @@
                                                 </div>
                                             </div>
                                             @endif
-                                            @if($record->time_out_photo_path)
+                                            @if(isset($record->time_out_photo_path) && $record->time_out_photo_path)
                                             <div class="relative rounded-lg overflow-hidden">
                                                 <button type="button" onclick="openMediaPopup('{{ asset('storage/' . $record->time_out_photo_path) }}','{{ $displayLogDate }} — {{ ucfirst($record->session ?? '') }} Out')" class="relative group block w-full">
                                                     <img src="{{ asset('storage/' . $record->time_out_photo_path) }}" alt="Out Photo"

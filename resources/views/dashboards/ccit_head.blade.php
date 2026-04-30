@@ -817,7 +817,42 @@
                 <button onclick="closeArchivedTemplatesModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl font-light">×</button>
             </div>
             <div class="overflow-auto flex-1 p-6">
-                <div id="archivedTemplatesList"><p class="text-gray-500 dark:text-gray-400 text-center py-8">Loading...</p></div>
+                <div id="archivedTemplatesList">
+                @if($archivedTemplates->isEmpty())
+                    <p class="text-gray-500 dark:text-gray-400 text-center py-8">No archived requirements.</p>
+                @else
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-200 dark:border-slate-700">
+                                <th class="text-left py-2 px-3 text-gray-500 dark:text-gray-400">Name</th>
+                                <th class="text-left py-2 px-3 text-gray-500 dark:text-gray-400">Category</th>
+                                <th class="text-center py-2 px-3 text-gray-500 dark:text-gray-400">Archived On</th>
+                                <th class="text-center py-2 px-3 text-gray-500 dark:text-gray-400">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach($archivedTemplates as $at)
+                            <tr class="border-b border-gray-100 dark:border-slate-700/50 hover:bg-gray-50 dark:hover:bg-slate-700/20">
+                                <td class="py-3 px-3 text-gray-500 dark:text-gray-400 line-through">{{ $at->name }}</td>
+                                <td class="py-3 px-3 text-gray-400 dark:text-gray-500 capitalize">{{ $at->category ?? '—' }}</td>
+                                <td class="py-3 px-3 text-center text-gray-400 dark:text-gray-500 text-xs">{{ $at->deleted_at->format('M d, Y') }}</td>
+                                <td class="py-3 px-3 text-center">
+                                    <form method="POST" action="/requirement-templates/{{ $at->id }}/restore" style="display:inline;">
+                                        @csrf
+                                        <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded font-semibold">Restore</button>
+                                    </form>
+                                    <form method="POST" action="/requirement-templates/{{ $at->id }}/force" style="display:inline;" onsubmit="return confirm('Permanently delete this requirement?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold ml-1">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                @endif
+                </div>
             </div>
         </div>
     </div>

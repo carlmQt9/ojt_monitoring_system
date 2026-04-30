@@ -156,7 +156,8 @@
         body.light [class*="bg-slate-900"] { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important; }
         body.light [class*="bg-slate-800"] { background: rgba(255,255,255,0.85) !important; box-shadow: 0 1px 3px rgba(30,58,95,0.08) !important; }
         body.light [class*="bg-slate-700"] { background: rgba(248,250,252,0.9) !important; }
-        body.light [class*="bg-slate-600"] { background: #f1f5f9 !important; }
+        body.light [class*="bg-slate-600"]:not(button):not([type="button"]):not([type="submit"]) { background: #f1f5f9 !important; }
+        body.light button[class*="bg-slate-600"], body.light [type="button"][class*="bg-slate-600"] { background: #64748b !important; color: #fff !important; }
         body.light [class*="border-slate-7"] { border-color: #cbd5e1 !important; }
         body.light [class*="border-slate-6"] { border-color: #cbd5e1 !important; }
         body.light [class*="divide-slate-7"] > * { border-color: #cbd5e1 !important; }
@@ -988,9 +989,9 @@
 
                             <!-- Camera Capture Section (replaced Upload tab with camera-only button) -->
                             <div class="mb-4">
-                                <p class="text-sm text-gray-400 mb-2">Capture a photo with your camera to time in.</p>
+                                <p class="text-sm text-gray-400 dark:text-gray-400 mb-2">Capture a photo with your camera to time in.</p>
                                 <button type="button" id="openCameraForTimeIn" onclick="openCameraModal('timein')"
-                                    class="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-600">
+                                    class="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-400 dark:disabled:bg-slate-600">
                                     📷 Open Camera
                                 </button>
                                 <!-- Lunch break lock notice -->
@@ -1152,7 +1153,7 @@
                                 </div>
                                 {{-- Morning time-out photo --}}
                                 <div class="flex flex-col items-center gap-1 flex-1">
-                                    @if($morning->time_out_photo_path)
+                                    @if(isset($morning->time_out_photo_path) && $morning->time_out_photo_path)
                                     <img src="{{ url('storage/' . $morning->time_out_photo_path) }}" alt="Out"
                                         class="w-full h-16 rounded-lg object-cover cursor-pointer hover:ring-2 hover:ring-orange-400 transition-all"
                                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
@@ -1195,7 +1196,7 @@
                                 </div>
                                 {{-- Afternoon time-out photo --}}
                                 <div class="flex flex-col items-center gap-1 flex-1">
-                                    @if($afternoon->time_out_photo_path)
+                                    @if(isset($afternoon->time_out_photo_path) && $afternoon->time_out_photo_path)
                                     <img src="{{ url('storage/' . $afternoon->time_out_photo_path) }}" alt="Out"
                                         class="w-full h-16 rounded-lg object-cover cursor-pointer hover:ring-2 hover:ring-orange-400 transition-all"
                                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
@@ -1618,7 +1619,7 @@
             <!-- Capture button -->
             <div class="flex gap-2 mb-3 shrink-0" id="cameraCaptureRow">
                 <button type="button" id="cameraModalCaptureBtn" disabled
-                    class="flex-1 px-4 py-3 rounded-lg font-semibold transition-all duration-300 bg-slate-600 text-slate-400 cursor-not-allowed text-base">
+                    class="flex-1 px-4 py-3 rounded-lg font-semibold transition-all duration-300 bg-slate-600 text-slate-400 dark:bg-slate-600 dark:text-slate-400 cursor-not-allowed text-base">
                     📸 Capture
                 </button>
             </div>
@@ -1803,7 +1804,7 @@
                 if (label) { label.style.color = '#fca5a5'; label.textContent = '👤 Align face here'; }
                 if (captureBtn) {
                     captureBtn.disabled = true;
-                    captureBtn.className = 'flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all duration-300 bg-slate-600 text-slate-400 cursor-not-allowed';
+                    captureBtn.className = 'flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all duration-300 bg-gray-400 dark:bg-slate-600 text-white dark:text-slate-400 cursor-not-allowed';
                     captureBtn.textContent = '📸 Capture';
                 }
             }
