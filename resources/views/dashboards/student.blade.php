@@ -7,6 +7,7 @@
     <title>Student Dashboard - OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
         /* ===== SIDEBAR ===== */
         #sidebar {
@@ -1810,108 +1811,103 @@
             }
         }
 
+        // face-api.js model loaded flag
+        let faceApiReady = false;
+        (async function loadFaceApi() {
+            try {
+                if (typeof faceapi === 'undefined') return;
+                // Load model weights from jsDelivr CDN — avoids InfinityFree binary file restrictions
+                const modelUrl = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js-models@master/tiny_face_detector';
+                await faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
+                faceApiReady = true;
+            } catch(e) {
+                console.warn('face-api.js model failed to load:', e);
+                faceApiReady = false;
+            }
+        })();
+
         async function startFaceDetection(videoEl) {
-            const host = location.hostname;
-            const isLocalhost = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.dev') || host.endsWith('.local') || host.endsWith('.test');
-            const isInsecureRemote = location.protocol === 'http:' && !isLocalhost;
-
-            // On remote HTTP: canvas is tainted — just turn green when camera is live
-            if (isInsecureRemote) {
-                setFaceGuide(false);
+            // ── face-api.js TinyFaceDetector — real neural net, works for all skin tones ──
+            if (typeof faceapi !== 'undefined') {
+                // Wait up to 12s for model to be ready (CDN can be slow on first load)
                 let waited = 0;
-                const waitForVideo = setInterval(() => {
-                    waited += 200;
-                    if (videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
-                        clearInterval(waitForVideo);
-                        setFaceGuide(true);
-                    }
-                    if (waited > 5000) { clearInterval(waitForVideo); setFaceGuide(true); }
-                }, 200);
-                return;
-            }
-
-            // Localhost / HTTPS: try native FaceDetector first
-            if ('FaceDetector' in window) {
-                const detector = new FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
-                const detectCanvas = document.createElement('canvas');
-                let lastCheck = 0;
-                async function detectLoop(ts) {
-                    faceDetectLoop = requestAnimationFrame(detectLoop);
-                    if (ts - lastCheck < 400) return;
-                    lastCheck = ts;
-                    if (!cameraStream || videoEl.readyState < 2) return;
-                    try {
-                        detectCanvas.width = videoEl.videoWidth || 320;
-                        detectCanvas.height = videoEl.videoHeight || 240;
-                        const ctx = detectCanvas.getContext('2d');
-                        ctx.drawImage(videoEl, 0, 0);
-                        const faces = await detector.detect(detectCanvas);
-                        if (faces.length === 0) { setFaceGuide(false); return; }
-                        const face = faces[0].boundingBox;
-                        const vw = detectCanvas.width, vh = detectCanvas.height;
-                        // Oval guide center and size (matches SVG: cx=50%, cy=46%, rx=22%, ry=28%)
-                        const ovalCX = vw * 0.50, ovalCY = vh * 0.46;
-                        const ovalRX = vw * 0.22, ovalRY = vh * 0.28;
-                        // Face center
-                        const faceCX = face.x + face.width / 2;
-                        const faceCY = face.y + face.height / 2;
-                        // Check if face center is inside the oval (with 30% tolerance)
-                        const dx = (faceCX - ovalCX) / (ovalRX * 1.3);
-                        const dy = (faceCY - ovalCY) / (ovalRY * 1.3);
-                        const inOval = (dx * dx + dy * dy) <= 1.0;
-                        // Face must also be a reasonable size (not too far/close)
-                        const faceW = face.width / vw;
-                        const sizeOk = faceW > 0.10 && faceW < 0.80;
-                        setFaceGuide(inOval && sizeOk);
-                    } catch(e) { setFaceGuide(false); }
+                while (!faceApiReady && waited < 12000) {
+                    await new Promise(r => setTimeout(r, 100));
+                    waited += 100;
                 }
-                faceDetectLoop = requestAnimationFrame(detectLoop);
-                return;
-            }
 
-            // Localhost / HTTPS fallback: skin-tone pixel sampling IN the oval region only
-            const detectCanvas2 = document.createElement('canvas');
-            let lastSkinCheck = 0;
-            function skinDetectLoop(ts) {
-                faceDetectLoop = requestAnimationFrame(skinDetectLoop);
-                if (ts - lastSkinCheck < 400) return;
-                lastSkinCheck = ts;
-                if (!cameraStream || videoEl.readyState < 2) return;
-                try {
-                    detectCanvas2.width = 160; detectCanvas2.height = 120;
-                    const ctx = detectCanvas2.getContext('2d');
-                    ctx.drawImage(videoEl, 0, 0, 160, 120);
-                    // Sample ONLY inside the oval (cx=80,cy=55,rx=28,ry=34 in 160x120 space)
-                    // This matches the SVG oval guide position
-                    const ovalCX = 80, ovalCY = 55, ovalRX = 28, ovalRY = 34;
-                    let skinPixels = 0, total = 0;
-                    // Sample a grid of points inside the oval
-                    for (let y = ovalCY - ovalRY; y <= ovalCY + ovalRY; y += 3) {
-                        for (let x = ovalCX - ovalRX; x <= ovalCX + ovalRX; x += 3) {
-                            // Check if point is inside oval
-                            const dx = (x - ovalCX) / ovalRX;
-                            const dy = (y - ovalCY) / ovalRY;
-                            if (dx*dx + dy*dy > 1) continue;
-                            const px = Math.round(x), py = Math.round(y);
-                            if (px < 0 || py < 0 || px >= 160 || py >= 120) continue;
-                            const idx = (py * 160 + px) * 4;
-                            const imgData = ctx.getImageData(px, py, 1, 1).data;
-                            const r = imgData[0], g = imgData[1], b = imgData[2];
-                            total++;
-                            // Skin tone detection
-                            const isSkin = r > 50 && g > 30 && b > 10
-                                && r > b + 10 && r > g * 0.7
-                                && r < 240 && g < 210;
-                            if (isSkin) skinPixels++;
+                if (faceApiReady) {
+                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+                    let detecting = false;
+
+                    async function faceApiLoop() {
+                        faceDetectLoop = requestAnimationFrame(faceApiLoop);
+                        if (detecting) return;  // don't stack calls
+                        if (!cameraStream || videoEl.readyState < 2 || videoEl.paused) return;
+                        detecting = true;
+                        try {
+                            const result = await faceapi.detectSingleFace(videoEl, options);
+                            if (!result) {
+                                setFaceGuide(false);
+                                detecting = false;
+                                return;
+                            }
+                            // Check the detected face box is inside our oval guide
+                            const vw = videoEl.videoWidth  || videoEl.offsetWidth;
+                            const vh = videoEl.videoHeight || videoEl.offsetHeight;
+                            const box = result.box;
+                            // Face center in normalized coords
+                            const fcx = (box.x + box.width  / 2) / vw;
+                            const fcy = (box.y + box.height / 2) / vh;
+                            // Oval guide: cx=50%, cy=46%, rx=22%, ry=28% (from SVG)
+                            // Allow 25% extra tolerance so normal head positioning works
+                            const oCX = 0.50, oCY = 0.46;
+                            const oRX = 0.22 * 1.25, oRY = 0.28 * 1.25;
+                            const dx = (fcx - oCX) / oRX;
+                            const dy = (fcy - oCY) / oRY;
+                            const inOval = dx * dx + dy * dy <= 1.0;
+                            // Face must be a reasonable size relative to frame
+                            const faceW = box.width / vw;
+                            const sizeOk = faceW > 0.08 && faceW < 0.95;
+                            setFaceGuide(inOval && sizeOk);
+                        } catch(e) {
+                            setFaceGuide(false);
                         }
+                        detecting = false;
                     }
-                    const ratio = total > 0 ? skinPixels / total : 0;
-                    setFaceGuide(ratio > 0.15);
-                } catch(e) {
-                    setFaceGuide(false);
+                    faceDetectLoop = requestAnimationFrame(faceApiLoop);
+                    return;
                 }
             }
-            faceDetectLoop = requestAnimationFrame(skinDetectLoop);
+
+            // ── Fallback: simple motion/presence detection (face-api not available) ─────────
+            // Just checks if there's something in front of the camera with enough brightness
+            // and variance. Not perfect but better than nothing.
+            const dc = document.createElement('canvas');
+            let lastTs = 0;
+            function fallbackLoop(ts) {
+                faceDetectLoop = requestAnimationFrame(fallbackLoop);
+                if (ts - lastTs < 200) return;
+                lastTs = ts;
+                if (!cameraStream || videoEl.readyState < 2) { setFaceGuide(false); return; }
+                try {
+                    dc.width = 160; dc.height = 120;
+                    const ctx = dc.getContext('2d');
+                    ctx.drawImage(videoEl, 0, 0, 160, 120);
+                    // Sample centre region (rough oval area)
+                    const imgData = ctx.getImageData(40, 15, 80, 90).data;
+                    let sum = 0, sqSum = 0, n = 0;
+                    for (let i = 0; i < imgData.length; i += 4) {
+                        const lum = (imgData[i]*77 + imgData[i+1]*150 + imgData[i+2]*29) >> 8;
+                        sum += lum; sqSum += lum*lum; n++;
+                    }
+                    const avg = sum / n;
+                    const variance = sqSum / n - avg * avg;
+                    // Something meaningful is in front of the camera
+                    setFaceGuide(avg > 20 && variance > 300);
+                } catch(e) { setFaceGuide(false); }
+            }
+            faceDetectLoop = requestAnimationFrame(fallbackLoop);
         }
         // ===== END FACE DETECTION =====
 
@@ -1999,12 +1995,13 @@
                 cameraModalVideo.muted = true;
                 cameraModalVideo.playsInline = true;
                 await cameraModalVideo.play();
+                // Do NOT enable capture button here — face detection controls it via setFaceGuide(true)
                 if (cameraModalCaptureBtn) {
-                    cameraModalCaptureBtn.disabled = false;
+                    cameraModalCaptureBtn.disabled = true;
                     cameraModalCaptureBtn.textContent = '📸 Capture';
                     cameraModalCaptureBtn.onclick = null;
                 }
-                // Start face detection
+                // Start face detection — setFaceGuide(true) will enable the button when face is aligned
                 startFaceDetection(cameraModalVideo);
             } catch (err) {
                 // Some browsers (iOS) need explicit user gesture to play
