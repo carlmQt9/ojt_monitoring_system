@@ -162,8 +162,8 @@
     margin-bottom: 4pt;
   }
   .photo-wrap img {
-    max-width: 3.2in;
-    max-height: 2.2in;
+    max-width: 2.8in;
+    max-height: 2in;
     border: 1pt solid #bbb;
     display: block;
     margin: 0 auto 2pt;
@@ -266,21 +266,77 @@
 
   <div class="day-content">
 
-    {{-- Photo — base64 embedded so Word can display it --}}
+    {{-- Photo — base64 embedded, resized to max 800px wide for faster load --}}
     @if($entry->photo_path)
     @php
       $absPath = storage_path('app/public/' . $entry->photo_path);
       $photoB64 = '';
       $mime = 'image/jpeg';
+      
       if (file_exists($absPath)) {
-        $photoB64 = base64_encode(file_get_contents($absPath));
         $ext = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
-        $mime = match($ext) {
-          'png'  => 'image/png',
-          'webp' => 'image/webp',
-          'gif'  => 'image/gif',
-          default => 'image/jpeg',
-        };
+        
+        // Resize and compress the image to reduce document size
+        try {
+          $img = null;
+          if (extension_loaded('gd')) {
+            // Use GD
+            switch($ext) {
+              case 'png':  $img = @imagecreatefrompng($absPath); break;
+              case 'webp': $img = @imagecreatefromwebp($absPath); break;
+              case 'gif':  $img = @imagecreatefromgif($absPath); break;
+              default:     $img = @imagecreatefromjpeg($absPath); break;
+            }
+            
+            if ($img) {
+              $origWidth  = imagesx($img);
+              $origHeight = imagesy($img);
+              $maxWidth   = 800;
+              
+              // Resize if wider than 800px
+              if ($origWidth > $maxWidth) {
+                $ratio     = $maxWidth / $origWidth;
+                $newWidth  = $maxWidth;
+                $newHeight = (int)($origHeight * $ratio);
+                $resized   = imagecreatetruecolor($newWidth, $newHeight);
+                
+                // Preserve transparency for PNG/GIF
+                if ($ext === 'png' || $ext === 'gif') {
+                  imagealphablending($resized, false);
+                  imagesavealpha($resized, true);
+                  $transparent = imagecolorallocatealpha($resized, 0, 0, 0, 127);
+                  imagefill($resized, 0, 0, $transparent);
+                }
+                
+                imagecopyresampled($resized, $img, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
+                imagedestroy($img);
+                $img = $resized;
+              }
+              
+              // Capture output
+              ob_start();
+              switch($ext) {
+                case 'png':  imagepng($img, null, 6); $mime = 'image/png'; break;
+                case 'webp': imagewebp($img, null, 80); $mime = 'image/webp'; break;
+                case 'gif':  imagegif($img); $mime = 'image/gif'; break;
+                default:     imagejpeg($img, null, 75); $mime = 'image/jpeg'; break;
+              }
+              $photoB64 = base64_encode(ob_get_clean());
+              imagedestroy($img);
+            }
+          } else {
+            // Fallback: just read the file (no resize)
+            $photoB64 = base64_encode(file_get_contents($absPath));
+            $mime = match($ext) {
+              'png'  => 'image/png',
+              'webp' => 'image/webp',
+              'gif'  => 'image/gif',
+              default => 'image/jpeg',
+            };
+          }
+        } catch (\Exception $e) {
+          // Silent fail — just skip the photo
+        }
       }
     @endphp
     @if($photoB64)

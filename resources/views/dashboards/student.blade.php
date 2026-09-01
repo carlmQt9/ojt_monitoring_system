@@ -1653,7 +1653,7 @@
                 <button type="button" onclick="closeNarrativeDownloadModal()"
                     class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold">Cancel</button>
                 <a id="narrativeDownloadLink" href="{{ route('narrative-report.download', $user->id) }}"
-                    onclick="closeNarrativeDownloadModal()"
+                    onclick="closeNarrativeDownloadModal(); setTimeout(() => { if(typeof showSuccess === 'function') showSuccess('📄 Narrative report downloaded successfully!'); }, 300);"
                     class="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-center transition-all">
                     ⬇ Download .doc
                 </a>
@@ -3107,13 +3107,17 @@
                 if (data.success) {
                     closeNarrativeModal();
                     const isEdit = !!_narrativeEditId;
-                    showSuccess(
-                        data.message || (isEdit
-                            ? 'Your narrative entry has been updated successfully.'
-                            : 'Day ' + (data.narrative?.day_number ?? '') + ' narrative submitted successfully.'),
-                        null,
-                        true  // reload on close
-                    );
+                    const msg = data.message || (isEdit
+                        ? 'Your narrative entry has been updated successfully.'
+                        : 'Day ' + (data.narrative?.day_number ?? '') + ' narrative submitted successfully.');
+                    
+                    // Ensure showSuccess is available
+                    if (typeof showSuccess === 'function') {
+                        showSuccess(msg, null, true);
+                    } else {
+                        alert(msg);
+                        window.location.reload();
+                    }
                 } else {
                     errEl.textContent = data.message || 'Something went wrong. Please try again.';
                     errEl.classList.remove('hidden');
