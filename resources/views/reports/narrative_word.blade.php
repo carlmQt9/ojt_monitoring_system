@@ -196,8 +196,8 @@
 {{-- ═══ LETTERHEAD ═══ --}}
 <div class="hdr">
   <div class="republic">Republic of the Philippines</div>
-  <div class="univ">Palawan State University</div>
-  <div class="address">Puerto Princesa City, Palawan</div>
+  <div class="univ">President Ramon Magsaysay State University</div>
+  <div class="address">Sta. Cruz Campus, Sta. Cruz, Zambales</div>
   <div class="title-box">OJT Narrative Report</div>
 </div>
 
@@ -216,7 +216,7 @@
   <tr>
     <td>
       <span class="lbl">Course &amp; School Year</span>
-      <span class="val-n">BSIT — {{ $student->school_year ?? '—' }}</span>
+      <span class="val-n">BSCS — {{ $student->school_year ?? '—' }}</span>
     </td>
     <td>
       <span class="lbl">Date Generated</span>
