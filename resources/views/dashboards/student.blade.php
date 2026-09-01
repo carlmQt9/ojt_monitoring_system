@@ -1340,109 +1340,291 @@
             $dbOnboardingKeys = \App\Models\RequirementTemplate::where('category','onboarding')->pluck('name')->toArray();
             $onboardingKeys = !empty($dbOnboardingKeys) ? $dbOnboardingKeys : ['Internship Application Form','Letter of Acceptance','Parental Consent','School ID','Government ID','Vaccination Card','Medical Report','Insurance'];
             $onboardingReports = $allSubmitted->filter(fn($r) => collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false));
-            $dailyReports = $allSubmitted->filter(fn($r) => !collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false))->values();
+            
+            // OT Letters only - filter by title containing 'OT', 'overtime', or 'over time'
+            $otLetters = $allSubmitted->filter(function($r) use ($onboardingKeys) {
+                $isNotOnboarding = !collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false);
+                $isOT = stripos($r->title, 'OT') !== false || 
+                        stripos($r->title, 'overtime') !== false || 
+                        stripos($r->title, 'over time') !== false;
+                return $isNotOnboarding && $isOT;
+            })->values();
+            
             $latestByTitle = $allSubmitted->groupBy(fn($r) => strtolower(trim($r->title)))
                 ->map(fn($group) => $group->sortByDesc('created_at')->first());
         ?>
 
-        <!-- Onboarding Requirements — compact grid -->
-        <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5 mb-5">
-            <h3 class="text-base font-bold text-white mb-3">📂 Onboarding Requirements</h3>
+        <!-- Onboarding Requirements — Responsive Table/Cards -->
+        <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3 sm:p-5 mb-5">
+            <h3 class="text-sm sm:text-base font-bold text-white mb-3">📂 Onboarding Requirements</h3>
             @if($onboardingReports->isNotEmpty())
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            
+            <!-- Desktop Table View (hidden on mobile) -->
+            <div class="hidden md:block overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-gray-400 uppercase bg-slate-700/30 border-b border-slate-600">
+                        <tr>
+                            <th class="px-3 py-2">Title</th>
+                            <th class="px-3 py-2">Date</th>
+                            <th class="px-3 py-2">Status</th>
+                            <th class="px-3 py-2 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/50">
+                        @foreach($onboardingReports as $req)
+                        @php $latestForThis = $latestByTitle[strtolower(trim($req->title))] ?? null; @endphp
+                        <tr class="hover:bg-slate-700/20 transition-colors">
+                            <td class="px-3 py-2.5">
+                                <div>
+                                    <p class="text-gray-200 text-sm font-medium">{{ $req->title }}</p>
+                                    @if($req->feedback)
+                                    <p class="text-xs text-blue-400 mt-1"><strong>Feedback:</strong> {{ Str::limit($req->feedback, 40) }}</p>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="px-3 py-2.5 text-gray-400 text-xs whitespace-nowrap">
+                                {{ $req->created_at->format('M d, Y') }}
+                                <br><span class="text-[10px] text-gray-500">{{ $req->created_at->format('h:i A') }}</span>
+                            </td>
+                            <td class="px-3 py-2.5">
+                                <span class="px-2 py-0.5 text-[10px] font-semibold rounded-full
+                                    @if($req->status==='approved') bg-green-500/20 text-green-400
+                                    @elseif($req->status==='denied') bg-red-500/20 text-red-400
+                                    @else bg-yellow-500/20 text-yellow-400 @endif">
+                                    {{ ucfirst($req->status) }}
+                                </span>
+                            </td>
+                            <td class="px-3 py-2.5 text-right">
+                                <div class="flex gap-1.5 justify-end">
+                                    @if($req->file_path)
+                                    <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" 
+                                        class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px]">View</button>
+                                    @endif
+                                    @if($req->status === 'denied' && $latestForThis && $latestForThis->id === $req->id)
+                                    <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" 
+                                        class="px-2 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-[10px]">Resubmit</button>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Mobile Card View (visible only on mobile) -->
+            <div class="md:hidden space-y-2">
                 @foreach($onboardingReports as $req)
                 @php $latestForThis = $latestByTitle[strtolower(trim($req->title))] ?? null; @endphp
-                <div class="bg-slate-700/40 rounded-lg border-l-4 @if($req->status==='approved') border-green-500 @elseif($req->status==='denied') border-red-500 @else border-yellow-500 @endif">
-                    <!-- Collapsed header — always visible -->
-                    <button type="button" onclick="toggleReqCard(this)"
-                        class="w-full flex items-center justify-between px-3 py-2.5 text-left gap-2">
-                        <span class="text-gray-200 text-sm font-medium truncate">{{ $req->title }}</span>
-                        <div class="flex items-center gap-2 shrink-0">
-                            <span class="px-2 py-0.5 text-xs font-semibold rounded-full
-                                @if($req->status==='approved') bg-green-500/20 text-green-400
-                                @elseif($req->status==='denied') bg-red-500/20 text-red-400
-                                @else bg-yellow-500/20 text-yellow-400 @endif">
-                                {{ ucfirst($req->status) }}
-                            </span>
-                            <span class="text-gray-500 text-xs">{{ $req->created_at->format('M d') }}</span>
-                            <svg class="w-3.5 h-3.5 text-gray-500 req-chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                        </div>
-                    </button>
-                    <!-- Expandable detail -->
-                    <div class="req-detail hidden px-3 pb-3 space-y-1.5 border-t border-slate-600/50 pt-2">
-                        @if($req->feedback)
-                        <p class="text-xs text-gray-400 bg-slate-800/50 px-2 py-1.5 rounded border-l border-blue-500"><strong>Feedback:</strong> {{ $req->feedback }}</p>
+                <div class="bg-slate-700/30 rounded-lg p-3 border-l-4 
+                    @if($req->status==='approved') border-green-500
+                    @elseif($req->status==='denied') border-red-500
+                    @else border-yellow-500 @endif">
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                        <p class="text-white text-sm font-medium flex-1">{{ $req->title }}</p>
+                        <span class="px-2 py-0.5 text-[10px] font-semibold rounded-full shrink-0
+                            @if($req->status==='approved') bg-green-500/20 text-green-400
+                            @elseif($req->status==='denied') bg-red-500/20 text-red-400
+                            @else bg-yellow-500/20 text-yellow-400 @endif">
+                            {{ ucfirst($req->status) }}
+                        </span>
+                    </div>
+                    <p class="text-gray-400 text-xs mb-2">{{ $req->created_at->format('M d, Y h:i A') }}</p>
+                    @if($req->feedback)
+                    <p class="text-xs text-blue-400 mb-2 bg-slate-800/50 px-2 py-1 rounded">
+                        <strong>Feedback:</strong> {{ $req->feedback }}
+                    </p>
+                    @endif
+                    <div class="flex gap-2">
+                        @if($req->file_path)
+                        <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" 
+                            class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">View</button>
                         @endif
-                        <div class="flex gap-2 flex-wrap">
-                            @if($req->file_path)
-                            <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" class="text-blue-400 hover:text-blue-300 text-xs">📎 View File</button>
-                            @endif
-                            @if($req->status === 'denied')
-                                @if($latestForThis && $latestForThis->id === $req->id)
-                                <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" class="text-orange-400 hover:text-orange-300 text-xs">↺ Resubmit</button>
-                                @else
-                                <span class="text-gray-500 text-xs">↺ Resubmitted</span>
-                                @endif
-                            @endif
-                        </div>
+                        @if($req->status === 'denied' && $latestForThis && $latestForThis->id === $req->id)
+                        <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" 
+                            class="px-2.5 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs">Resubmit</button>
+                        @endif
                     </div>
                 </div>
                 @endforeach
             </div>
+            
             @else
-            <p class="text-gray-400 text-sm text-center py-4">No onboarding documents submitted yet.</p>
+            <p class="text-gray-400 text-xs sm:text-sm text-center py-4">No onboarding documents submitted yet.</p>
             @endif
         </div>
 
-        <!-- Daily Narrative — table with show more -->
+        <!-- Daily Submissions — OT Letters Only (Responsive) -->
+        <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3 sm:p-5 mb-5">
+            <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+                <h3 class="text-sm sm:text-base font-bold text-white">📋 Daily Submissions
+                    <span class="ml-1 px-1.5 py-0.5 bg-slate-700 text-gray-400 text-[10px] rounded-full font-normal">{{ $otLetters->count() }}</span>
+                </h3>
+                <button type="button" onclick="openUploadModal('OT Letter')" class="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap">+ Upload</button>
+            </div>
+
+            @if($otLetters->isNotEmpty())
+            <!-- Filter tabs -->
+            <div class="flex gap-1.5 sm:gap-2 mb-3 flex-wrap" id="dailySubmissionsTabs">
+                <button onclick="filterDailySubmissions('all')" class="daily-tab-btn active px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-[10px] sm:text-xs font-semibold">
+                    All ({{ $otLetters->count() }})
+                </button>
+                <button onclick="filterDailySubmissions('pending')" class="daily-tab-btn px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-700/50 hover:bg-slate-600 text-gray-300 rounded-lg text-[10px] sm:text-xs font-semibold">
+                    Pending ({{ $otLetters->where('status', 'pending')->count() }})
+                </button>
+                <button onclick="filterDailySubmissions('approved')" class="daily-tab-btn px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-700/50 hover:bg-slate-600 text-gray-300 rounded-lg text-[10px] sm:text-xs font-semibold">
+                    Approved ({{ $otLetters->where('status', 'approved')->count() }})
+                </button>
+                <button onclick="filterDailySubmissions('denied')" class="daily-tab-btn px-2 sm:px-3 py-1 sm:py-1.5 bg-slate-700/50 hover:bg-slate-600 text-gray-300 rounded-lg text-[10px] sm:text-xs font-semibold">
+                    Denied ({{ $otLetters->where('status', 'denied')->count() }})
+                </button>
+            </div>
+
+            <!-- Desktop Table View (hidden on mobile) -->
+            <div class="hidden md:block overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-gray-400 uppercase bg-slate-700/30 border-b border-slate-600">
+                        <tr>
+                            <th class="px-3 py-2">Title</th>
+                            <th class="px-3 py-2">Date</th>
+                            <th class="px-3 py-2">Status</th>
+                            <th class="px-3 py-2 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/50">
+                        @foreach($otLetters as $req)
+                        @php $latestForThis = $latestByTitle[strtolower(trim($req->title))] ?? null; @endphp
+                        <tr class="daily-submission-row hover:bg-slate-700/20 transition-colors" data-status="{{ $req->status }}">
+                            <td class="px-3 py-2.5">
+                                <div>
+                                    <p class="text-gray-200 text-sm font-medium">{{ $req->title }}</p>
+                                    @if($req->feedback)
+                                    <p class="text-xs text-blue-400 mt-1"><strong>Feedback:</strong> {{ Str::limit($req->feedback, 40) }}</p>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="px-3 py-2.5 text-gray-400 text-xs whitespace-nowrap">
+                                {{ $req->created_at->format('M d, Y') }}
+                                <br><span class="text-[10px] text-gray-500">{{ $req->created_at->format('h:i A') }}</span>
+                            </td>
+                            <td class="px-3 py-2.5">
+                                <span class="px-2 py-0.5 text-[10px] font-semibold rounded-full
+                                    @if($req->status==='approved') bg-green-500/20 text-green-400
+                                    @elseif($req->status==='denied') bg-red-500/20 text-red-400
+                                    @else bg-yellow-500/20 text-yellow-400 @endif">
+                                    {{ ucfirst($req->status) }}
+                                </span>
+                            </td>
+                            <td class="px-3 py-2.5 text-right">
+                                <div class="flex gap-1.5 justify-end">
+                                    @if($req->file_path)
+                                    <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" 
+                                        class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px]">View</button>
+                                    @endif
+                                    @if($req->status === 'denied' && $latestForThis && $latestForThis->id === $req->id)
+                                    <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" 
+                                        class="px-2 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-[10px]">Resubmit</button>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Mobile Card View (visible only on mobile) -->
+            <div class="md:hidden space-y-2">
+                @foreach($otLetters as $req)
+                @php $latestForThis = $latestByTitle[strtolower(trim($req->title))] ?? null; @endphp
+                <div class="daily-submission-row bg-slate-700/30 rounded-lg p-3 border-l-4 
+                    @if($req->status==='approved') border-green-500
+                    @elseif($req->status==='denied') border-red-500
+                    @else border-yellow-500 @endif"
+                    data-status="{{ $req->status }}">
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                        <p class="text-white text-sm font-medium flex-1">{{ $req->title }}</p>
+                        <span class="px-2 py-0.5 text-[10px] font-semibold rounded-full shrink-0
+                            @if($req->status==='approved') bg-green-500/20 text-green-400
+                            @elseif($req->status==='denied') bg-red-500/20 text-red-400
+                            @else bg-yellow-500/20 text-yellow-400 @endif">
+                            {{ ucfirst($req->status) }}
+                        </span>
+                    </div>
+                    <p class="text-gray-400 text-xs mb-2">{{ $req->created_at->format('M d, Y h:i A') }}</p>
+                    @if($req->feedback)
+                    <p class="text-xs text-blue-400 mb-2 bg-slate-800/50 px-2 py-1 rounded">
+                        <strong>Feedback:</strong> {{ $req->feedback }}
+                    </p>
+                    @endif
+                    <div class="flex gap-2">
+                        @if($req->file_path)
+                        <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" 
+                            class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs">View</button>
+                        @endif
+                        @if($req->status === 'denied' && $latestForThis && $latestForThis->id === $req->id)
+                        <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" 
+                            class="px-2.5 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs">Resubmit</button>
+                        @endif
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            
+            @else
+            <p class="text-gray-400 text-xs sm:text-sm text-center py-4 sm:py-6">No OT letters submitted yet. Click <strong>+ Upload</strong> to submit an OT letter.</p>
+            @endif
+        </div>
+
+        <!-- Daily Narrative — Responsive List -->
         @php
             $narrativeReports = \App\Models\DailyNarrative::where('student_id', $user->id)
                 ->orderBy('day_number', 'desc')->get();
         @endphp
-        <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+        <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3 sm:p-5">
             <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
-                <h3 class="text-base font-bold text-white">📒 Daily Narrative
-                    <span class="ml-1 px-2 py-0.5 bg-slate-700 text-gray-400 text-xs rounded-full font-normal">{{ $narrativeReports->count() }}</span>
+                <h3 class="text-sm sm:text-base font-bold text-white">📒 Daily Narrative
+                    <span class="ml-1 px-1.5 py-0.5 bg-slate-700 text-gray-400 text-[10px] rounded-full font-normal">{{ $narrativeReports->count() }}</span>
                 </h3>
-                <div class="flex gap-2 flex-wrap">
+                <div class="flex gap-1.5 sm:gap-2 flex-wrap">
                     @if($narrativeReports->isNotEmpty())
-                    <button type="button" onclick="openNarrativeDownloadModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap">⬇ Download</button>
+                    <button type="button" onclick="openNarrativeDownloadModal()" class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap">⬇ Download</button>
                     @endif
-                    <button type="button" onclick="openNarrativeModal(null,'')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap">+ Daily Report</button>
+                    <button type="button" onclick="openNarrativeModal(null,'')" class="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap">+ Daily Report</button>
                 </div>
             </div>
 
             @if($narrativeReports->isNotEmpty())
             <!-- Mobile-friendly card list -->
-            <div class="space-y-2">
+            <div class="space-y-1.5 sm:space-y-2">
                 @foreach($narrativeReports as $i => $nr)
                 <div class="narrative-entry-row @if($i >= 10) hidden @endif
-                    flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg border border-slate-700/50
+                    flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-slate-700/30 rounded-lg border border-slate-700/50
                     hover:bg-slate-700/50 transition-colors cursor-pointer"
                     data-narrative-id="{{ $nr->id }}"
                     onclick="openNarrativeViewModal({{ $nr->id }},'{{ addslashes($nr->description) }}','{{ $nr->photo_url }}',{{ $nr->day_number }},'{{ \Carbon\Carbon::parse($nr->report_date)->format('M d, Y') }}')">
 
                     {{-- Day badge --}}
-                    <div class="w-10 h-10 bg-indigo-500/20 border border-indigo-500/30 rounded-lg flex items-center justify-center shrink-0">
-                        <span class="text-indigo-400 text-xs font-bold">D{{ $nr->day_number }}</span>
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 bg-indigo-500/20 border border-indigo-500/30 rounded-lg flex items-center justify-center shrink-0">
+                        <span class="text-indigo-400 text-[10px] sm:text-xs font-bold">D{{ $nr->day_number }}</span>
                     </div>
 
                     {{-- Content --}}
                     <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2 flex-wrap">
-                            <span class="text-gray-400 text-[11px] whitespace-nowrap">{{ \Carbon\Carbon::parse($nr->report_date)->format('M d, Y') }}</span>
+                        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                            <span class="text-gray-400 text-[10px] sm:text-[11px] whitespace-nowrap">{{ \Carbon\Carbon::parse($nr->report_date)->format('M d, Y') }}</span>
                             @if($nr->photo_path)
                             <span class="text-indigo-400 text-[10px]">📷</span>
                             @endif
                         </div>
-                        <p class="text-gray-200 text-xs font-medium leading-snug mt-0.5 truncate">{{ Str::limit($nr->description, 60) }}</p>
+                        <p class="text-gray-200 text-[11px] sm:text-xs font-medium leading-snug mt-0.5 truncate">{{ Str::limit($nr->description, 50) }}</p>
                     </div>
 
                     {{-- Actions --}}
                     <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
                         <button type="button"
                             onclick="openNarrativeModal({{ $nr->id }},'{{ addslashes($nr->description) }}')"
-                            class="w-7 h-7 flex items-center justify-center bg-slate-600 hover:bg-slate-500 text-gray-300 rounded text-xs">✏</button>
+                            class="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center bg-slate-600 hover:bg-slate-500 text-gray-300 rounded text-[10px] sm:text-xs">✏</button>
                     </div>
                 </div>
                 @endforeach
@@ -1450,16 +1632,16 @@
             </div>
 
             @if($narrativeReports->count() > 10)
-            <div class="mt-3 text-center">
+            <div class="mt-2 sm:mt-3 text-center">
                 <button id="showMoreNarrativeBtn" onclick="showMoreNarratives()"
-                    class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-lg text-xs">
+                    class="px-3 sm:px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-lg text-[11px] sm:text-xs">
                     Show more ({{ $narrativeReports->count() - 10 }} remaining)
                 </button>
             </div>
             @endif
 
             @else
-            <p class="text-gray-400 text-sm text-center py-6">No narrative entries yet. Click <strong>+ Daily Report</strong> to start.</p>
+            <p class="text-gray-400 text-xs sm:text-sm text-center py-4 sm:py-6">No narrative entries yet. Click <strong>+ Daily Report</strong> to start.</p>
             @endif
         </div>
 
@@ -2972,6 +3154,27 @@
                 if (remaining <= 0) btn.classList.add('hidden');
                 else btn.textContent = 'Show more (' + remaining + ' remaining)';
             }
+        }
+
+        // ===== DAILY SUBMISSIONS FILTER =====
+        function filterDailySubmissions(status) {
+            // Update tab styles
+            document.querySelectorAll('.daily-tab-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-slate-700', 'text-white');
+                btn.classList.add('bg-slate-700/50', 'text-gray-300');
+            });
+            event.target.classList.add('active', 'bg-slate-700', 'text-white');
+            event.target.classList.remove('bg-slate-700/50', 'text-gray-300');
+
+            // Filter rows
+            const rows = document.querySelectorAll('.daily-submission-row');
+            rows.forEach(row => {
+                if (status === 'all' || row.dataset.status === status) {
+                    row.classList.remove('hidden');
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
         }
 
         // ===== NARRATIVE REPORT =====
