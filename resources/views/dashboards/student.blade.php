@@ -1662,28 +1662,6 @@
     </div>
     <!-- ===== END NARRATIVE DOWNLOAD MODAL ===== -->
 
-    <!-- ===== NARRATIVE SUCCESS NOTIFICATION ===== -->
-    <div id="narrativeSuccessToast"
-        class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-[200] w-[90vw] max-w-sm
-               bg-slate-800 border border-green-500/60 rounded-2xl shadow-2xl shadow-green-500/20
-               flex items-start gap-4 px-5 py-4 transition-all duration-300">
-        <!-- Icon -->
-        <div class="w-10 h-10 bg-green-500/20 border border-green-500/40 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-            <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-            </svg>
-        </div>
-        <!-- Text -->
-        <div class="flex-1 min-w-0">
-            <p id="narrativeToastTitle" class="text-white font-bold text-sm leading-tight">Submitted!</p>
-            <p id="narrativeToastMsg" class="text-green-300 text-xs mt-1 leading-snug"></p>
-        </div>
-        <!-- Close -->
-        <button onclick="closeNarrativeToast()"
-            class="shrink-0 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors text-sm mt-0.5">✕</button>
-    </div>
-    <!-- ===== END NARRATIVE SUCCESS NOTIFICATION ===== -->
-
     <!-- OT Summary Modal (shown before final time-out) -->
     <div id="otSummaryModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4">
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
@@ -3129,11 +3107,12 @@
                 if (data.success) {
                     closeNarrativeModal();
                     const isEdit = !!_narrativeEditId;
-                    showNarrativeToast(
-                        isEdit ? '✏ Entry Updated!' : '✅ Submitted!',
+                    showSuccess(
                         data.message || (isEdit
                             ? 'Your narrative entry has been updated successfully.'
-                            : 'Day ' + (data.narrative?.day_number ?? '') + ' narrative submitted successfully.')
+                            : 'Day ' + (data.narrative?.day_number ?? '') + ' narrative submitted successfully.'),
+                        null,
+                        true  // reload on close
                     );
                 } else {
                     errEl.textContent = data.message || 'Something went wrong. Please try again.';
@@ -3182,28 +3161,6 @@
             document.getElementById('narrativeDownloadModal').classList.add('hidden');
         }
         // ===== END NARRATIVE REPORT =====
-
-        // ─── Narrative success toast ───
-        let _narrativeToastTimer = null;
-        function showNarrativeToast(title, msg) {
-            const toast = document.getElementById('narrativeSuccessToast');
-            document.getElementById('narrativeToastTitle').textContent = title;
-            document.getElementById('narrativeToastMsg').textContent   = msg;
-            toast.classList.remove('hidden');
-            toast.style.opacity = '1';
-            // Auto-dismiss after 2.5 s then reload
-            if (_narrativeToastTimer) clearTimeout(_narrativeToastTimer);
-            _narrativeToastTimer = setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => { window.location.reload(); }, 300);
-            }, 2500);
-        }
-        function closeNarrativeToast() {
-            if (_narrativeToastTimer) clearTimeout(_narrativeToastTimer);
-            document.getElementById('narrativeSuccessToast').classList.add('hidden');
-            window.location.reload();
-        }
-        // ─── End narrative success toast ───
 
         // ===== REPORTS SECTION =====
         function toggleReqCard(btn) {
