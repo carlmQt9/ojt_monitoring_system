@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use App\Models\User;
+use App\Models\StudentSchoolId;
 
 /**
  * Authentication Middleware
@@ -52,6 +53,25 @@ class AuthMiddleware
             
             return redirect()->route('login')
                 ->withErrors(['auth' => 'Your account no longer exists.']);
+        }
+
+        // Block students whose school ID has been archived — they cannot access any route
+        if ($user->role === 'student' && $user->school_id_number) {
+            $schoolIdArchived = \App\Models\StudentSchoolId::withTrashed()
+                ->where('school_id_number', $user->school_id_number)
+                ->whereNotNull('deleted_at')
+                ->exists();
+            if ($schoolIdArchived) {
+                session()->flush();
+                if ($request->expectsJson() || $request->is('api/*')) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Your School ID has been archived. Please contact the administrator.'
+                    ], 403);
+                }
+                return redirect()->route('login')
+                    ->withErrors(['auth' => 'Your School ID has been archived. Please contact the administrator.']);
+            }
         }
 
         // Sync session with latest user data

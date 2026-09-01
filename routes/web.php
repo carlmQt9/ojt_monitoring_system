@@ -93,9 +93,18 @@ Route::post('/register', function () {
             return back()->withErrors(['school_id_number' => 'School ID number is required for students.'])->withInput();
         }
         $schoolId = \App\Models\StudentSchoolId::where('school_id_number', $validated['school_id_number'])
-            ->where('is_used', false)->first();
+            ->where('is_used', false)
+            ->whereNull('deleted_at')  // archived IDs are not available
+            ->first();
         if (!$schoolId) {
-            return back()->withErrors(['school_id_number' => 'This School ID is not on the approved list or has already been used.'])->withInput();
+            // Give a specific message if the ID is archived vs just used/missing
+            $archived = \App\Models\StudentSchoolId::withTrashed()
+                ->where('school_id_number', $validated['school_id_number'])
+                ->whereNotNull('deleted_at')->exists();
+            $errorMsg = $archived
+                ? 'This School ID is archived and cannot be used for registration.'
+                : 'This School ID is not on the approved list or has already been used.';
+            return back()->withErrors(['school_id_number' => $errorMsg])->withInput();
         }
     }
 
@@ -138,6 +147,7 @@ Route::get('/dashboard', function () {
         session()->flush();
         return redirect('/login');
     }
+
     session(['user' => $user]); // keep session in sync
 
     // ===== AUTO-TIMEOUT: if student forgot to time out before lunch =====
@@ -1403,29 +1413,35 @@ Route::post('/reset-password', function () {
 Route::middleware('auth.custom')->group(function () {
 
 Route::get('/api/school-ids', function () {
-    // Auto-sync is_used: any school_id_number that belongs to a registered student = used
-    $usedIds = \App\Models\User::whereNotNull('school_id_number')
+    // Auto-sync is_used: any school_id_number that belongs to an ACTIVE (non-deleted) registered student = used.
+    // Use withTrashed so we can distinguish active vs deleted users.
+    $activeUsedIds = \App\Models\User::whereNotNull('school_id_number')
+        ->whereNull('deleted_at')  // only active users
         ->pluck('school_id_number')
         ->filter()
         ->unique()
         ->toArray();
 
-    if (!empty($usedIds)) {
-        // Mark as used where a student exists
-        \App\Models\StudentSchoolId::whereIn('school_id_number', $usedIds)
+    // Mark as used where an ACTIVE student exists
+    if (!empty($activeUsedIds)) {
+        \App\Models\StudentSchoolId::whereIn('school_id_number', $activeUsedIds)
             ->where('is_used', false)
+            ->whereNull('deleted_at')
             ->update(['is_used' => true]);
-        // Mark as available where no student exists (handles deleted users)
-        \App\Models\StudentSchoolId::whereNotIn('school_id_number', $usedIds)
-            ->where('is_used', true)
-            ->whereNull('deleted_at')
-            ->update(['is_used' => false]);
-    } else {
-        // No students at all — reset all non-archived to available
-        \App\Models\StudentSchoolId::where('is_used', true)
-            ->whereNull('deleted_at')
-            ->update(['is_used' => false]);
     }
+
+    // Mark as available where NO active student exists AND the school ID is not archived
+    // (archived school IDs keep is_used=true regardless — they cannot be freed this way)
+    \App\Models\StudentSchoolId::whereNotIn('school_id_number', $activeUsedIds)
+        ->where('is_used', true)
+        ->whereNull('deleted_at')
+        ->whereNotExists(function($q) {
+            // Safety: don't free it if any user (even soft-deleted) still holds this ID
+            $q->from('users')
+              ->whereColumn('users.school_id_number', 'student_school_ids.school_id_number')
+              ->whereNull('users.deleted_at');
+        })
+        ->update(['is_used' => false]);
 
     $sy = request('school_year');
     $query = \App\Models\StudentSchoolId::orderBy('created_at', 'desc');
