@@ -1283,21 +1283,21 @@
                 $todayNarrative = $narratives->first(fn($n) => $n->report_date->isToday());
             @endphp
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
                     <div>
                         <h3 class="text-lg font-bold text-white">📒 Daily Narrative</h3>
                         <p class="text-gray-400 text-xs mt-1">Daily OJT journal entries</p>
                     </div>
-                    <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap justify-end">
                         @if($narratives->isNotEmpty())
                         <button type="button" onclick="openNarrativeDownloadModal()"
-                            class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">
-                            ⬇ Download Report
+                            class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap">
+                            ⬇ Download
                         </button>
                         @endif
                         <button type="button"
                             onclick="openNarrativeModal({{ $todayNarrative ? $todayNarrative->id : 'null' }}, '{{ $todayNarrative ? addslashes($todayNarrative->description) : '' }}')"
-                            class="px-3 py-2 {{ $todayNarrative ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700' }} text-white rounded-lg text-sm font-semibold">
+                            class="px-3 py-1.5 {{ $todayNarrative ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700' }} text-white rounded-lg text-xs font-semibold whitespace-nowrap">
                             {{ $todayNarrative ? '✏ Edit Today' : '+ Daily Report' }}
                         </button>
                     </div>
@@ -1404,56 +1404,49 @@
                 <h3 class="text-base font-bold text-white">📒 Daily Narrative
                     <span class="ml-1 px-2 py-0.5 bg-slate-700 text-gray-400 text-xs rounded-full font-normal">{{ $narrativeReports->count() }}</span>
                 </h3>
-                <div class="flex gap-2">
+                <div class="flex gap-2 flex-wrap">
                     @if($narrativeReports->isNotEmpty())
-                    <button type="button" onclick="openNarrativeDownloadModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">⬇ Download Report</button>
+                    <button type="button" onclick="openNarrativeDownloadModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap">⬇ Download</button>
                     @endif
-                    <button type="button" onclick="openNarrativeModal(null,'')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold">+ Daily Report</button>
+                    <button type="button" onclick="openNarrativeModal(null,'')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap">+ Daily Report</button>
                 </div>
             </div>
 
             @if($narrativeReports->isNotEmpty())
-            <!-- Compact table -->
-            <div class="overflow-hidden rounded-lg border border-slate-700">
-                <table class="w-full text-xs">
-                    <thead class="bg-slate-700/60">
-                        <tr>
-                            <th class="text-left py-2 px-3 text-gray-400 font-semibold">Day</th>
-                            <th class="text-left py-2 px-3 text-gray-400 font-semibold">Summary</th>
-                            <th class="text-center py-2 px-3 text-gray-400 font-semibold w-24">Date</th>
-                            <th class="text-center py-2 px-3 text-gray-400 font-semibold w-16">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($narrativeReports as $i => $nr)
-                        <tr class="narrative-entry-row border-t border-slate-700/50 hover:bg-slate-700/20 transition-colors @if($i >= 10) hidden @endif"
-                            data-narrative-id="{{ $nr->id }}">
-                            <td class="py-2 px-3">
-                                <div class="w-9 h-9 bg-indigo-500/20 border border-indigo-500/30 rounded-lg flex items-center justify-center mx-auto">
-                                    <span class="text-indigo-400 text-xs font-bold">D{{ $nr->day_number }}</span>
-                                </div>
-                            </td>
-                            <td class="py-2 px-3">
-                                <p class="text-gray-200 font-medium leading-tight truncate max-w-[220px]">{{ Str::limit($nr->description, 70) }}</p>
-                                @if($nr->photo_path)
-                                <span class="text-indigo-400 text-[10px]">📷 photo attached</span>
-                                @endif
-                            </td>
-                            <td class="py-2 px-3 text-center text-gray-400">{{ \Carbon\Carbon::parse($nr->report_date)->format('M d, Y') }}</td>
-                            <td class="py-2 px-3 text-center">
-                                <div class="flex items-center justify-center gap-1">
-                                    <button type="button"
-                                        onclick="openNarrativeViewModal({{ $nr->id }},'{{ addslashes($nr->description) }}','{{ $nr->photo_url }}',{{ $nr->day_number }},'{{ \Carbon\Carbon::parse($nr->report_date)->format('M d, Y') }}')"
-                                        class="px-2 py-1 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-[10px]">View</button>
-                                    <button type="button"
-                                        onclick="openNarrativeModal({{ $nr->id }},'{{ addslashes($nr->description) }}')"
-                                        class="px-2 py-1 bg-slate-600 hover:bg-slate-500 text-gray-300 rounded text-[10px]">✏</button>
-                                </div>
-                            </td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+            <!-- Mobile-friendly card list -->
+            <div class="space-y-2">
+                @foreach($narrativeReports as $i => $nr)
+                <div class="narrative-entry-row @if($i >= 10) hidden @endif
+                    flex items-center gap-3 p-3 bg-slate-700/30 rounded-lg border border-slate-700/50
+                    hover:bg-slate-700/50 transition-colors cursor-pointer"
+                    data-narrative-id="{{ $nr->id }}"
+                    onclick="openNarrativeViewModal({{ $nr->id }},'{{ addslashes($nr->description) }}','{{ $nr->photo_url }}',{{ $nr->day_number }},'{{ \Carbon\Carbon::parse($nr->report_date)->format('M d, Y') }}')">
+
+                    {{-- Day badge --}}
+                    <div class="w-10 h-10 bg-indigo-500/20 border border-indigo-500/30 rounded-lg flex items-center justify-center shrink-0">
+                        <span class="text-indigo-400 text-xs font-bold">D{{ $nr->day_number }}</span>
+                    </div>
+
+                    {{-- Content --}}
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-gray-400 text-[11px] whitespace-nowrap">{{ \Carbon\Carbon::parse($nr->report_date)->format('M d, Y') }}</span>
+                            @if($nr->photo_path)
+                            <span class="text-indigo-400 text-[10px]">📷</span>
+                            @endif
+                        </div>
+                        <p class="text-gray-200 text-xs font-medium leading-snug mt-0.5 truncate">{{ Str::limit($nr->description, 60) }}</p>
+                    </div>
+
+                    {{-- Actions --}}
+                    <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
+                        <button type="button"
+                            onclick="openNarrativeModal({{ $nr->id }},'{{ addslashes($nr->description) }}')"
+                            class="w-7 h-7 flex items-center justify-center bg-slate-600 hover:bg-slate-500 text-gray-300 rounded text-xs">✏</button>
+                    </div>
+                </div>
+                @endforeach
+            </div>
             </div>
 
             @if($narrativeReports->count() > 10)
