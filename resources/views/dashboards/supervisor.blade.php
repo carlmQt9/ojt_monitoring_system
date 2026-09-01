@@ -368,11 +368,7 @@
 
                 foreach($supervisorStudents as $student) {
                     $studentHours = \App\Models\StudentHours::where('student_id', $student->id)->first();
-                    $actualCompleted = \App\Models\TimeInRecord::where('student_id', $student->id)
-                        ->whereNotNull('time_out')
-                        ->get()
-                        ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
-                    $displayHours = max($studentHours->hours_completed ?? 0, $actualCompleted);
+                    $displayHours = $studentHours->hours_completed ?? 0;
                     $required = $studentHours->total_hours_required ?? 600;
                     $progress = $required > 0 ? ($displayHours / $required) * 100 : 0;
                     $totalProgress += $progress;
@@ -412,8 +408,7 @@
             foreach($supervisorStudents as $_s2) {
                 $_sh3 = \App\Models\StudentHours::where('student_id',$_s2->id)->first();
                 $_req3 = $_sh3 ? $_sh3->total_hours_required : 600;
-                $_done3 = \App\Models\TimeInRecord::where('student_id',$_s2->id)->whereNotNull('time_out')->get()
-                    ->sum(fn($r)=>\Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out))/60);
+                $_done3 = $_sh3 ? ($_sh3->hours_completed ?? 0) : 0;
                 $_progLabels[] = explode(' ',$_s2->name)[0]; // first name only
                 $_progData[] = $_req3>0 ? round(min(($_done3/$_req3)*100,100),1) : 0;
             }
@@ -514,12 +509,9 @@
                         ['student_id' => $student->id],
                         ['total_hours_required' => 600, 'hours_completed' => 0, 'hours_remaining' => 600]
                     );
-                    $actualCompleted = \App\Models\TimeInRecord::where('student_id', $student->id)
-                        ->whereNotNull('time_out')
-                        ->get()
-                        ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
-                    $studentHours->hours_completed = max($studentHours->hours_completed ?? 0, $actualCompleted);
-                    $progressPercentage = ($studentHours->hours_completed / ($studentHours->total_hours_required ?? 600)) * 100;
+                    $progressPercentage = ($studentHours->total_hours_required ?? 600) > 0
+                        ? ($studentHours->hours_completed / ($studentHours->total_hours_required ?? 600)) * 100
+                        : 0;
                     $dailyLogs = \App\Models\DailyHourLog::where('student_id', $student->id)->orderBy('log_date', 'desc')->limit(7)->get();
                     $pendingTimeEdits = \App\Models\TimeInRecord::where('student_id', $student->id)->where('status', 'pending')->count();
                     $timeInRecords = \App\Models\TimeInRecord::where('student_id', $student->id)->orderBy('date', 'desc')->limit(5)->get();
@@ -802,10 +794,12 @@
                                         $displayLogDate = \Carbon\Carbon::parse($logDate)->format('M d, Y');
                                         $dayStatus = $dayLogs->first()->status ?? 'pending';
                                         // Check if afternoon session has no time_out (forgot to time out)
+                                        // Exclude records with time_out = '00:00' — those are real midnight time-outs
                                         $hasIncomplete = \App\Models\TimeInRecord::where('student_id', $student->id)
                                             ->whereDate('date', $logDate)
                                             ->where('session', 'afternoon')
                                             ->whereNull('time_out')
+                                            ->where('status', '!=', 'denied')
                                             ->exists();
                                         $allApproved = $dayLogs->every(fn($r) => $r->status === 'approved');
                                         $allDenied   = $dayLogs->every(fn($r) => $r->status === 'denied');
@@ -833,6 +827,7 @@
                                                         ->whereDate('date', $logDate)
                                                         ->where('session', 'afternoon')
                                                         ->whereNull('time_out')
+                                                        ->where('status', '!=', 'denied')
                                                         ->update([
                                                             'time_out'      => '00:00',
                                                             'regular_hours' => 0,
@@ -1033,9 +1028,7 @@
             @php
                 $certStudents = $supervisorStudents->map(function($s) {
                     $sh = \App\Models\StudentHours::where('student_id', $s->id)->first();
-                    $actual = \App\Models\TimeInRecord::where('student_id', $s->id)->whereNotNull('time_out')->get()
-                        ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
-                    $s->_hours    = round(max($sh->hours_completed ?? 0, $actual), 2);
+                    $s->_hours    = round($sh->hours_completed ?? 0, 2);
                     $s->_required = $sh->total_hours_required ?? 600;
                     $s->_done     = $s->_hours >= $s->_required;
                     return $s;

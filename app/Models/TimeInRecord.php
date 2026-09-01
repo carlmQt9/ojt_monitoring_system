@@ -30,11 +30,14 @@ class TimeInRecord extends Model
         'ot_status',
     ];
 
-    // Returns total minutes worked for this record
+    // Returns total minutes worked for this record (cross-midnight safe)
     public function getMinutesWorkedAttribute(): float
     {
         if (!$this->time_in || !$this->time_out) return 0;
-        return max(0, \Carbon\Carbon::parse($this->time_in)->diffInMinutes(\Carbon\Carbon::parse($this->time_out)));
+        $i = \Carbon\Carbon::parse($this->time_in);
+        $o = \Carbon\Carbon::parse($this->time_out);
+        if ($o->lte($i)) $o->addDay(); // handles midnight crossing
+        return max(0, $i->diffInMinutes($o));
     }
 
     // Returns hours worked rounded to 2 decimals

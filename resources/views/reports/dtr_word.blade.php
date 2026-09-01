@@ -183,10 +183,11 @@
           @php
             $hrs=0; $amIn=''; $amOut=''; $pmIn=''; $pmOut='';
             if ($rec->time_out) {
-              $hrs = round(\Carbon\Carbon::parse($rec->time_in)->diffInMinutes(\Carbon\Carbon::parse($rec->time_out))/60,2);
-              $monthHours += $hrs;
               $tIn  = \Carbon\Carbon::parse($rec->time_in);
               $tOut = \Carbon\Carbon::parse($rec->time_out);
+              if ($tOut->lte($tIn)) $tOut->addDay(); // cross-midnight fix
+              $hrs = round($tIn->diffInMinutes($tOut)/60,2);
+              $monthHours += $hrs;
               if ($tIn->hour < 12) {
                 $amIn = $tIn->format('h:i A');
                 if ($tOut->hour < 12) { $amOut = $tOut->format('h:i A'); }

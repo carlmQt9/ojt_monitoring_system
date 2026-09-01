@@ -337,8 +337,7 @@
             foreach($_studentsAll as $_s){
                 $_sh2 = \App\Models\StudentHours::where('student_id',$_s->id)->first();
                 $_req2 = $_sh2 ? $_sh2->total_hours_required : 600;
-                $_done2 = \App\Models\TimeInRecord::where('student_id',$_s->id)->whereNotNull('time_out')->get()
-                    ->sum(fn($r)=>\Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out))/60);
+                $_done2 = $_sh2 ? ($_sh2->hours_completed ?? 0) : 0;
                 $_pct2 = $_req2>0 ? ($_done2/$_req2)*100 : 0;
                 if($_pct2<=25) $_buckets['0-25%']++;
                 elseif($_pct2<=50) $_buckets['26-50%']++;
@@ -348,7 +347,7 @@
             // Reports status counts
             $_repApproved = \App\Models\StudentRequirement::where('status','approved')->whereHas('student')->count();
             $_repPending  = \App\Models\StudentRequirement::where('status','pending')->whereHas('student')->count();
-            $_repRejected = \App\Models\StudentRequirement::where('status','rejected')->whereHas('student')->count();
+            $_repRejected = \App\Models\StudentRequirement::where('status','denied')->whereHas('student')->count();
             // Top 5 companies by intern count
             $_topCompanies = \App\Models\Company::withCount('students')->orderByDesc('students_count')->limit(5)->get();
             // Time-ins last 7 days
@@ -674,11 +673,8 @@
                                             ['student_id' => $student->id],
                                             ['total_hours_required' => 600, 'hours_completed' => 0, 'hours_remaining' => 600]
                                         );
-                                        $actualCompleted = \App\Models\TimeInRecord::where('student_id', $student->id)
-                                            ->whereNotNull('time_out')
-                                            ->get()
-                                            ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
-                                        $displayCompleted = max($studentHours->hours_completed ?? 0, $actualCompleted);
+                                        $actualCompleted = $studentHours->hours_completed ?? 0;
+                                        $displayCompleted = $actualCompleted;
                                         $required = $studentHours->total_hours_required ?? 600;
                                         $progressPct = round(($displayCompleted / $required) * 100, 2);
                                         $pendingLogs = \App\Models\DailyHourLog::where('student_id', $student->id)->where('status', 'pending')->count();
@@ -812,10 +808,7 @@
                                 ['student_id' => $student->id],
                                 ['total_hours_required' => 600, 'hours_completed' => 0, 'hours_remaining' => 600]
                             );
-                            $actualCompleted2 = \App\Models\TimeInRecord::where('student_id', $student->id)
-                                ->whereNotNull('time_out')->get()
-                                ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
-                            $displayCompleted2 = max($studentHours2->hours_completed ?? 0, $actualCompleted2);
+                            $displayCompleted2 = $studentHours2->hours_completed ?? 0;
                             $required2 = $studentHours2->total_hours_required ?? 600;
                             $progressPct2 = round(($displayCompleted2 / $required2) * 100, 2);
                             $pendingTotal2 = \App\Models\DailyHourLog::where('student_id',$student->id)->where('status','pending')->count()

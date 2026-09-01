@@ -1,14 +1,11 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 
-class YourController extends \App\Http\Controllers\Controller
+class SupervisorController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth');
-    }
-
-    // ...existing methods...
+    // Supervisor actions are handled inline in routes/web.php
+    // This controller class is reserved for future refactoring
 }

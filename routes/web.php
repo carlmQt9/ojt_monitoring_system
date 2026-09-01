@@ -154,20 +154,29 @@ Route::get('/dashboard', function () {
                 ->first();
             if ($openMorning) {
                 $autoOut = '12:00';
-                $openMorning->update(['time_out' => $autoOut]);
                 $inTime  = \Carbon\Carbon::createFromTimeString($openMorning->time_in);
                 $outTime = \Carbon\Carbon::createFromTimeString($autoOut);
                 $hoursWorked = round(max(0, $inTime->diffInMinutes($outTime)) / 60, 2);
+                $regularHours = min($hoursWorked, 8.0);
+                $otHours      = max(0, round($hoursWorked - 8.0, 2));
+                // Bug #9 fix: store regular_hours/ot_hours on the record so approval logic can read them
+                $openMorning->update([
+                    'time_out'      => $autoOut,
+                    'regular_hours' => $regularHours,
+                    'ot_hours'      => $otHours,
+                    'status'        => 'pending',
+                ]);
                 $sh = \App\Models\StudentHours::where('student_id', $user->id)
                     ->firstOrCreate(['student_id' => $user->id], ['total_hours_required' => 600]);
+                $newCompleted = round(max(0, $sh->hours_completed + $regularHours), 2);
                 $sh->update([
-                    'hours_completed' => round(max(0, $sh->hours_completed + $hoursWorked), 2),
-                    'hours_remaining' => round(max(0, $sh->total_hours_required - $sh->hours_completed - $hoursWorked), 2),
+                    'hours_completed' => $newCompleted,
+                    'hours_remaining' => round(max(0, $sh->total_hours_required - $newCompleted), 2),
                 ]);
                 \App\Models\DailyHourLog::create([
                     'student_id'   => $user->id,
                     'log_date'     => $today,
-                    'hours_logged' => $hoursWorked,
+                    'hours_logged' => $regularHours,
                     'is_overtime'  => false,
                     'status'       => 'approved',
                 ]);
@@ -177,11 +186,13 @@ Route::get('/dashboard', function () {
         // ===== Afternoon forgot to time out: detected on NEXT DAY login =====
         // If student logs in today and yesterday's afternoon is still open with no time_out
         // — mark it as incomplete/not recorded, only morning hours count
+        // NOTE: time_out = '00:00' means the student timed out at midnight — do NOT deny those.
         $yesterday = now()->subDay()->toDateString();
         $openAfternoonYesterday = \App\Models\TimeInRecord::where('student_id', $user->id)
             ->whereDate('date', $yesterday)
             ->where('session', 'afternoon')
             ->whereNull('time_out')
+            ->where('status', '!=', 'denied')
             ->first();
         if ($openAfternoonYesterday) {
             // Mark as denied — no hours credited, afternoon time not recorded
@@ -352,11 +363,14 @@ Route::post('/time-out', function () {
     }
     $record->update($updateData);
 
-    // Calculate hours for THIS session
+    // Calculate hours for THIS session (handle cross-midnight: if time_out < time_in, add 1 day)
     $timeInParts  = explode(':', $record->time_in);
     $timeOutParts = explode(':', $serverTimeOut);
     $inTime  = \Carbon\Carbon::createFromTime($timeInParts[0], $timeInParts[1], 0);
     $outTime = \Carbon\Carbon::createFromTime($timeOutParts[0], $timeOutParts[1], 0);
+    if ($outTime->lessThanOrEqualTo($inTime)) {
+        $outTime->addDay(); // crossed midnight
+    }
     $sessionMinutes = max(0, $inTime->diffInMinutes($outTime));
     $sessionHours   = round($sessionMinutes / 60, 2);
 
@@ -366,9 +380,11 @@ Route::post('/time-out', function () {
         ->whereNotNull('time_out')
         ->where('id', '!=', $record->id)
         ->get();
-    $prevDayMinutes = $prevSessionsToday->sum(fn($r) =>
-        max(0, \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)))
-    );
+    $prevDayMinutes = $prevSessionsToday->sum(fn($r) => (function($ti, $to) {
+        $i = \Carbon\Carbon::parse($ti); $o = \Carbon\Carbon::parse($to);
+        if ($o->lte($i)) $o->addDay();
+        return max(0, $i->diffInMinutes($o));
+    })($r->time_in, $r->time_out));
     $prevDayHours = round($prevDayMinutes / 60, 2);
     $totalDayHours = round($prevDayHours + $sessionHours, 2);
 
@@ -480,8 +496,10 @@ Route::post('/time-out-ajax', function () {
     $timeOutParts = explode(':', $serverTimeOut);
     $inTime = \Carbon\Carbon::createFromTime($timeInParts[0], $timeInParts[1], 0);
     $outTime = \Carbon\Carbon::createFromTime($timeOutParts[0], $timeOutParts[1], 0);
-    $minutesWorked = $outTime->diffInMinutes($inTime);
-    if ($minutesWorked < 0) $minutesWorked = 0;
+    if ($outTime->lessThanOrEqualTo($inTime)) {
+        $outTime->addDay(); // crossed midnight
+    }
+    $minutesWorked = max(0, $inTime->diffInMinutes($outTime));
     $hoursWorked = round($minutesWorked / 60, 2);
 
     $studentHours = \App\Models\StudentHours::where('student_id', $validated['student_id'])
@@ -544,7 +562,9 @@ Route::get('/student-progress/{studentId}', function ($studentId) {
         'student' => $student,
         'hours' => $studentHours,
         'daily_logs' => $dailyLogs,
-        'progress_percentage' => ($studentHours->hours_completed / 600) * 100,
+        'progress_percentage' => ($studentHours->total_hours_required > 0)
+            ? ($studentHours->hours_completed / $studentHours->total_hours_required) * 100
+            : 0,
     ]);
 })->name('student-progress')->middleware('auth.custom');
 
@@ -636,9 +656,10 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
         if ($totalToCredit > 0) {
             $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)
                 ->firstOrCreate(['student_id' => $record->student_id], ['total_hours_required' => 600]);
+            $newCompleted = round(max(0, $studentHours->hours_completed + $totalToCredit), 2);
             $studentHours->update([
-                'hours_completed' => round(max(0, $studentHours->hours_completed + $totalToCredit), 2),
-                'hours_remaining' => round(max(0, $studentHours->total_hours_required - $studentHours->hours_completed - $totalToCredit), 2),
+                'hours_completed' => $newCompleted,
+                'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
             ]);
         }
 
@@ -732,22 +753,27 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
             if ($credited > 0) {
                 $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)->first();
                 if ($studentHours) {
+                    $newCompleted = round(max(0, $studentHours->hours_completed - $credited), 2);
                     $studentHours->update([
-                        'hours_completed' => round(max(0, $studentHours->hours_completed - $credited), 2),
-                        'hours_remaining' => round(min($studentHours->total_hours_required, $studentHours->hours_remaining + $credited), 2),
+                        'hours_completed' => $newCompleted,
+                        'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
                     ]);
                 }
             }
         }
-        // Only credit regular hours (8 hrs max), deny OT
-        $regularOnly = floatval($session->regular_hours ?? 0);
-        if ($regularOnly > 0) {
-            $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)
-                ->firstOrCreate(['student_id' => $record->student_id], ['total_hours_required' => 600]);
-            $studentHours->update([
-                'hours_completed' => round(max(0, $studentHours->hours_completed + $regularOnly), 2),
-                'hours_remaining' => round(max(0, $studentHours->total_hours_required - $studentHours->hours_completed - $regularOnly), 2),
-            ]);
+        // Bug #3 fix: only re-credit regular hours for sessions that were PENDING (not already approved).
+        // Approved sessions were already deducted above — re-adding them here would double-credit.
+        if ($session->status === 'pending') {
+            $regularOnly = floatval($session->regular_hours ?? 0);
+            if ($regularOnly > 0) {
+                $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)
+                    ->firstOrCreate(['student_id' => $record->student_id], ['total_hours_required' => 600]);
+                $newCompleted = round(max(0, $studentHours->hours_completed + $regularOnly), 2);
+                $studentHours->update([
+                    'hours_completed' => $newCompleted,
+                    'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
+                ]);
+            }
         }
         $session->update([
             'status'        => 'denied',
@@ -808,8 +834,11 @@ Route::post('/approve-all-time-in/{studentId}', function ($studentId) {
     }
     if ($totalToCredit > 0) {
         $sh = \App\Models\StudentHours::where('student_id', $studentId)->firstOrCreate(['student_id' => $studentId], ['total_hours_required' => 600]);
-        $sh->update(['hours_completed' => round(max(0, $sh->hours_completed + $totalToCredit), 2),
-            'hours_remaining' => round(max(0, $sh->total_hours_required - $sh->hours_completed - $totalToCredit), 2)]);
+        $newCompleted = round(max(0, $sh->hours_completed + $totalToCredit), 2);
+        $sh->update([
+            'hours_completed' => $newCompleted,
+            'hours_remaining' => round(max(0, $sh->total_hours_required - $newCompleted), 2),
+        ]);
     }
     \App\Models\DailyHourLog::where('student_id', $studentId)->where('status', 'pending')->update(['status' => 'approved']);
     // Send email notification
@@ -837,8 +866,11 @@ Route::post('/deny-all-time-in/{studentId}', function ($studentId) {
     }
     if ($totalRegular > 0) {
         $sh = \App\Models\StudentHours::where('student_id', $studentId)->firstOrCreate(['student_id' => $studentId], ['total_hours_required' => 600]);
-        $sh->update(['hours_completed' => round(max(0, $sh->hours_completed + $totalRegular), 2),
-            'hours_remaining' => round(max(0, $sh->total_hours_required - $sh->hours_completed - $totalRegular), 2)]);
+        $newCompleted = round(max(0, $sh->hours_completed + $totalRegular), 2);
+        $sh->update([
+            'hours_completed' => $newCompleted,
+            'hours_remaining' => round(max(0, $sh->total_hours_required - $newCompleted), 2),
+        ]);
     }
     \App\Models\DailyHourLog::where('student_id', $studentId)->where('status', 'pending')->update(['status' => 'denied']);
     // Send email notification
@@ -868,7 +900,11 @@ Route::post('/approve-all-requirements/{studentId}', function ($studentId) {
             foreach ($otRecs as $or) { $totalOt += floatval($or->ot_hours); $or->update(['ot_status'=>'approved']); }
             if ($totalOt > 0) {
                 $sh = \App\Models\StudentHours::where('student_id',$studentId)->firstOrCreate(['student_id'=>$studentId],['total_hours_required'=>600]);
-                $sh->update(['hours_completed'=>round(max(0,$sh->hours_completed+$totalOt),2),'hours_remaining'=>round(max(0,$sh->total_hours_required-$sh->hours_completed-$totalOt),2)]);
+                $newCompleted = round(max(0, $sh->hours_completed + $totalOt), 2);
+                $sh->update([
+                    'hours_completed' => $newCompleted,
+                    'hours_remaining' => round(max(0, $sh->total_hours_required - $newCompleted), 2),
+                ]);
             }
         }
     }
@@ -984,9 +1020,10 @@ Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
         if ($totalOtToCredit > 0) {
             $studentHours = \App\Models\StudentHours::where('student_id', $requirement->student_id)
                 ->firstOrCreate(['student_id' => $requirement->student_id], ['total_hours_required' => 600]);
+            $newCompleted = round(max(0, $studentHours->hours_completed + $totalOtToCredit), 2);
             $studentHours->update([
-                'hours_completed' => round(max(0, $studentHours->hours_completed + $totalOtToCredit), 2),
-                'hours_remaining' => round(max(0, $studentHours->total_hours_required - $studentHours->hours_completed - $totalOtToCredit), 2),
+                'hours_completed' => $newCompleted,
+                'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
             ]);
             // Log the OT hours as approved
             \App\Models\DailyHourLog::create([
@@ -1104,8 +1141,7 @@ Route::get('/generate-dtr-word/{studentId}', function ($studentId) {
     $sh = \App\Models\StudentHours::where('student_id', $studentId)->first();
     $timeInRecords = \App\Models\TimeInRecord::where('student_id', $studentId)->orderBy('date','asc')->get();
     $required   = $sh->total_hours_required ?? 600;
-    $actual     = $timeInRecords->whereNotNull('time_out')->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
-    $totalHours = round(max($sh->hours_completed ?? 0, $actual), 2);
+    $totalHours = round($sh->hours_completed ?? 0, 2);
     $remaining  = round(max(0, $required - $totalHours), 2);
     $pct        = $required > 0 ? round(($totalHours / $required) * 100, 2) : 0;
     $company    = $student->company->name ?? 'N/A';
@@ -1121,8 +1157,7 @@ Route::get('/generate-dtr/{studentId}', function ($studentId) {
     $sh = \App\Models\StudentHours::where('student_id', $studentId)->first();
     $timeInRecords = \App\Models\TimeInRecord::where('student_id', $studentId)->orderBy('date','asc')->get();
     $required   = $sh->total_hours_required ?? 600;
-    $actual     = $timeInRecords->whereNotNull('time_out')->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
-    $totalHours = round(max($sh->hours_completed ?? 0, $actual), 2);
+    $totalHours = round($sh->hours_completed ?? 0, 2);
     $remaining  = round(max(0, $required - $totalHours), 2);
     $pct        = $required > 0 ? round(($totalHours / $required) * 100, 2) : 0;
     $company    = $student->company->name ?? 'N/A';
@@ -1589,11 +1624,7 @@ Route::get('/api/dashboard-stats', function () {
     $totalProgress = 0;
     foreach ($students as $sid) {
         $sh = \App\Models\StudentHours::where('student_id', $sid)->first();
-        $actual = \App\Models\TimeInRecord::where('student_id', $sid)
-            ->whereNotNull('time_out')
-            ->get()
-            ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
-        $hours = max($sh->hours_completed ?? 0, $actual);
+        $hours = $sh->hours_completed ?? 0;
         $req = $sh->total_hours_required ?? 600;
         $pct = $req > 0 ? ($hours / $req) * 100 : 0;
         $totalProgress += $pct;
@@ -1841,11 +1872,8 @@ Route::get('/api/analytics', function () {
 
     $analytics = $students->map(function ($student) use ($required) {
         $sh = \App\Models\StudentHours::where('student_id', $student->id)->first();
-        $actual = \App\Models\TimeInRecord::where('student_id', $student->id)
-            ->whereNotNull('time_out')
-            ->get()
-            ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
-        $completed = round(max($sh->hours_completed ?? 0, $actual), 4);
+        $actual = $sh->hours_completed ?? 0;
+        $completed = round($actual, 4);
         return [
             'student_id' => $student->id,
             'student_name' => $student->name,
@@ -1926,9 +1954,7 @@ Route::get('/api/reports/system', function () {
     $studentRows       = [];
     foreach (User::where('role','student')->get() as $s) {
         $sh     = \App\Models\StudentHours::where('student_id',$s->id)->first();
-        $actual = \App\Models\TimeInRecord::where('student_id',$s->id)->whereNotNull('time_out')->get()
-                    ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out))/60);
-        $hours  = round(max($sh->hours_completed ?? 0, $actual), 4);
+        $hours  = round($sh->hours_completed ?? 0, 4);
         $rem    = round(max(0, $required - $hours), 4);
         $pct    = $required > 0 ? round(($hours/$required)*100,2) : 0;
         $totalProgress += $pct;
@@ -1948,9 +1974,7 @@ Route::get('/api/reports/students', function () {
     $students = [];
     foreach (User::where('role','student')->get() as $s) {
         $sh     = \App\Models\StudentHours::where('student_id',$s->id)->first();
-        $actual = \App\Models\TimeInRecord::where('student_id',$s->id)->whereNotNull('time_out')->get()
-                    ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out))/60);
-        $hours  = round(max($sh->hours_completed ?? 0, $actual), 4);
+        $hours  = round($sh->hours_completed ?? 0, 4);
         $rem    = round(max(0, $required - $hours), 4);
         $pct    = $required > 0 ? round(($hours/$required)*100,2) : 0;
         $students[] = ['name'=>$s->name,'email'=>$s->email,'company'=>$s->company->name??'N/A','hours_completed'=>$hours,'required'=>$required,'remaining'=>$rem,'pct'=>$pct,'status'=>$hours>=$required?'Completed':'In Progress'];
@@ -1967,7 +1991,7 @@ Route::get('/api/reports/attendance-data', function () {
     $rows = [];
     foreach (\App\Models\TimeInRecord::with('student')->whereHas('student')->orderBy('date','desc')->get() as $rec) {
         if (!$rec->student) continue;
-        $hrs = $rec->time_out ? round(\Carbon\Carbon::parse($rec->time_in)->diffInMinutes(\Carbon\Carbon::parse($rec->time_out))/60, 2) : 0;
+        $hrs = $rec->time_out ? round((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lte($i))$o->addDay();return $i->diffInMinutes($o);})(  $rec->time_in,$rec->time_out)/60, 2) : 0;
         $rows[] = [
             'student_name' => $rec->student->name,
             'date'         => $rec->date->format('Y-m-d'),
@@ -1984,7 +2008,7 @@ Route::get('/api/reports/attendance', function () {
     $rows = [];
     foreach (\App\Models\TimeInRecord::with('student')->whereHas('student')->orderBy('date','desc')->get() as $rec) {
         if (!$rec->student) continue;
-        $hrs = $rec->time_out ? round(\Carbon\Carbon::parse($rec->time_in)->diffInMinutes(\Carbon\Carbon::parse($rec->time_out))/60,4) : 0;
+        $hrs = $rec->time_out ? round((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lte($i))$o->addDay();return $i->diffInMinutes($o);})(  $rec->time_in,$rec->time_out)/60,4) : 0;
         $rows[] = ['date'=>$rec->date->format('Y-m-d'),'name'=>$rec->student->name,'company'=>$rec->student->company->name??'N/A','time_in'=>$rec->time_in,'time_out'=>$rec->time_out??'-','hours'=>$hrs,'status'=>$rec->status,'verified'=>$rec->verified];
     }
     $records = $rows;
@@ -2045,8 +2069,6 @@ Route::get('/certificate/{studentId}', function ($studentId) {
     }
     $sh       = \App\Models\StudentHours::where('student_id', $studentId)->first();
     $required = $sh->total_hours_required ?? 600;
-    $actual   = \App\Models\TimeInRecord::where('student_id', $studentId)->whereNotNull('time_out')->get()
-                    ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
-    $hours    = round(max($sh->hours_completed ?? 0, $actual), 2);
+    $hours    = round($sh->hours_completed ?? 0, 2);
     return view('certificate', compact('student', 'hours', 'required'));
 })->name('certificate')->middleware('auth.custom');

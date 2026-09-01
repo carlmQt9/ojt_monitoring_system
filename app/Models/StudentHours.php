@@ -37,6 +37,9 @@ class StudentHours extends Model
 
     public function getProgressPercentageAttribute()
     {
+        if (!$this->total_hours_required || $this->total_hours_required <= 0) {
+            return 0;
+        }
         return ($this->hours_completed / $this->total_hours_required) * 100;
     }
 }

@@ -184,7 +184,7 @@
         $_required = $_sh ? $_sh->total_hours_required : 600;
         $_allRecordsTotal = \App\Models\TimeInRecord::where('student_id', $user->id)
             ->whereNotNull('time_out')->where('status', 'approved')->get()
-            ->sum(fn($r) => max(0, \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out))) / 60);
+            ->sum(function($r){$i=\Carbon\Carbon::parse($r->time_in);$o=\Carbon\Carbon::parse($r->time_out);if($o->lte($i))$o->addDay();return max(0,$i->diffInMinutes($o))/60;});
         $_completed = $_sh ? $_sh->hours_completed : round($_allRecordsTotal, 2);
         // Pending hours = timed out but not yet approved (awaiting supervisor)
         $_pendingHours = round(\App\Models\TimeInRecord::where('student_id', $user->id)
@@ -386,9 +386,15 @@
                 $rec = \App\Models\TimeInRecord::where('student_id', $user->id)
                     ->whereDate('date', $d->toDateString())
                     ->whereNotNull('time_out')
+                    ->where('status', 'approved')
                     ->first();
                 if ($rec) {
-                    $_last7[] = round(\Carbon\Carbon::parse($rec->time_in)->diffInMinutes(\Carbon\Carbon::parse($rec->time_out)) / 60, 2);
+                    // Use stored regular_hours when available; fall back to computed diff
+                    $recHrs = floatval($rec->regular_hours ?? 0);
+                    if ($recHrs <= 0) {
+                        $recHrs = (function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lte($i))$o->addDay();return $i->diffInMinutes($o)/60;})($rec->time_in,$rec->time_out);
+                    }
+                    $_last7[] = round($recHrs, 2);
                 } else {
                     $_last7[] = 0;
                 }
@@ -396,7 +402,7 @@
             // Requirements status breakdown
             $_reqApproved = $allReqs->where('status','approved')->count();
             $_reqPending  = $allReqs->where('status','pending')->count();
-            $_reqRejected = $allReqs->where('status','rejected')->count();
+            $_reqRejected = $allReqs->where('status','denied')->count();
         ?>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <!-- Donut: OJT Progress -->
@@ -447,10 +453,7 @@
         @php
             $_timeinSH = \App\Models\StudentHours::where('student_id', $user->id)->first();
             $_timeinRequired = $_timeinSH ? $_timeinSH->total_hours_required : 600;
-            $_timeinActual = \App\Models\TimeInRecord::where('student_id', $user->id)
-                ->whereNotNull('time_out')->get()
-                ->sum(fn($r) => \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)) / 60);
-            $_timeinCompleted = max($_timeinSH->hours_completed ?? 0, $_timeinActual);
+            $_timeinCompleted = $_timeinSH->hours_completed ?? 0;
             $_ojtDone = $_timeinCompleted >= $_timeinRequired;
             $required = $_timeinRequired;
             $today = date('Y-m-d');
@@ -648,9 +651,10 @@
                     $activeRecord = $todayRecords->whereNull('time_out')->first();
 
                     // Total hours today (completed sessions)
-                    $totalDayMinutes = $todayRecords->whereNotNull('time_out')->sum(fn($r) =>
-                        max(0, \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out)))
-                    );
+                    $totalDayMinutes = $todayRecords->whereNotNull('time_out')->sum(function($r){
+                        $i=\Carbon\Carbon::parse($r->time_in);$o=\Carbon\Carbon::parse($r->time_out);
+                        if($o->lte($i))$o->addDay();return max(0,$i->diffInMinutes($o));
+                    });
                     $totalDayHours = round($totalDayMinutes / 60, 2);
                     $regularHours  = min($totalDayHours, 8);
                     $otHours       = max(0, round($totalDayHours - 8, 2));
@@ -679,7 +683,7 @@
                                 <p class="text-gray-400 text-sm">Time In: <span class="text-green-400 font-semibold">{{ \Carbon\Carbon::parse($morningRecord->time_in)->format('h:i A') }}</span></p>
                                 @if($morningRecord->time_out)
                                     <p class="text-gray-400 text-sm">Time Out: <span class="text-orange-400 font-semibold">{{ \Carbon\Carbon::parse($morningRecord->time_out)->format('h:i A') }}</span></p>
-                                    <p class="text-gray-400 text-sm">Hours: <span class="text-blue-400 font-semibold">{{ number_format(\Carbon\Carbon::parse($morningRecord->time_in)->diffInMinutes(\Carbon\Carbon::parse($morningRecord->time_out)) / 60, 2) }} hrs</span></p>
+                                    <p class="text-gray-400 text-sm">Hours: <span class="text-blue-400 font-semibold">{{ number_format((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lte($i))$o->addDay();return $i->diffInMinutes($o)/60;})($morningRecord->time_in,$morningRecord->time_out), 2) }} hrs</span></p>
                                 @else
                                     <p class="text-yellow-400 text-xs mt-1">⏳ Currently active</p>
                                 @endif
@@ -693,7 +697,7 @@
                                 <p class="text-gray-400 text-sm">Time In: <span class="text-green-400 font-semibold">{{ \Carbon\Carbon::parse($afternoonRecord->time_in)->format('h:i A') }}</span></p>
                                 @if($afternoonRecord->time_out)
                                     <p class="text-gray-400 text-sm">Time Out: <span class="text-orange-400 font-semibold">{{ \Carbon\Carbon::parse($afternoonRecord->time_out)->format('h:i A') }}</span></p>
-                                    <p class="text-gray-400 text-sm">Hours: <span class="text-blue-400 font-semibold">{{ number_format(\Carbon\Carbon::parse($afternoonRecord->time_in)->diffInMinutes(\Carbon\Carbon::parse($afternoonRecord->time_out)) / 60, 2) }} hrs</span></p>
+                                    <p class="text-gray-400 text-sm">Hours: <span class="text-blue-400 font-semibold">{{ number_format((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lte($i))$o->addDay();return $i->diffInMinutes($o)/60;})($afternoonRecord->time_in,$afternoonRecord->time_out), 2) }} hrs</span></p>
                                 @else
                                     <p class="text-yellow-400 text-xs mt-1">⏳ Currently active</p>
                                 @endif
@@ -742,7 +746,7 @@
                             @php
                                 // Minutes from all completed sessions today (excluding active)
                                 $_prevMins = $todayRecords->whereNotNull('time_out')->where('id','!=',$activeRecord->id)
-                                    ->sum(fn($r) => max(0, \Carbon\Carbon::parse($r->time_in)->diffInMinutes(\Carbon\Carbon::parse($r->time_out))));
+                                    ->sum(function($r){$i=\Carbon\Carbon::parse($r->time_in);$o=\Carbon\Carbon::parse($r->time_out);if($o->lte($i))$o->addDay();return max(0,$i->diffInMinutes($o));});
                                 // Elapsed minutes in the current active session (server now - time_in)
                                 $_activeElapsed = max(0, \Carbon\Carbon::createFromTimeString($activeRecord->time_in)->diffInMinutes(\Carbon\Carbon::now()));
                                 // Total minutes logged today = completed + currently elapsed
