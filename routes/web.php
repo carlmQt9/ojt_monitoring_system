@@ -2088,3 +2088,131 @@ Route::get('/certificate/{studentId}', function ($studentId) {
     $hours    = round($sh->hours_completed ?? 0, 2);
     return view('certificate', compact('student', 'hours', 'required'));
 })->name('certificate')->middleware('auth.custom');
+
+// ── Daily Narrative Routes ──────────────────────────────────────────────────
+
+// Submit a daily narrative entry (student only, 1 per day, rate-limited to 5/day)
+Route::post('/daily-narrative', function () {
+    $student = User::findOrFail(session('user_id'));
+
+    $validated = request()->validate([
+        'report_date' => 'required|date|before_or_equal:today',
+        'description' => 'required|string|min:10|max:5000',
+        'photo'       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120', // max 5 MB
+    ]);
+
+    $reportDate = \Carbon\Carbon::parse($validated['report_date'])->toDateString();
+
+    // One entry per day per student
+    $existing = \App\Models\DailyNarrative::where('student_id', $student->id)
+        ->where('report_date', $reportDate)
+        ->first();
+    if ($existing) {
+        return response()->json([
+            'success' => false,
+            'message' => 'You already submitted a narrative for ' . \Carbon\Carbon::parse($reportDate)->format('M d, Y') . '. You can edit it instead.',
+        ], 422);
+    }
+
+    // Store photo if provided
+    $photoPath = null;
+    if (request()->hasFile('photo')) {
+        // Ensure directory exists
+        $dir = storage_path('app/public/narratives');
+        if (!file_exists($dir)) @mkdir($dir, 0755, true);
+        $photoPath = request()->file('photo')->store('narratives', 'public');
+    }
+
+    // Auto-compute day number = how many distinct narrative days this student has + 1
+    $dayNumber = \App\Models\DailyNarrative::where('student_id', $student->id)->count() + 1;
+
+    $narrative = \App\Models\DailyNarrative::create([
+        'student_id'  => $student->id,
+        'report_date' => $reportDate,
+        'day_number'  => $dayNumber,
+        'description' => trim($validated['description']),
+        'photo_path'  => $photoPath,
+    ]);
+
+    return response()->json([
+        'success'    => true,
+        'message'    => 'Daily narrative submitted for Day ' . $dayNumber . '!',
+        'narrative'  => [
+            'id'          => $narrative->id,
+            'report_date' => \Carbon\Carbon::parse($narrative->report_date)->format('M d, Y'),
+            'day_number'  => $narrative->day_number,
+            'description' => $narrative->description,
+            'photo_url'   => $narrative->photo_url,
+        ],
+    ]);
+})->name('daily-narrative.store')->middleware(['auth.custom', 'role:student', 'throttle:5,1']);
+
+// Edit/update an existing narrative entry
+Route::put('/daily-narrative/{id}', function ($id) {
+    $student   = User::findOrFail(session('user_id'));
+    $narrative = \App\Models\DailyNarrative::where('id', $id)
+        ->where('student_id', $student->id) // IDOR guard
+        ->firstOrFail();
+
+    $validated = request()->validate([
+        'description' => 'required|string|min:10|max:5000',
+        'photo'       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
+    ]);
+
+    // Replace photo if a new one is uploaded
+    if (request()->hasFile('photo')) {
+        if ($narrative->photo_path) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($narrative->photo_path);
+        }
+        $dir = storage_path('app/public/narratives');
+        if (!file_exists($dir)) @mkdir($dir, 0755, true);
+        $narrative->photo_path = request()->file('photo')->store('narratives', 'public');
+    }
+
+    $narrative->description = trim($validated['description']);
+    $narrative->save();
+
+    return response()->json([
+        'success'   => true,
+        'message'   => 'Narrative updated.',
+        'narrative' => [
+            'id'          => $narrative->id,
+            'report_date' => \Carbon\Carbon::parse($narrative->report_date)->format('M d, Y'),
+            'day_number'  => $narrative->day_number,
+            'description' => $narrative->description,
+            'photo_url'   => $narrative->photo_url,
+        ],
+    ]);
+})->name('daily-narrative.update')->middleware(['auth.custom', 'role:student', 'throttle:10,1']);
+
+// Download compiled narrative report as Word (.doc)
+// Accessible by the student themselves OR supervisor/coordinator/ccit_head
+Route::get('/narrative-report/{studentId}', function ($studentId) {
+    $viewer  = User::findOrFail(session('user_id'));
+    $student = User::findOrFail($studentId);
+
+    // Authorization: student can only download their own; staff can download any
+    if ($viewer->role === 'student' && $viewer->id !== $student->id) {
+        abort(403, 'Access denied.');
+    }
+
+    $narratives = \App\Models\DailyNarrative::where('student_id', $studentId)
+        ->orderBy('day_number')
+        ->get();
+
+    $sh       = \App\Models\StudentHours::where('student_id', $studentId)->first();
+    $required = $sh->total_hours_required ?? 600;
+    $completed = $sh->hours_completed ?? 0;
+    $company  = $student->company->name ?? 'N/A';
+
+    $content = view('reports.narrative_word', compact(
+        'student', 'narratives', 'company', 'required', 'completed'
+    ))->render();
+
+    $safeName = preg_replace('/[^A-Za-z0-9_]/', '', str_replace(' ', '_', $student->name));
+    $filename = 'NarrativeReport_' . $safeName . '_' . now()->format('Y-m-d') . '.doc';
+
+    return response($content)
+        ->header('Content-Type', 'application/msword')
+        ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+})->name('narrative-report.download')->middleware('auth.custom');

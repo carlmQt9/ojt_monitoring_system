@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <link rel="icon" type="image/jpeg" href="/logo.jpg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Student Dashboard - OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -1276,57 +1277,56 @@
             </div>
 
             <!-- Daily Submissions Cabinet -->
+            @php
+                $narratives = \App\Models\DailyNarrative::where('student_id', $user->id)
+                    ->orderBy('day_number', 'desc')->get();
+                $todayNarrative = $narratives->first(fn($n) => $n->report_date->isToday());
+            @endphp
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
                 <div class="flex justify-between items-center mb-4">
                     <div>
-                        <h3 class="text-lg font-bold text-white">📋 Daily Submissions</h3>
-                        <p class="text-gray-400 text-xs mt-1">Narratives & daily reports</p>
+                        <h3 class="text-lg font-bold text-white">📒 Daily Narrative</h3>
+                        <p class="text-gray-400 text-xs mt-1">Daily OJT journal entries</p>
                     </div>
-                    @if($tplDaily->isNotEmpty())
-                    <div class="flex gap-2">
-                        @foreach($tplDaily as $dt)
-                        <button type="button" onclick="openUploadModal('{{ addslashes($dt->name) }}', {{ $dt->max_files }})" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold">+ {{ $dt->name }}</button>
-                        @endforeach
+                    <div class="flex items-center gap-2">
+                        @if($narratives->isNotEmpty())
+                        <button type="button" onclick="openNarrativeDownloadModal()"
+                            class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">
+                            ⬇ Download Report
+                        </button>
+                        @endif
+                        <button type="button"
+                            onclick="openNarrativeModal({{ $todayNarrative ? $todayNarrative->id : 'null' }}, '{{ $todayNarrative ? addslashes($todayNarrative->description) : '' }}')"
+                            class="px-3 py-2 {{ $todayNarrative ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700' }} text-white rounded-lg text-sm font-semibold">
+                            {{ $todayNarrative ? '✏ Edit Today' : '+ Daily Report' }}
+                        </button>
                     </div>
-                    @else
-                    <button type="button" onclick="openUploadModal('Daily Report')" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold">+ Upload</button>
-                    @endif
                 </div>
-                <?php
-                    if ($tplDaily->isNotEmpty()) {
-                        $dailyNames = $tplDaily->pluck('name')->toArray();
-                        $dailyReqs = $requirements->filter(fn($r) => collect($dailyNames)->contains(fn($n) => stripos($r->title, $n) !== false));
-                    } else {
-                        $dailyReqs = $requirements->filter(fn($r)=> stripos($r->title,'narrative')!==false || stripos($r->title,'daily')!==false || stripos($r->title,'report')!==false);
-                    }
-                ?>
-                @if($dailyReqs->isNotEmpty())
-                <div class="space-y-3">
-                    @foreach($dailyReqs as $daily)
-                    <div class="flex justify-between items-start p-3 bg-slate-700/40 rounded-lg">
-                        <div>
-                            <div class="text-gray-200 font-semibold text-sm">{{ $daily->title }}</div>
-                            <div class="text-xs text-gray-400 mt-0.5">{{ $daily->created_at->format('M d, Y') }}</div>
+
+                @if($narratives->isNotEmpty())
+                <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    @foreach($narratives as $n)
+                    <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-lg cursor-pointer hover:bg-slate-700/60 transition-colors"
+                         onclick="openNarrativeViewModal({{ $n->id }}, '{{ addslashes($n->description) }}', '{{ $n->photo_url }}', {{ $n->day_number }}, '{{ \Carbon\Carbon::parse($n->report_date)->format('M d, Y') }}')">
+                        <div class="w-9 h-9 bg-indigo-500/20 border border-indigo-500/40 rounded-lg flex items-center justify-center shrink-0">
+                            <span class="text-indigo-400 text-xs font-bold">D{{ $n->day_number }}</span>
                         </div>
-                        <div class="flex items-center gap-2">
-                            @if($daily->file_path)
-                                <button type="button" onclick="openFileViewer('{{ asset('storage/' . $daily->file_path) }}','{{ addslashes($daily->title) }}')" class="px-2 py-1 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-xs">View</button>
-                            @endif
-                            <span class="text-xs px-2 py-0.5 rounded-full
-                                @if($daily->status==='approved') bg-green-500/20 text-green-400
-                                @elseif($daily->status==='denied') bg-red-500/20 text-red-400
-                                @else bg-yellow-500/20 text-yellow-400 @endif">
-                                {{ ucfirst($daily->status) }}
-                            </span>
-                            @if($daily->status === 'denied')
-                                <button type="button" onclick="openUploadModal('{{ addslashes($daily->title) }}')" class="px-2 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs">Resubmit</button>
-                            @endif
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <p class="text-gray-200 text-sm font-semibold">Day {{ $n->day_number }}</p>
+                                <span class="text-gray-500 text-xs">{{ \Carbon\Carbon::parse($n->report_date)->format('M d, Y') }}</span>
+                                @if($n->photo_path)<span class="text-xs text-indigo-400">📷</span>@endif
+                            </div>
+                            <p class="text-gray-400 text-xs mt-0.5 truncate">{{ Str::limit($n->description, 80) }}</p>
                         </div>
+                        <button type="button"
+                            onclick="event.stopPropagation(); openNarrativeModal({{ $n->id }}, '{{ addslashes($n->description) }}')"
+                            class="shrink-0 px-2 py-1 bg-slate-600 hover:bg-slate-500 text-gray-300 rounded text-xs">✏</button>
                     </div>
                     @endforeach
                 </div>
                 @else
-                <p class="text-gray-500 text-sm text-center py-6">No daily submissions yet.</p>
+                <p class="text-gray-500 text-sm text-center py-6">No narrative entries yet. Click <strong>+ Daily Report</strong> to start.</p>
                 @endif
             </div>
 
@@ -1394,69 +1394,60 @@
             @endif
         </div>
 
-        <!-- Daily Submissions — table with filter tabs + show more -->
+        <!-- Daily Narrative — table with show more -->
+        @php
+            $narrativeReports = \App\Models\DailyNarrative::where('student_id', $user->id)
+                ->orderBy('day_number', 'desc')->get();
+        @endphp
         <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
             <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
-                <h3 class="text-base font-bold text-white">📋 Daily Submissions
-                    <span class="ml-1 px-2 py-0.5 bg-slate-700 text-gray-400 text-xs rounded-full font-normal">{{ $dailyReports->count() }}</span>
+                <h3 class="text-base font-bold text-white">📒 Daily Narrative
+                    <span class="ml-1 px-2 py-0.5 bg-slate-700 text-gray-400 text-xs rounded-full font-normal">{{ $narrativeReports->count() }}</span>
                 </h3>
-                <button type="button" onclick="openUploadModal('')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold">+ Upload</button>
+                <div class="flex gap-2">
+                    @if($narrativeReports->isNotEmpty())
+                    <button type="button" onclick="openNarrativeDownloadModal()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">⬇ Download Report</button>
+                    @endif
+                    <button type="button" onclick="openNarrativeModal(null,'')" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold">+ Daily Report</button>
+                </div>
             </div>
 
-            @if($dailyReports->isNotEmpty())
-            <!-- Filter tabs -->
-            <div class="flex gap-1 mb-3 flex-wrap" id="dailyFilterTabs">
-                @php
-                    $dCounts = ['all'=>$dailyReports->count(), 'pending'=>$dailyReports->where('status','pending')->count(), 'approved'=>$dailyReports->where('status','approved')->count(), 'denied'=>$dailyReports->where('status','denied')->count()];
-                @endphp
-                @foreach(['all'=>'All','pending'=>'Pending','approved'=>'Approved','denied'=>'Denied'] as $fKey=>$fLabel)
-                <button onclick="filterDailyReports('{{ $fKey }}')" id="dtab-{{ $fKey }}"
-                    class="px-3 py-1 rounded-full text-xs font-semibold transition-colors
-                    @if($fKey==='all') bg-indigo-600 text-white @else bg-slate-700 text-gray-400 hover:text-white @endif">
-                    {{ $fLabel }} <span class="opacity-70">({{ $dCounts[$fKey] }})</span>
-                </button>
-                @endforeach
-            </div>
-
+            @if($narrativeReports->isNotEmpty())
             <!-- Compact table -->
             <div class="overflow-hidden rounded-lg border border-slate-700">
                 <table class="w-full text-xs">
                     <thead class="bg-slate-700/60">
                         <tr>
-                            <th class="text-left py-2 px-3 text-gray-400 font-semibold">Title</th>
-                            <th class="text-center py-2 px-3 text-gray-400 font-semibold w-20">Date</th>
-                            <th class="text-center py-2 px-3 text-gray-400 font-semibold w-20">Status</th>
+                            <th class="text-left py-2 px-3 text-gray-400 font-semibold">Day</th>
+                            <th class="text-left py-2 px-3 text-gray-400 font-semibold">Summary</th>
+                            <th class="text-center py-2 px-3 text-gray-400 font-semibold w-24">Date</th>
                             <th class="text-center py-2 px-3 text-gray-400 font-semibold w-16">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="dailyReportsTable">
-                        @foreach($dailyReports as $i => $req)
-                        @php $latestForThis = $latestByTitle[strtolower(trim($req->title))] ?? null; @endphp
-                        <tr class="daily-row border-t border-slate-700/50 hover:bg-slate-700/20 transition-colors @if($i >= 10) hidden @endif"
-                            data-status="{{ $req->status }}" data-index="{{ $i }}">
+                    <tbody>
+                        @foreach($narrativeReports as $i => $nr)
+                        <tr class="narrative-entry-row border-t border-slate-700/50 hover:bg-slate-700/20 transition-colors @if($i >= 10) hidden @endif"
+                            data-narrative-id="{{ $nr->id }}">
                             <td class="py-2 px-3">
-                                <p class="text-gray-200 font-medium leading-tight">{{ $req->title }}</p>
-                                @if($req->feedback)
-                                <p class="text-gray-500 text-[10px] mt-0.5 truncate max-w-[200px]" title="{{ $req->feedback }}">{{ $req->feedback }}</p>
+                                <div class="w-9 h-9 bg-indigo-500/20 border border-indigo-500/30 rounded-lg flex items-center justify-center mx-auto">
+                                    <span class="text-indigo-400 text-xs font-bold">D{{ $nr->day_number }}</span>
+                                </div>
+                            </td>
+                            <td class="py-2 px-3">
+                                <p class="text-gray-200 font-medium leading-tight truncate max-w-[220px]">{{ Str::limit($nr->description, 70) }}</p>
+                                @if($nr->photo_path)
+                                <span class="text-indigo-400 text-[10px]">📷 photo attached</span>
                                 @endif
                             </td>
-                            <td class="py-2 px-3 text-center text-gray-400">{{ $req->created_at->format('M d, Y') }}</td>
-                            <td class="py-2 px-3 text-center">
-                                <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold
-                                    @if($req->status==='approved') bg-green-500/20 text-green-400
-                                    @elseif($req->status==='denied') bg-red-500/20 text-red-400
-                                    @else bg-yellow-500/20 text-yellow-400 @endif">
-                                    {{ ucfirst($req->status) }}
-                                </span>
-                            </td>
+                            <td class="py-2 px-3 text-center text-gray-400">{{ \Carbon\Carbon::parse($nr->report_date)->format('M d, Y') }}</td>
                             <td class="py-2 px-3 text-center">
                                 <div class="flex items-center justify-center gap-1">
-                                    @if($req->file_path)
-                                    <button type="button" onclick="openFileViewer('{{ asset('storage/' . $req->file_path) }}','{{ addslashes($req->title) }}')" class="px-2 py-1 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-[10px]">View</button>
-                                    @endif
-                                    @if($req->status === 'denied' && $latestForThis && $latestForThis->id === $req->id)
-                                    <button type="button" onclick="openUploadModal('{{ addslashes($req->title) }}')" class="px-2 py-1 bg-orange-600/80 hover:bg-orange-600 text-white rounded text-[10px]">Resubmit</button>
-                                    @endif
+                                    <button type="button"
+                                        onclick="openNarrativeViewModal({{ $nr->id }},'{{ addslashes($nr->description) }}','{{ $nr->photo_url }}',{{ $nr->day_number }},'{{ \Carbon\Carbon::parse($nr->report_date)->format('M d, Y') }}')"
+                                        class="px-2 py-1 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-[10px]">View</button>
+                                    <button type="button"
+                                        onclick="openNarrativeModal({{ $nr->id }},'{{ addslashes($nr->description) }}')"
+                                        class="px-2 py-1 bg-slate-600 hover:bg-slate-500 text-gray-300 rounded text-[10px]">✏</button>
                                 </div>
                             </td>
                         </tr>
@@ -1465,16 +1456,17 @@
                 </table>
             </div>
 
-            @if($dailyReports->count() > 10)
+            @if($narrativeReports->count() > 10)
             <div class="mt-3 text-center">
-                <button id="showMoreDailyBtn" onclick="showMoreDaily()" class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-lg text-xs">
-                    Show more ({{ $dailyReports->count() - 10 }} remaining)
+                <button id="showMoreNarrativeBtn" onclick="showMoreNarratives()"
+                    class="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-lg text-xs">
+                    Show more ({{ $narrativeReports->count() - 10 }} remaining)
                 </button>
             </div>
             @endif
 
             @else
-            <p class="text-gray-400 text-sm text-center py-6">No daily reports submitted yet.</p>
+            <p class="text-gray-400 text-sm text-center py-6">No narrative entries yet. Click <strong>+ Daily Report</strong> to start.</p>
             @endif
         </div>
 
@@ -1540,6 +1532,142 @@
         </div>
     </div>
     <!-- ===== END UPLOAD MODAL ===== -->
+
+    <!-- ===== NARRATIVE SUBMIT/EDIT MODAL ===== -->
+    <div id="narrativeModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onclick="if(event.target===this)closeNarrativeModal()">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+                <h3 id="narrativeModalTitle" class="text-lg font-bold text-white">📝 Daily Narrative Report</h3>
+                <button onclick="closeNarrativeModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-lg">✕</button>
+            </div>
+            <div class="px-6 py-5 space-y-4">
+                <!-- Hidden fields -->
+                <input type="hidden" id="narrativeEntryId" value="">
+
+                <!-- Date -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Report Date *</label>
+                    <input type="date" id="narrativeDate"
+                        max="{{ now()->toDateString() }}"
+                        value="{{ now()->toDateString() }}"
+                        class="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-green-500 focus:outline-none">
+                    <p id="narrativeDateNote" class="text-xs text-gray-500 mt-1">One entry per day. Past dates allowed if you forgot to submit.</p>
+                </div>
+
+                <!-- Photo upload -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">
+                        📷 Photo <span class="text-gray-500 font-normal">(optional — max 5 MB)</span>
+                    </label>
+                    <div id="narrativePhotoArea" class="relative">
+                        <input type="file" id="narrativePhoto"
+                            accept="image/jpeg,image/png,image/webp"
+                            onchange="previewNarrativePhoto(this)"
+                            class="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 text-white rounded-lg text-sm
+                                   file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold
+                                   file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer">
+                        <p class="text-xs text-gray-500 mt-1">JPG, PNG, WebP — max 5 MB</p>
+                        <p id="narrativePhotoError" class="text-red-400 text-xs mt-1 hidden"></p>
+                    </div>
+                    <!-- Photo preview -->
+                    <div id="narrativePhotoPreview" class="hidden mt-2 relative inline-block">
+                        <img id="narrativePreviewImg" src="" alt="Preview"
+                            class="max-h-32 rounded-lg border border-slate-600 object-contain">
+                        <button type="button" onclick="clearNarrativePhoto()"
+                            class="absolute -top-2 -right-2 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs flex items-center justify-center leading-none">✕</button>
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">
+                        What did you accomplish today? *
+                    </label>
+                    <textarea id="narrativeDescription" rows="5" maxlength="5000"
+                        placeholder="Describe the tasks you worked on, what you learned, and any observations..."
+                        class="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-green-500 focus:outline-none resize-none text-sm leading-relaxed"></textarea>
+                    <div class="flex justify-between mt-1">
+                        <p id="narrativeDescError" class="text-red-400 text-xs hidden"></p>
+                        <p class="text-gray-500 text-xs ml-auto"><span id="narrativeCharCount">0</span>/5000</p>
+                    </div>
+                </div>
+
+                <!-- Error -->
+                <p id="narrativeSubmitError" class="text-red-400 text-sm hidden"></p>
+            </div>
+
+            <div class="flex gap-3 px-6 pb-5">
+                <button type="button" onclick="closeNarrativeModal()"
+                    class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">Cancel</button>
+                <button type="button" id="narrativeSubmitBtn" onclick="submitNarrative()"
+                    class="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all">
+                    <span id="narrativeSubmitLabel">Submit Report</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- ===== END NARRATIVE SUBMIT MODAL ===== -->
+
+    <!-- ===== NARRATIVE VIEW MODAL ===== -->
+    <div id="narrativeViewModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onclick="if(event.target===this)closeNarrativeViewModal()">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700 shrink-0">
+                <div>
+                    <h3 id="nvTitle" class="text-lg font-bold text-white">Day —</h3>
+                    <p id="nvDate" class="text-xs text-gray-400 mt-0.5"></p>
+                </div>
+                <button onclick="closeNarrativeViewModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-lg">✕</button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                <div id="nvPhotoWrap" class="hidden text-center">
+                    <img id="nvPhoto" src="" alt="Day photo"
+                        class="max-h-52 rounded-xl border border-slate-600 object-contain mx-auto">
+                </div>
+                <p id="nvDesc" class="text-gray-200 text-sm leading-relaxed whitespace-pre-wrap"></p>
+            </div>
+            <div class="flex gap-3 px-6 pb-5 shrink-0 border-t border-slate-700 pt-4">
+                <button type="button" onclick="closeNarrativeViewModal()"
+                    class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold">Close</button>
+                <button type="button" id="nvEditBtn" onclick=""
+                    class="flex-1 px-4 py-2.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-semibold">✏ Edit</button>
+            </div>
+        </div>
+    </div>
+    <!-- ===== END NARRATIVE VIEW MODAL ===== -->
+
+    <!-- ===== NARRATIVE DOWNLOAD MODAL ===== -->
+    <div id="narrativeDownloadModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onclick="if(event.target===this)closeNarrativeDownloadModal()">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+                <h3 class="text-lg font-bold text-white">⬇ Download Narrative Report</h3>
+                <button onclick="closeNarrativeDownloadModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-lg">✕</button>
+            </div>
+            <div class="px-6 py-5 space-y-4">
+                <div class="bg-slate-700/40 rounded-xl p-4 text-center">
+                    <div class="text-4xl mb-2">📄</div>
+                    <p class="text-white font-semibold text-sm">OJT Narrative Report</p>
+                    <p class="text-gray-400 text-xs mt-1">All <span id="dlDayCount" class="text-indigo-400 font-bold"></span> narrative entries compiled into one Word document</p>
+                </div>
+                <div class="bg-slate-700/20 rounded-lg p-3 space-y-1 text-xs text-gray-400">
+                    <p>✓ University header &amp; student info</p>
+                    <p>✓ Day-by-day entries with dates</p>
+                    <p>✓ Photos embedded per day</p>
+                    <p>✓ Signature block</p>
+                    <p>✓ Compatible with Microsoft Word</p>
+                </div>
+            </div>
+            <div class="flex gap-3 px-6 pb-5">
+                <button type="button" onclick="closeNarrativeDownloadModal()"
+                    class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold">Cancel</button>
+                <a id="narrativeDownloadLink" href="{{ route('narrative-report.download', $user->id) }}"
+                    onclick="closeNarrativeDownloadModal()"
+                    class="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-center transition-all">
+                    ⬇ Download .doc
+                </a>
+            </div>
+        </div>
+    </div>
+    <!-- ===== END NARRATIVE DOWNLOAD MODAL ===== -->
 
     <!-- OT Summary Modal (shown before final time-out) -->
     <div id="otSummaryModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4">
@@ -2841,6 +2969,199 @@
         }
         document.getElementById('uploadModal')?.addEventListener('click', function(e){ if(e.target===this) closeUploadModal(); });
         // ===== END UPLOAD MODAL =====
+
+        function showMoreNarratives() {
+            const hidden = [...document.querySelectorAll('.narrative-entry-row.hidden')];
+            hidden.slice(0, 20).forEach(r => r.classList.remove('hidden'));
+            const btn = document.getElementById('showMoreNarrativeBtn');
+            if (btn) {
+                const remaining = document.querySelectorAll('.narrative-entry-row.hidden').length;
+                if (remaining <= 0) btn.classList.add('hidden');
+                else btn.textContent = 'Show more (' + remaining + ' remaining)';
+            }
+        }
+
+        // ===== NARRATIVE REPORT =====
+        let _narrativeEditId = null;
+
+        function openNarrativeModal(entryId, existingDesc) {
+            _narrativeEditId = entryId || null;
+            document.getElementById('narrativeEntryId').value = _narrativeEditId || '';
+
+            // If editing, pre-fill description; date is locked to the existing entry's date
+            const descEl = document.getElementById('narrativeDescription');
+            descEl.value = existingDesc || '';
+            updateNarrativeCharCount();
+
+            // Title reflects mode
+            document.getElementById('narrativeModalTitle').textContent =
+                _narrativeEditId ? '✏ Edit Narrative Entry' : '📝 Daily Narrative Report';
+            document.getElementById('narrativeSubmitLabel').textContent =
+                _narrativeEditId ? 'Save Changes' : 'Submit Report';
+
+            // For new entries, default to today; for edits lock the date field
+            const dateEl = document.getElementById('narrativeDate');
+            dateEl.disabled = !!_narrativeEditId;
+            dateEl.classList.toggle('opacity-50', !!_narrativeEditId);
+            document.getElementById('narrativeDateNote').textContent = _narrativeEditId
+                ? 'Date is fixed for existing entries.'
+                : 'One entry per day. Past dates allowed if you forgot to submit.';
+
+            // Reset photo state
+            clearNarrativePhoto();
+            document.getElementById('narrativeSubmitError').classList.add('hidden');
+            document.getElementById('narrativeDescError').classList.add('hidden');
+
+            document.getElementById('narrativeViewModal').classList.add('hidden');
+            document.getElementById('narrativeModal').classList.remove('hidden');
+            descEl.focus();
+        }
+
+        function closeNarrativeModal() {
+            document.getElementById('narrativeModal').classList.add('hidden');
+            _narrativeEditId = null;
+        }
+
+        function updateNarrativeCharCount() {
+            const val = document.getElementById('narrativeDescription').value;
+            document.getElementById('narrativeCharCount').textContent = val.length;
+        }
+        document.getElementById('narrativeDescription')?.addEventListener('input', updateNarrativeCharCount);
+
+        function previewNarrativePhoto(input) {
+            const errEl = document.getElementById('narrativePhotoError');
+            errEl.classList.add('hidden');
+            if (!input.files || !input.files.length) return;
+            const file = input.files[0];
+            const sizeMB = file.size / (1024 * 1024);
+            if (sizeMB > 5) {
+                errEl.textContent = 'Photo exceeds 5 MB. Please choose a smaller image.';
+                errEl.classList.remove('hidden');
+                input.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = e => {
+                document.getElementById('narrativePreviewImg').src = e.target.result;
+                document.getElementById('narrativePhotoPreview').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearNarrativePhoto() {
+            document.getElementById('narrativePhoto').value = '';
+            document.getElementById('narrativePhotoPreview').classList.add('hidden');
+            document.getElementById('narrativePreviewImg').src = '';
+            document.getElementById('narrativePhotoError').classList.add('hidden');
+        }
+
+        async function submitNarrative() {
+            const descEl   = document.getElementById('narrativeDescription');
+            const errEl    = document.getElementById('narrativeSubmitError');
+            const descErr  = document.getElementById('narrativeDescError');
+            const btn      = document.getElementById('narrativeSubmitBtn');
+            const label    = document.getElementById('narrativeSubmitLabel');
+
+            errEl.classList.add('hidden');
+            descErr.classList.add('hidden');
+
+            const desc = descEl.value.trim();
+            if (desc.length < 10) {
+                descErr.textContent = 'Please write at least 10 characters describing your day.';
+                descErr.classList.remove('hidden');
+                descEl.focus();
+                return;
+            }
+
+            // Photo error check
+            const photoErr = document.getElementById('narrativePhotoError');
+            if (!photoErr.classList.contains('hidden')) return;
+
+            btn.disabled = true;
+            const origLabel = label.textContent;
+            label.textContent = 'Saving…';
+
+            const formData = new FormData();
+            formData.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}');
+            formData.append('description', desc);
+
+            const photoFile = document.getElementById('narrativePhoto').files[0];
+            if (photoFile) formData.append('photo', photoFile);
+
+            let url, method;
+            if (_narrativeEditId) {
+                // PUT via POST + _method spoofing
+                formData.append('_method', 'PUT');
+                url    = '/daily-narrative/' + _narrativeEditId;
+                method = 'POST';
+            } else {
+                const dateVal = document.getElementById('narrativeDate').value;
+                if (!dateVal) {
+                    errEl.textContent = 'Please select a date.';
+                    errEl.classList.remove('hidden');
+                    btn.disabled = false; label.textContent = origLabel;
+                    return;
+                }
+                formData.append('report_date', dateVal);
+                url    = '/daily-narrative';
+                method = 'POST';
+            }
+
+            try {
+                const res  = await fetch(url, { method, body: formData });
+                const data = await res.json();
+
+                if (data.success) {
+                    closeNarrativeModal();
+                    // Show success and reload to reflect new entry
+                    window.location.reload();
+                } else {
+                    errEl.textContent = data.message || 'Something went wrong. Please try again.';
+                    errEl.classList.remove('hidden');
+                    btn.disabled = false; label.textContent = origLabel;
+                }
+            } catch (e) {
+                errEl.textContent = 'Network error. Please try again.';
+                errEl.classList.remove('hidden');
+                btn.disabled = false; label.textContent = origLabel;
+            }
+        }
+
+        // View modal
+        function openNarrativeViewModal(id, desc, photoUrl, dayNum, dateStr) {
+            document.getElementById('nvTitle').textContent = 'Day ' + dayNum;
+            document.getElementById('nvDate').textContent  = dateStr;
+            document.getElementById('nvDesc').textContent  = desc;
+            const photoWrap = document.getElementById('nvPhotoWrap');
+            const photoImg  = document.getElementById('nvPhoto');
+            if (photoUrl) {
+                photoImg.src = photoUrl;
+                photoWrap.classList.remove('hidden');
+            } else {
+                photoWrap.classList.add('hidden');
+            }
+            // Wire edit button
+            document.getElementById('nvEditBtn').onclick = () => {
+                closeNarrativeViewModal();
+                openNarrativeModal(id, desc);
+            };
+            document.getElementById('narrativeViewModal').classList.remove('hidden');
+        }
+        function closeNarrativeViewModal() {
+            document.getElementById('narrativeViewModal').classList.add('hidden');
+        }
+
+        // Download modal
+        function openNarrativeDownloadModal() {
+            const count = document.querySelectorAll('.narrative-entry-row, [data-narrative-id]').length
+                        || {{ \App\Models\DailyNarrative::where('student_id', $user->id)->count() }};
+            document.getElementById('dlDayCount').textContent = count;
+            document.getElementById('narrativeDownloadModal').classList.remove('hidden');
+        }
+        function closeNarrativeDownloadModal() {
+            document.getElementById('narrativeDownloadModal').classList.add('hidden');
+        }
+        // ===== END NARRATIVE REPORT =====
 
         // ===== REPORTS SECTION =====
         function toggleReqCard(btn) {
