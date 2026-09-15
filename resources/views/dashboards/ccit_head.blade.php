@@ -2668,6 +2668,8 @@
         };
         function showSection(name) {
             try {
+                if (typeof showDashboardSkeleton === 'function') showDashboardSkeleton(name);
+
                 // Hide ALL sections first
                 document.querySelectorAll('.dash-section').forEach(s => {
                     s.classList.add('hidden');

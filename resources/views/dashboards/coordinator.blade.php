@@ -1576,6 +1576,8 @@
 
         function showSection(name) {
             try {
+                if (typeof showDashboardSkeleton === 'function') showDashboardSkeleton(name);
+
                 // hide all sections
                 document.querySelectorAll('.dash-section').forEach(s => s.classList.add('hidden'));
                 
