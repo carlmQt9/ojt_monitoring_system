@@ -175,6 +175,8 @@
     </style>
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-gray-100">
+    @include('partials.dashboard-skeleton')
+
     <!-- Sidebar Backdrop (mobile) -->
     <div id="sidebar-backdrop" class="fixed inset-0 bg-black/60 z-30 lg:hidden" onclick="closeSidebar()"></div>
 
