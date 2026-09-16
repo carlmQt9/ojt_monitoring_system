@@ -2078,9 +2078,11 @@
         const cameraCanvas = document.createElement('canvas');
         let faceDetectLoop = null;
         let faceInFrame = false;
+        let cameraPhotoCaptured = false;
 
         // ===== FACE DETECTION =====
         function setFaceGuide(detected) {
+            if (cameraPhotoCaptured) return;
             faceInFrame = detected;
             const container = document.getElementById('cameraVideoContainer');
             const statusBar = document.getElementById('faceGuideStatus');
@@ -2402,6 +2404,7 @@
             }
             
             cameraPhoto = null;
+            cameraPhotoCaptured = false;
             
             console.log('About to call startCamera()');
             startCamera();
@@ -2419,6 +2422,7 @@
             if (cameraModal) cameraModal.classList.add('hidden');
             stopCamera();
             // reset UI
+            cameraPhotoCaptured = false;
             if (cameraModalImage) cameraModalImage.src = '';
             cameraModalImage?.classList.add('hidden');
             cameraModalVideo?.classList.remove('hidden');
@@ -2621,7 +2625,9 @@
 
                         // hide capture button and stop live feed
                         cameraModalCaptureBtn.classList.add('hidden');
+                        cameraPhotoCaptured = true;
                         stopCamera();
+                        setFaceGuide(true);
                     } catch (err) {
                         console.error('capture error', err);
                         alert('Capture failed. Check camera and try again.');
@@ -2782,6 +2788,7 @@
                     cameraModalCaptureBtn.classList.remove('hidden');
                     cameraModalVideo.classList.remove('hidden');
                     // reset face guide to red before restarting
+                    cameraPhotoCaptured = false;
                     setFaceGuide(false);
                     // restart camera feed + face detection
                     startCamera();

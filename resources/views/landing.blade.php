@@ -314,7 +314,29 @@
             }
 
             .hero-bg {
+                min-height: calc(100svh - 4rem) !important;
+            }
+
+            .hero-shell > .hero-copy {
+                width: 100%;
+            }
+
+            .hero-copy > .grid.grid-cols-2 {
+                width: min(100%, 19rem);
+                margin-inline: auto;
+                column-gap: 1.25rem !important;
+                row-gap: 1rem !important;
+                padding-top: 0.5rem;
+            }
+
+            #about {
                 min-height: auto !important;
+                padding-top: 3.5rem !important;
+                padding-bottom: 3.5rem !important;
+            }
+
+            #about .about-shell {
+                align-items: start;
             }
 
             .flip-card {
