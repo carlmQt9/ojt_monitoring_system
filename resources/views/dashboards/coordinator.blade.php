@@ -355,7 +355,7 @@
             // Time-ins last 7 days
             $_dtrLabels = []; $_dtrCounts = [];
             for($i=6;$i>=0;$i--){
-                $d=\Carbon\Carbon::now()->subDays($i);
+                $d=\Carbon\Carbon::now('Asia/Manila')->subDays($i);
                 $_dtrLabels[]=$d->format('D');
                 $_dtrCounts[]=\App\Models\TimeInRecord::whereDate('date',$d->toDateString())->whereHas('student')->count();
             }
@@ -646,7 +646,9 @@
             <?php 
             $activeSchoolYear = $activeSY ? $activeSY->label : null;
             $students = \App\Models\User::where('role', 'student')
-                ->when($activeSchoolYear, fn($q) => $q->where('school_year', $activeSchoolYear))
+                ->when($activeSchoolYear, fn($q) => $q->where(function($inner) use ($activeSchoolYear) {
+                    $inner->where('school_year', $activeSchoolYear)->orWhereNull('school_year');
+                }))
                 ->get();
             ?>
 
@@ -915,10 +917,13 @@
             <?php
             try {
                 $allReports = \App\Models\StudentRequirement::with('student')
-                    ->whereHas('student')
+                    ->whereHas('student', function($q) {
+                        $q->whereNull('deleted_at');
+                    })
                     ->orderBy('created_at', 'desc')
                     ->get();
             } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Coordinator reports query failed: ' . $e->getMessage());
                 $allReports = collect([]);
             }
             $reportsByStudent = $allReports->groupBy(function($r){ return $r->student->id ?? 'no-student'; });

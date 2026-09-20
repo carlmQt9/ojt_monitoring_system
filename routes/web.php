@@ -152,10 +152,14 @@ Route::get('/dashboard', function () {
 
     // ===== AUTO-TIMEOUT: if student forgot to time out before lunch =====
     if ($user->role === 'student') {
-        $today    = now()->toDateString();
-        $nowHour  = (int) now()->format('H');
+        $manilaTime = \Carbon\Carbon::now('Asia/Manila');
+        $today      = $manilaTime->toDateString();
+        $nowHour    = (int) $manilaTime->format('H');
 
-        // Morning auto-timeout at 12:00
+        // ── Morning auto-timeout at exactly 12:00 noon ──────────────────────
+        // ONLY fires when it is currently past 12:00 PM Manila time.
+        // ONLY targets morning session of TODAY.
+        // NEVER touches afternoon sessions.
         if ($nowHour >= 12) {
             $openMorning = \App\Models\TimeInRecord::where('student_id', $user->id)
                 ->whereDate('date', $today)
@@ -163,13 +167,12 @@ Route::get('/dashboard', function () {
                 ->whereNull('time_out')
                 ->first();
             if ($openMorning) {
-                $autoOut = '12:00';
-                $inTime  = \Carbon\Carbon::createFromTimeString($openMorning->time_in);
-                $outTime = \Carbon\Carbon::createFromTimeString($autoOut);
-                $hoursWorked = round(max(0, $inTime->diffInMinutes($outTime)) / 60, 2);
+                $autoOut      = '12:00';
+                $inTime       = \Carbon\Carbon::createFromTimeString($openMorning->time_in);
+                $outTime      = \Carbon\Carbon::createFromTimeString($autoOut);
+                $hoursWorked  = round(max(0, $inTime->diffInMinutes($outTime)) / 60, 2);
                 $regularHours = min($hoursWorked, 8.0);
                 $otHours      = max(0, round($hoursWorked - 8.0, 2));
-                // Bug #9 fix: store regular_hours/ot_hours on the record so approval logic can read them
                 $openMorning->update([
                     'time_out'      => $autoOut,
                     'regular_hours' => $regularHours,
@@ -193,19 +196,23 @@ Route::get('/dashboard', function () {
             }
         }
 
-        // ===== Afternoon forgot to time out: detected on NEXT DAY login =====
-        // If student logs in today and yesterday's afternoon is still open with no time_out
-        // — mark it as incomplete/not recorded, only morning hours count
-        // NOTE: time_out = '00:00' means the student timed out at midnight — do NOT deny those.
-        $yesterday = now()->subDay()->toDateString();
+        // ── Afternoon forgot to time out: ONLY deny on NEXT DAY login ────────
+        // Conditions that ALL must be true before denying:
+        //   1. Current Manila date is strictly AFTER the record's date (it is a new day)
+        //   2. The record's date is exactly yesterday Manila date
+        //   3. The record is afternoon session with no time_out and not already denied
+        //
+        // This block will NEVER fire while the student is still on the same calendar day
+        // in Manila time — even if InfinityFree server UTC thinks it is a different day.
+        $yesterday = $manilaTime->copy()->subDay()->toDateString();
         $openAfternoonYesterday = \App\Models\TimeInRecord::where('student_id', $user->id)
-            ->whereDate('date', $yesterday)
             ->where('session', 'afternoon')
             ->whereNull('time_out')
             ->where('status', '!=', 'denied')
+            ->whereDate('date', $yesterday)
+            ->whereDate('date', '<', $today)  // double guard: record must be before today Manila
             ->first();
         if ($openAfternoonYesterday) {
-            // Mark as denied — no hours credited, afternoon time not recorded
             $openAfternoonYesterday->update([
                 'time_out'      => '00:00',
                 'regular_hours' => 0,
@@ -214,7 +221,6 @@ Route::get('/dashboard', function () {
                 'status'        => 'denied',
                 'denial_reason' => 'Auto-denied: student did not time out before end of day. Only morning hours are recorded.',
             ]);
-            // No hours credited — afternoon is forfeited
         }
     }
     // ===== END AUTO-TIMEOUT =====
@@ -254,8 +260,10 @@ Route::post('/time-in', function () {
     $student = User::findOrFail($validated['student_id']);
 
     // Determine session: afternoon only allowed after 12:50
-    $nowHour = (int) now()->format('H');
-    $nowMin  = (int) now()->format('i');
+    // Use Manila timezone so InfinityFree UTC server does not detect wrong session
+    $nowManila = \Carbon\Carbon::now('Asia/Manila');
+    $nowHour = (int) $nowManila->format('H');
+    $nowMin  = (int) $nowManila->format('i');
     $session = $validated['session'] ?? 'morning';
 
     // Auto-detect afternoon if current time >= 12:50
@@ -266,8 +274,10 @@ Route::post('/time-in', function () {
     }
 
     // Check if already timed in for this session today
+    // Use server Manila date — never the client-sent date
+    $serverTodayManila = \Carbon\Carbon::now('Asia/Manila')->toDateString();
     $existingRecord = \App\Models\TimeInRecord::where('student_id', $student->id)
-        ->whereDate('date', $validated['date'])
+        ->whereDate('date', $serverTodayManila)
         ->where('session', $session)
         ->first();
 
@@ -298,18 +308,18 @@ Route::post('/time-in', function () {
             $image_data = base64_decode($base64Image);
         }
         
-        $filename = 'time-in-' . $student->id . '-' . now()->timestamp . '.jpg';
+        $filename = 'time-in-' . $student->id . '-' . \Carbon\Carbon::now('Asia/Manila')->timestamp . '.jpg';
         $photoPath = 'time-in-photos/' . $filename;
         
         \Illuminate\Support\Facades\Storage::disk('public')->put($photoPath, $image_data);
     }
 
     // For security, always record server time for time-in to prevent client tampering
-    $serverTimeIn = now()->format('H:i');
+    $serverTimeIn = \Carbon\Carbon::now('Asia/Manila')->format('H:i');
 
     $timeInRecord = \App\Models\TimeInRecord::create([
         'student_id' => $student->id,
-        'date'       => $validated['date'],
+        'date'       => \Carbon\Carbon::now('Asia/Manila')->toDateString(), // always server Manila date
         'session'    => $session,
         'time_in'    => $serverTimeIn,
         'photo_path' => $photoPath,
@@ -332,8 +342,10 @@ Route::post('/time-out', function () {
     $validated = request()->validate($rules);
 
     // Find the open (no time_out) record for today matching session
+    // Always use server Manila date — never trust the client-sent date
+    $serverTodayManila = \Carbon\Carbon::now('Asia/Manila')->toDateString();
     $record = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
-        ->whereDate('date', $validated['date'])
+        ->whereDate('date', $serverTodayManila)
         ->whereNull('time_out')
         ->when(isset($validated['session']), fn($q) => $q->where('session', $validated['session']))
         ->latest()
@@ -358,14 +370,14 @@ Route::post('/time-out', function () {
         }
         
         $student = User::findOrFail($validated['student_id']);
-        $filename = 'time-out-' . $student->id . '-' . now()->timestamp . '.jpg';
+        $filename = 'time-out-' . $student->id . '-' . \Carbon\Carbon::now('Asia/Manila')->timestamp . '.jpg';
         $timeOutPhotoPath = 'time-out-photos/' . $filename;
         
         \Illuminate\Support\Facades\Storage::disk('public')->put($timeOutPhotoPath, $image_data);
     }
 
     // Use server time for time-out to prevent tampering
-    $serverTimeOut = now()->format('H:i');
+    $serverTimeOut = \Carbon\Carbon::now('Asia/Manila')->format('H:i');
     
     $updateData = ['time_out' => $serverTimeOut];
     if ($timeOutPhotoPath && \Illuminate\Support\Facades\Schema::hasColumn('time_in_records', 'time_out_photo_path')) {
@@ -386,7 +398,7 @@ Route::post('/time-out', function () {
 
     // Calculate total hours already logged today (previous sessions, already timed out)
     $prevSessionsToday = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
-        ->whereDate('date', $validated['date'])
+        ->whereDate('date', $serverTodayManila)
         ->whereNotNull('time_out')
         ->where('id', '!=', $record->id)
         ->get();
@@ -412,7 +424,7 @@ Route::post('/time-out', function () {
     if ($otThisSession > 0) {
         // Check if student already has an approved OT letter for today
         $otLetterApproved = \App\Models\StudentRequirement::where('student_id', $validated['student_id'])
-            ->whereDate('created_at', $validated['date'])
+            ->whereDate('created_at', $serverTodayManila)
             ->where('status', 'approved')
             ->where(function($q) {
                 $q->where('title', 'like', '%OT%')
@@ -434,7 +446,7 @@ Route::post('/time-out', function () {
     // Create daily log entry as pending (only regular hours tracked here; OT handled separately)
     \App\Models\DailyHourLog::create([
         'student_id'   => $validated['student_id'],
-        'log_date'     => $validated['date'],
+        'log_date'     => $serverTodayManila,
         'hours_logged' => $regularThisSession,
         'is_overtime'  => false,
         'status'       => 'pending',
@@ -444,7 +456,7 @@ Route::post('/time-out', function () {
     if ($otThisSession > 0 && $otStatus === 'approved') {
         \App\Models\DailyHourLog::create([
             'student_id'   => $validated['student_id'],
-            'log_date'     => $validated['date'],
+            'log_date'     => $serverTodayManila,
             'hours_logged' => $otThisSession,
             'is_overtime'  => true,
             'status'       => 'pending',
@@ -473,8 +485,10 @@ Route::post('/time-out-ajax', function () {
 
     $validated = request()->validate($rules);
 
+    // Always use server Manila date to find the record — never trust client date
+    $serverTodayManila = \Carbon\Carbon::now('Asia/Manila')->toDateString();
     $record = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
-        ->whereDate('date', $validated['date'])
+        ->whereDate('date', $serverTodayManila)
         ->first();
 
     if (!$record) {
@@ -491,12 +505,12 @@ Route::post('/time-out-ajax', function () {
             $image_data = base64_decode($base64Image);
         }
         $student = User::findOrFail($validated['student_id']);
-        $filename = 'time-out-' . $student->id . '-' . now()->timestamp . '.jpg';
+        $filename = 'time-out-' . $student->id . '-' . \Carbon\Carbon::now('Asia/Manila')->timestamp . '.jpg';
         $timeOutPhotoPath = 'time-out-photos/' . $filename;
         \Illuminate\Support\Facades\Storage::disk('public')->put($timeOutPhotoPath, $image_data);
     }
 
-    $serverTimeOut = now()->format('H:i');
+    $serverTimeOut = \Carbon\Carbon::now('Asia/Manila')->format('H:i');
 
     $updateData = ['time_out' => $serverTimeOut];
     if ($timeOutPhotoPath && \Illuminate\Support\Facades\Schema::hasColumn('time_in_records', 'time_out_photo_path')) $updateData['time_out_photo_path'] = $timeOutPhotoPath;
@@ -524,10 +538,10 @@ Route::post('/time-out-ajax', function () {
     ]);
 
     \App\Models\DailyHourLog::create([
-        'student_id' => $validated['student_id'],
-        'log_date' => $validated['date'],
+        'student_id'   => $validated['student_id'],
+        'log_date'     => $serverTodayManila,
         'hours_logged' => max(0, $hoursWorked),
-        'status' => 'approved',
+        'status'       => 'approved',
     ]);
 
     return response()->json([
@@ -1332,11 +1346,8 @@ Route::put('/requirement-templates/{id}', function ($id) {
     return back()->with('success', 'Requirement updated successfully!');
 })->name('requirement-templates.update')->middleware(['auth.custom', 'role:ccit_head']);
 
-Route::delete('/requirement-templates/{id}', function ($id) {
-    \App\Models\RequirementTemplate::findOrFail($id)->delete();
-    return back()->with('success', 'Requirement archived!');
-})->name('requirement-templates.destroy')->middleware(['auth.custom', 'role:ccit_head']);
-
+// NOTE: /force and /restore must be declared BEFORE /{id} so Laravel
+// does not swallow them as the {id} wildcard and return 404.
 Route::post('/requirement-templates/{id}/restore', function ($id) {
     \App\Models\RequirementTemplate::withTrashed()->findOrFail($id)->restore();
     return back()->with('success', 'Requirement restored!');
@@ -1346,6 +1357,11 @@ Route::delete('/requirement-templates/{id}/force', function ($id) {
     \App\Models\RequirementTemplate::withTrashed()->findOrFail($id)->forceDelete();
     return back()->with('success', 'Requirement permanently deleted!');
 })->name('requirement-templates.force-delete')->middleware(['auth.custom', 'role:ccit_head']);
+
+Route::delete('/requirement-templates/{id}', function ($id) {
+    \App\Models\RequirementTemplate::findOrFail($id)->delete();
+    return back()->with('success', 'Requirement archived!');
+})->name('requirement-templates.destroy')->middleware(['auth.custom', 'role:ccit_head']);
 
 // Forgot Password
 Route::post('/forgot-password', function () {

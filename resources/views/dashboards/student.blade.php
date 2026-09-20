@@ -383,7 +383,7 @@
             $_last7 = [];
             $_last7Labels = [];
             for ($i = 6; $i >= 0; $i--) {
-                $d = \Carbon\Carbon::now()->subDays($i);
+                $d = \Carbon\Carbon::now('Asia/Manila')->subDays($i);
                 $_last7Labels[] = $d->format('D');
                 $rec = \App\Models\TimeInRecord::where('student_id', $user->id)
                     ->whereDate('date', $d->toDateString())
@@ -458,7 +458,7 @@
             $_timeinCompleted = $_timeinSH->hours_completed ?? 0;
             $_ojtDone = $_timeinCompleted >= $_timeinRequired;
             $required = $_timeinRequired;
-            $today = date('Y-m-d');
+            $today = \Carbon\Carbon::now('Asia/Manila')->toDateString();
             $totalDayHours = 0;
         @endphp
 
@@ -637,8 +637,8 @@
                     <h2 class="text-2xl font-bold text-white mb-6">Daily Time-In</h2>
                     
                     <?php 
-                    $today = date('Y-m-d');
-                    $nowHour = (int) date('H');
+                    $today   = \Carbon\Carbon::now('Asia/Manila')->toDateString();
+                    $nowHour = (int) \Carbon\Carbon::now('Asia/Manila')->format('H');
 
                     // Get all today's records
                     $todayRecords = \App\Models\TimeInRecord::where('student_id', $user->id)
@@ -750,7 +750,7 @@
                                 $_prevMins = $todayRecords->whereNotNull('time_out')->where('id','!=',$activeRecord->id)
                                     ->sum(function($r){$i=\Carbon\Carbon::parse($r->time_in);$o=\Carbon\Carbon::parse($r->time_out);if($o->lte($i))$o->addDay();return max(0,$i->diffInMinutes($o));});
                                 // Elapsed minutes in the current active session (server now - time_in)
-                                $_activeElapsed = max(0, \Carbon\Carbon::createFromTimeString($activeRecord->time_in)->diffInMinutes(\Carbon\Carbon::now()));
+                                $_activeElapsed = max(0, \Carbon\Carbon::createFromTimeString($activeRecord->time_in)->diffInMinutes(\Carbon\Carbon::now('Asia/Manila')));
                                 // Total minutes logged today = completed + currently elapsed
                                 $_totalDayMinsNow = $_prevMins + $_activeElapsed;
                                 // Has student hit 8 hours (480 mins) based on actual time data?
@@ -842,7 +842,7 @@
                                             onsubmit="return validateOtLetterForm(this)" id="otLetterUploadForm">
                                             @csrf
                                             <input type="hidden" name="student_id" value="{{ $user->id }}">
-                                            <input type="hidden" name="title" value="OT Letter - {{ now()->format('M d, Y') }}">
+                                            <input type="hidden" name="title" value="OT Letter - {{ \Carbon\Carbon::now('Asia/Manila')->format('M d, Y') }}">
                                             <div class="mb-3">
                                                 <label class="block text-xs text-gray-300 mb-1">Description (optional)</label>
                                                 <textarea name="description" rows="2" maxlength="1000"
@@ -1281,7 +1281,7 @@
             @php
                 $narratives = \App\Models\DailyNarrative::where('student_id', $user->id)
                     ->orderBy('day_number', 'desc')->get();
-                $todayNarrative = $narratives->first(fn($n) => $n->report_date->isToday());
+                $todayNarrative = $narratives->first(fn($n) => $n->report_date->isSameDay(\Carbon\Carbon::now('Asia/Manila')));
             @endphp
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
                 <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
@@ -1341,16 +1341,20 @@
             $dbOnboardingKeys = \App\Models\RequirementTemplate::where('category','onboarding')->pluck('name')->toArray();
             $onboardingKeys = !empty($dbOnboardingKeys) ? $dbOnboardingKeys : ['Internship Application Form','Letter of Acceptance','Parental Consent','School ID','Government ID','Vaccination Card','Medical Report','Insurance'];
             $onboardingReports = $allSubmitted->filter(fn($r) => collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false));
-            
-            // OT Letters only - filter by title containing 'OT', 'overtime', or 'over time'
-            $otLetters = $allSubmitted->filter(function($r) use ($onboardingKeys) {
+
+            // Daily template keys from DB
+            $dbDailyKeys = \App\Models\RequirementTemplate::where('category','daily')->pluck('name')->toArray();
+
+            // Daily Submissions = OT letters + any submission matching a daily template title
+            $otLetters = $allSubmitted->filter(function($r) use ($onboardingKeys, $dbDailyKeys) {
                 $isNotOnboarding = !collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false);
-                $isOT = stripos($r->title, 'OT') !== false || 
-                        stripos($r->title, 'overtime') !== false || 
+                $isOT = stripos($r->title, 'OT') !== false ||
+                        stripos($r->title, 'overtime') !== false ||
                         stripos($r->title, 'over time') !== false;
-                return $isNotOnboarding && $isOT;
+                $isDailyTemplate = collect($dbDailyKeys)->contains(fn($k) => stripos($r->title, $k) !== false);
+                return $isNotOnboarding && ($isOT || $isDailyTemplate);
             })->values();
-            
+
             $latestByTitle = $allSubmitted->groupBy(fn($r) => strtolower(trim($r->title)))
                 ->map(fn($group) => $group->sortByDesc('created_at')->first());
         ?>
@@ -1724,8 +1728,8 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-300 mb-1">Report Date *</label>
                     <input type="date" id="narrativeDate"
-                        max="{{ now()->toDateString() }}"
-                        value="{{ now()->toDateString() }}"
+                        max="{{ \Carbon\Carbon::now('Asia/Manila')->toDateString() }}"
+                        value="{{ \Carbon\Carbon::now('Asia/Manila')->toDateString() }}"
                         class="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-green-500 focus:outline-none">
                     <p id="narrativeDateNote" class="text-xs text-gray-500 mt-1">One entry per day. Past dates allowed if you forgot to submit.</p>
                 </div>

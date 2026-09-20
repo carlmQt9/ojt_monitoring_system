@@ -13,6 +13,12 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Force Manila timezone at PHP level — overrides InfinityFree server UTC timezone.
+        // This ensures date(), Carbon::now(), and all time functions return PHT (UTC+8).
+        date_default_timezone_set('Asia/Manila');
+        \Carbon\Carbon::setTestNow(null); // clear any test now
+        \Carbon\Carbon::now()->setTimezone('Asia/Manila');
+
         // 1. Login — 5 attempts per minute per IP
         RateLimiter::for('login', function (Request $request) {
             return Limit::perMinute(5)

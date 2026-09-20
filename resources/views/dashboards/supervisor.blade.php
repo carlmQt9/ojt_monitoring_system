@@ -360,7 +360,9 @@
                             $q->orWhere('company_id', $companyId);
                         }
                     })
-                    ->when($activeSchoolYear, fn($q) => $q->where('school_year', $activeSchoolYear))
+                    ->when($activeSchoolYear, fn($q) => $q->where(function($inner) use ($activeSchoolYear) {
+                        $inner->where('school_year', $activeSchoolYear)->orWhereNull('school_year');
+                    }))
                     ->get();
 
                 $totalStudents = $supervisorStudents->count();
@@ -424,7 +426,7 @@
             $_compId = $user->company->id ?? null;
             $_tiLabels = []; $_tiCounts = [];
             for($i=6;$i>=0;$i--) {
-                $d=\Carbon\Carbon::now()->subDays($i);
+                $d=\Carbon\Carbon::now('Asia/Manila')->subDays($i);
                 $_tiLabels[]=$d->format('D');
                 $q=\App\Models\TimeInRecord::whereDate('date',$d->toDateString())->whereHas('student');
                 if($_compId) $q->whereHas('student',fn($sq)=>$sq->where('company_id',$_compId));
@@ -822,24 +824,8 @@
                                                 @elseif($allDenied)
                                                 <span class="px-2 py-0.5 bg-red-500/20 text-red-300 text-[10px] rounded-full">Denied</span>
                                                 @elseif($hasIncomplete)
-                                                {{-- Afternoon not finished — auto-deny it and show denied --}}
-                                                @php
-                                                    // Auto-deny the incomplete afternoon record now
-                                                    \App\Models\TimeInRecord::where('student_id', $student->id)
-                                                        ->whereDate('date', $logDate)
-                                                        ->where('session', 'afternoon')
-                                                        ->whereNull('time_out')
-                                                        ->where('status', '!=', 'denied')
-                                                        ->update([
-                                                            'time_out'      => '00:00',
-                                                            'regular_hours' => 0,
-                                                            'ot_hours'      => 0,
-                                                            'ot_status'     => null,
-                                                            'status'        => 'denied',
-                                                            'denial_reason' => 'Auto-denied: student did not time out.',
-                                                        ]);
-                                                @endphp
-                                                <span class="px-2 py-0.5 bg-red-500/20 text-red-300 text-[10px] rounded-full font-semibold">Denied (incomplete)</span>
+                                                {{-- Afternoon session still open — student has not timed out yet --}}
+                                                <span class="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-[10px] rounded-full font-semibold">⏳ Not Finished</span>
                                                 @elseif($anyPending)
                                                 {{-- All sessions timed out and pending — show approve/deny --}}
                                                 <form method="POST" action="{{ url('/approve-all-time-in/'.$student->id) }}" class="inline">

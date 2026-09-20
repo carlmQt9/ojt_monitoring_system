@@ -708,65 +708,41 @@
                 @endif
             </div>
 
-            <!-- Daily Requirements -->
+            <!-- Daily Requirements — static Daily Narrative, cannot be archived or deleted -->
             <div class="mb-6 bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-6">
-                <h3 class="text-lg font-bold text-white mb-4">📋 Daily Submission Requirements</h3>
-                @php $dailyTpls = $reqTemplates->where('category','daily'); @endphp
-                @if($dailyTpls->isNotEmpty())
-                {{-- Desktop table --}}
+                <h3 class="text-lg font-bold text-white mb-1">📋 Daily Submission Requirements</h3>
+                <p class="text-gray-400 text-xs mb-4">This section is system-defined and cannot be archived or deleted.</p>
                 <div class="hidden sm:block overflow-x-auto">
                     <table class="w-full">
                         <thead>
                             <tr class="border-b border-slate-700">
                                 <th class="text-left py-2 px-3 text-gray-300 font-semibold">Name</th>
                                 <th class="text-left py-2 px-3 text-gray-300 font-semibold">Description</th>
-                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Max Files</th>
-                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Order</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Type</th>
                                 <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($dailyTpls as $tpl)
-                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors">
-                                <td class="py-3 px-3 text-gray-200 font-medium">{{ $tpl->name }}</td>
-                                <td class="py-3 px-3 text-gray-400 text-sm">{{ $tpl->description ?? '-' }}</td>
-                                <td class="py-3 px-3 text-center"><span class="px-2 py-1 bg-green-500/20 text-green-400 rounded text-sm">{{ $tpl->max_files }}</span></td>
-                                <td class="py-3 px-3 text-center text-gray-400 text-sm">{{ $tpl->sort_order }}</td>
-                                <td class="py-3 px-3 text-center">
-                                    <div class="flex items-center justify-center gap-2">
-                                        <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }},{{ $tpl->category === 'onboarding' ? $onboardingCount : $dailyCount }})" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Edit</button>
-                                        <button onclick="showArchiveTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Archive</button>
-                                    </div>
-                                </td>
+                            <tr class="border-b border-slate-700/50">
+                                <td class="py-3 px-3 text-gray-200 font-medium">Daily Narrative Report</td>
+                                <td class="py-3 px-3 text-gray-400 text-sm">Student's daily OJT journal entry with optional photo, auto-numbered per day.</td>
+                                <td class="py-3 px-3 text-center"><span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold">System-Defined</span></td>
+                                <td class="py-3 px-3 text-center"><span class="text-gray-500 text-xs italic">Cannot be archived</span></td>
                             </tr>
-                            @endforeach
                         </tbody>
                     </table>
                 </div>
-                {{-- Mobile card list --}}
-                <div class="sm:hidden space-y-3">
-                    @foreach($dailyTpls as $tpl)
+                {{-- Mobile card --}}
+                <div class="sm:hidden">
                     <div class="bg-slate-700/30 border border-slate-600/50 rounded-xl p-4">
                         <div class="flex items-start justify-between gap-2 mb-1">
-                            <p class="text-gray-200 font-semibold text-sm leading-tight">{{ $tpl->name }}</p>
-                            <span class="shrink-0 px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs font-semibold">{{ $tpl->max_files }} file{{ $tpl->max_files != 1 ? 's' : '' }}</span>
+                            <p class="text-gray-200 font-semibold text-sm leading-tight">Daily Narrative Report</p>
+                            <span class="shrink-0 px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold">System-Defined</span>
                         </div>
-                        @if($tpl->description)
-                        <p class="text-gray-400 text-xs mb-2">{{ $tpl->description }}</p>
-                        @endif
-                        <p class="text-gray-500 text-xs mb-3">Order: {{ $tpl->sort_order }}</p>
-                        <div class="flex gap-2">
-                            <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }},{{ $tpl->category === 'onboarding' ? $onboardingCount : $dailyCount }})"
-                                class="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors">✏️ Edit</button>
-                            <button onclick="showArchiveTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')"
-                                class="flex-1 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition-colors">🗑 Archive</button>
-                        </div>
+                        <p class="text-gray-400 text-xs mb-2">Student's daily OJT journal entry with optional photo, auto-numbered per day.</p>
+                        <p class="text-gray-500 text-xs italic">Cannot be archived or deleted.</p>
                     </div>
-                    @endforeach
                 </div>
-                @else
-                <p class="text-gray-400 text-center py-6">No daily requirements yet.</p>
-                @endif
             </div>
 
             <!-- Archive Trash -->
@@ -875,7 +851,6 @@
                     <label class="block text-sm font-medium text-gray-300 mb-2">Category *</label>
                     <select name="category" required class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
                         <option value="onboarding">Onboarding</option>
-                        <option value="daily">Daily Submission</option>
                     </select>
                 </div>
                 <div>
@@ -917,7 +892,7 @@
                     <label class="block text-sm font-medium text-gray-300 mb-2">Category *</label>
                     <select name="category" id="edit_tpl_category" required class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
                         <option value="onboarding">Onboarding</option>
-                        <option value="daily">Daily Submission</option>
+                    </select>
                     </select>
                 </div>
                 <div>
