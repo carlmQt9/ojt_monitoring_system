@@ -801,6 +801,7 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
         }
         $session->update([
             'status'        => 'denied',
+            'verified'      => false,
             'ot_status'     => $session->ot_hours > 0 ? 'denied' : $session->ot_status,
             'denial_reason' => $validated['reason'],
             'approved_by'   => $reviewer->id,
@@ -885,7 +886,7 @@ Route::post('/deny-all-time-in/{studentId}', function ($studentId) {
     $totalRegular = 0;
     foreach ($pendingRecords as $record) {
         $totalRegular += floatval($record->regular_hours ?? 0);
-        $record->update(['status' => 'denied', 'ot_status' => $record->ot_hours > 0 ? 'denied' : $record->ot_status,
+        $record->update(['status' => 'denied', 'verified' => false, 'ot_status' => $record->ot_hours > 0 ? 'denied' : $record->ot_status,
             'denial_reason' => $validated['reason'], 'approved_by' => $reviewer->id, 'approved_at' => now()]);
     }
     if ($totalRegular > 0) {
@@ -2021,8 +2022,16 @@ Route::get('/api/reports/students', function () {
 
 Route::get('/api/reports/attendance-data', function () {
     $rows = [];
-    foreach (\App\Models\TimeInRecord::with('student')->whereHas('student')->orderBy('date','desc')->get() as $rec) {
+    foreach (\App\Models\TimeInRecord::with('student')
+        ->whereHas('student')
+        ->where('status', 'approved')
+        ->where('verified', true)
+        ->whereNotNull('time_out')
+        ->whereNull('denial_reason')
+        ->orderBy('date','desc')
+        ->get() as $rec) {
         if (!$rec->student) continue;
+        if (!$rec->time_in || !$rec->time_out || $rec->time_out === '00:00:00') continue;
         $hrs = $rec->time_out ? round((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lte($i))$o->addDay();return $i->diffInMinutes($o);})(  $rec->time_in,$rec->time_out)/60, 2) : 0;
         $rows[] = [
             'student_name' => $rec->student->name,
@@ -2030,7 +2039,7 @@ Route::get('/api/reports/attendance-data', function () {
             'time_in'      => $rec->time_in ?? '—',
             'time_out'     => $rec->time_out ?? '—',
             'hours'        => $hrs,
-            'status'       => $rec->status ?? 'pending',
+            'status'       => $rec->status ?? 'approved',
         ];
     }
     return response()->json(['records' => $rows]);
@@ -2038,8 +2047,16 @@ Route::get('/api/reports/attendance-data', function () {
 
 Route::get('/api/reports/attendance', function () {
     $rows = [];
-    foreach (\App\Models\TimeInRecord::with('student')->whereHas('student')->orderBy('date','desc')->get() as $rec) {
+    foreach (\App\Models\TimeInRecord::with('student')
+        ->whereHas('student')
+        ->where('status', 'approved')
+        ->where('verified', true)
+        ->whereNotNull('time_out')
+        ->whereNull('denial_reason')
+        ->orderBy('date','desc')
+        ->get() as $rec) {
         if (!$rec->student) continue;
+        if (!$rec->time_in || !$rec->time_out || $rec->time_out === '00:00:00') continue;
         $hrs = $rec->time_out ? round((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lte($i))$o->addDay();return $i->diffInMinutes($o);})(  $rec->time_in,$rec->time_out)/60,4) : 0;
         $rows[] = ['date'=>$rec->date->format('Y-m-d'),'name'=>$rec->student->name,'company'=>$rec->student->company->name??'N/A','time_in'=>$rec->time_in,'time_out'=>$rec->time_out??'-','hours'=>$hrs,'status'=>$rec->status,'verified'=>$rec->verified];
     }

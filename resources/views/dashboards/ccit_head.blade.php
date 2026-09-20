@@ -405,10 +405,10 @@
                     <button onclick="approveAll()" id="approveAllBtn" class="hidden col-span-2 sm:col-span-auto px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold">✓ Approve All Pending</button>
                     <select id="roleFilter" onchange="applyFilters()" class="px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded-lg text-sm focus:outline-none focus:border-red-500">
                         <option value="">All Roles</option>
-                        <option value="student">Student</option>
-                        <option value="supervisor">Supervisor</option>
-                        <option value="coordinator">Coordinator</option>
                         <option value="ccit_head">CCIT Head</option>
+                        <option value="coordinator">Coordinator</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="student">Student</option>
                     </select>
                     <select id="approvalFilter" onchange="applyFilters()" class="px-3 py-2 bg-slate-700 border border-slate-600 text-white rounded-lg text-sm focus:outline-none focus:border-red-500">
                         <option value="">All Status</option>
@@ -1057,10 +1057,10 @@
                             <label class="block text-gray-300 mb-2">Role</label>
                             <select name="role" required class="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:border-red-500">
                                 <option value="">Select Role</option>
-                                <option value="student">Student</option>
-                                <option value="supervisor">Supervisor</option>
-                                <option value="coordinator">Coordinator</option>
                                 <option value="ccit_head">CCIT Head</option>
+                                <option value="coordinator">Coordinator</option>
+                                <option value="supervisor">Supervisor</option>
+                                <option value="student">Student</option>
                             </select>
                         </div>
                         <div id="companyField">
@@ -1603,11 +1603,18 @@
                 approveAllBtn.textContent = `✓ Approve All Pending (${pendingCount})`;
             }
             if (users.length > 0) {
-                // sort: pending first
+                const roleOrder = { ccit_head: 1, coordinator: 2, supervisor: 3, student: 4 };
+                // sort: pending first, then by your custom role priority
                 const sorted = [...users].sort((a, b) => {
                     const aPending = !a.is_approved && a.role !== 'student';
                     const bPending = !b.is_approved && b.role !== 'student';
-                    return bPending - aPending;
+                    if (bPending !== aPending) return bPending - aPending;
+
+                    const aRoleRank = roleOrder[a.role] ?? 99;
+                    const bRoleRank = roleOrder[b.role] ?? 99;
+                    if (aRoleRank !== bRoleRank) return aRoleRank - bRoleRank;
+
+                    return (a.name || '').localeCompare(b.name || '');
                 });
                 sorted.forEach(user => {
                     const isPending = !user.is_approved && user.role !== 'student';
@@ -2012,12 +2019,21 @@
 
             /* ── fetch data ── */
             let rows = [], columns = [], title = '', subtitle = '';
+            const roleOrder = { ccit_head: 1, coordinator: 2, supervisor: 3, student: 4 };
             if (type === 'system') {
                 title = 'OJT Monitoring System — System Report';
                 subtitle = 'All registered users and their roles';
                 const res = await fetch(currentSchoolYear ? `/api/users?school_year=${encodeURIComponent(currentSchoolYear)}` : '/api/users').then(r=>r.json());
                 columns = ['Name','Email','Role','Company','School Year'];
-                rows = (res.users||[]).map(u=>[u.name, u.email, u.role, u.company||'—', u.school_year||'—']);
+                rows = (res.users||[])
+                    .slice()
+                    .sort((a,b)=> {
+                        const aRank = roleOrder[a.role] ?? 99;
+                        const bRank = roleOrder[b.role] ?? 99;
+                        if (aRank !== bRank) return aRank - bRank;
+                        return (a.name || '').localeCompare(b.name || '');
+                    })
+                    .map(u=>[u.name, u.email, u.role, u.company||'—', u.school_year||'—']);
             } else if (type === 'students') {
                 title = 'OJT Monitoring System — Student Progress Report';
                 subtitle = 'OJT hours completed and status per student';
@@ -2034,7 +2050,9 @@
                 subtitle = 'System-wide time-in/out records';
                 const res = await fetch('/api/reports/attendance-data').then(r=>r.json()).catch(()=>({records:[]}));
                 columns = ['Student','Date','Time In','Time Out','Hours'];
-                rows = (res.records||[]).map(r=>[r.student_name, r.date, r.time_in||'—', r.time_out||'—', r.hours||'—']);
+                rows = (res.records||[])
+                    .filter(r => r && r.status === 'approved' && r.time_in && r.time_out && r.time_out !== '—' && r.time_out !== '00:00:00')
+                    .map(r=>[r.student_name, r.date, r.time_in||'—', r.time_out||'—', r.hours||'—']);
             }
 
             if (format === 'pdf') {
@@ -2043,7 +2061,7 @@
                 const W = doc.internal.pageSize.getWidth();
 
                 /* header bar */
-                doc.setFillColor(185,28,28);
+                doc.setFillColor(96,165,250);
                 doc.rect(0,0,W,28,'F');
                 doc.setTextColor(255,255,255);
                 doc.setFontSize(16); doc.setFont('helvetica','bold');
@@ -2066,7 +2084,7 @@
                     startY: 60,
                     head: [columns],
                     body: rows.length ? rows : [Array(columns.length).fill('No data available')],
-                    headStyles: { fillColor:[185,28,28], textColor:255, fontStyle:'bold', fontSize:9 },
+                    headStyles: { fillColor:[96,165,250], textColor:255, fontStyle:'bold', fontSize:9 },
                     bodyStyles: { fontSize:8, textColor:[30,30,30] },
                     alternateRowStyles: { fillColor:[248,248,248] },
                     styles: { cellPadding:3, lineColor:[220,220,220], lineWidth:0.2 },

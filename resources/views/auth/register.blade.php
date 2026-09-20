@@ -250,10 +250,10 @@
                             style="background:rgba(8,20,70,0.98);border:1px solid rgba(59,130,246,0.35);backdrop-filter:blur(16px)">
                             @php
                             $roleOptions = [
-                                ['value'=>'student',     'icon'=>'🎓', 'label'=>'Student',     'sub'=>'Track OJT hours & submit requirements'],
-                                ['value'=>'supervisor',  'icon'=>'👔', 'label'=>'Supervisor',   'sub'=>'Monitor & evaluate assigned interns'],
-                                ['value'=>'coordinator', 'icon'=>'📋', 'label'=>'Coordinator',  'sub'=>'Oversee all students & manage companies'],
                                 ['value'=>'ccit_head',   'icon'=>'🏫', 'label'=>'CCIT Head',    'sub'=>'Full system administration & analytics'],
+                                ['value'=>'coordinator', 'icon'=>'📋', 'label'=>'Coordinator',  'sub'=>'Oversee all students & manage companies'],
+                                ['value'=>'supervisor',  'icon'=>'👔', 'label'=>'Supervisor',   'sub'=>'Monitor & evaluate assigned interns'],
+                                ['value'=>'student',     'icon'=>'🎓', 'label'=>'Student',     'sub'=>'Track OJT hours & submit requirements'],
                             ];
                             @endphp
                             @foreach($roleOptions as $opt)
