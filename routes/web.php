@@ -243,6 +243,16 @@ Route::get('/logout', function () {
 
 // Time-In Routes — Students only
 Route::post('/time-in', function () {
+    $studentUser = User::findOrFail(session('user_id'));
+
+    if ($studentUser->role !== 'student') {
+        abort(403, 'Access denied: only students can record time-in.');
+    }
+
+    if (request()->filled('student_id') && (int) request()->input('student_id') !== (int) $studentUser->id) {
+        abort(403, 'You can only record time-in for yourself.');
+    }
+
     $rules = [
         'student_id' => 'required|exists:users,id',
         'date'       => 'required|date',
@@ -642,8 +652,30 @@ Route::post('/deny-hours/{logId}', function ($logId) {
 })->name('deny-hours')->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
 Route::post('/approve-time-in/{recordId}', function ($recordId) {
-    $record = \App\Models\TimeInRecord::findOrFail($recordId);
     $reviewer = User::findOrFail(session('user_id'));
+
+    if (!in_array($reviewer->role, ['coordinator', 'supervisor'])) {
+        abort(403, 'Access denied: only coordinators and supervisors can approve time-in records.');
+    }
+
+    $record = \App\Models\TimeInRecord::find($recordId);
+
+    if (!$record) {
+        if ($reviewer->role === 'supervisor') {
+            abort(403, 'You can only approve time-in records for students in your company.');
+        }
+
+        abort(404);
+    }
+
+    if ($reviewer->role === 'supervisor') {
+        $student = User::find($record->student_id);
+        if (!$student || $student->company_id !== $reviewer->company_id) {
+            abort(403, 'You can only approve time-in records for students in your company.');
+        }
+    }
+
+    $totalToCredit = 0;
 
     if ($record->status !== 'approved' && $record->time_in && $record->time_out) {
         // Get ALL sessions for this student on this date
@@ -663,7 +695,6 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
                   ->orWhere('title', 'like', '%over time%');
             })->exists();
 
-        $totalToCredit = 0;
         foreach ($allDaySessions as $session) {
             $regularHours = floatval($session->regular_hours ?? 0);
             $otHours = floatval($session->ot_hours ?? 0);
@@ -1076,6 +1107,20 @@ Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
 })->name('approve-requirement')->middleware(['auth.custom', 'role:coordinator,ccit_head,supervisor']);
 
 Route::post('/save-evaluation/{studentId}', function ($studentId) {
+    $reviewer = User::findOrFail(session('user_id'));
+
+    if ($reviewer->role !== 'supervisor') {
+        abort(403, 'Access denied: only supervisors can evaluate students.');
+    }
+
+    $targetStudent = User::find($studentId);
+    $completedHours = \App\Models\StudentHours::where('student_id', $studentId)
+        ->value('hours_completed') ?? 0;
+
+    if (!$targetStudent || (float) $completedHours < 600) {
+        abort(403, 'Evaluation is not allowed until the student completes 600 hours.');
+    }
+
     try {
         $data = request()->validate([
             'supervisor_id'                    => 'required|integer',
@@ -1119,7 +1164,11 @@ Route::post('/save-evaluation/{studentId}', function ($studentId) {
         );
         return response()->json(['success' => true, 'rating' => $eval->rating, 'message' => 'Evaluation submitted successfully!']);
     } catch (\Illuminate\Validation\ValidationException $e) {
-        return response()->json(['success' => false, 'message' => 'Validation failed: ' . implode(', ', array_merge(...array_values($e->errors())))], 422);
+        $messages = collect($e->errors())->flatten()->all();
+        return response()->json([
+            'success' => false,
+            'message' => 'Validation failed: ' . implode(', ', $messages)
+        ], 422);
     } catch (\Throwable $e) {
         \Illuminate\Support\Facades\Log::error('Evaluation save error: ' . $e->getMessage());
         return response()->json(['success' => false, 'message' => 'An error occurred. Please try again.'], 500);
@@ -1558,12 +1607,12 @@ Route::get('/api/companies', function () {
 Route::get('/api/school-years', function () {
     $years = \App\Models\SchoolYear::orderBy('label', 'desc')->get();
     return response()->json(['school_years' => $years]);
-});
+})->middleware('role:ccit_head');
 
 Route::get('/api/school-years/archived', function () {
     $archived = \App\Models\SchoolYear::onlyTrashed()->orderBy('deleted_at', 'desc')->get();
     return response()->json(['school_years' => $archived]);
-});
+})->middleware('role:ccit_head');
 
 Route::post('/api/school-years', function () {
     $validated = request()->validate([
@@ -1640,7 +1689,7 @@ Route::get('/api/settings', function () {
     $required = \App\Models\StudentHours::query()->value('total_hours_required') ?? 600;
     $email = cache('settings.email_notifications', true);
     return response()->json(['required_hours' => $required, 'email_notifications' => $email]);
-});
+})->middleware('role:ccit_head');
 
 Route::get('/api/dashboard-stats', function () {
     $sy = request('school_year');
