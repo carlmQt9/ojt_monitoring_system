@@ -25,8 +25,8 @@ class AuthMiddleware
     {
         // Check if user session exists
         if (!session('user_id')) {
-            // For API routes, return JSON error
-            if ($request->expectsJson() || $request->is('api/*')) {
+            // For API/AJAX routes, return JSON error
+            if ($request->expectsJson() || $request->is('api/*') || $request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Unauthenticated. Please log in.'
@@ -44,7 +44,7 @@ class AuthMiddleware
         if (!$user) {
             session()->flush();
             
-            if ($request->expectsJson() || $request->is('api/*')) {
+            if ($request->expectsJson() || $request->is('api/*') || $request->ajax() || $request->wantsJson()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'User account not found.'
@@ -63,7 +63,7 @@ class AuthMiddleware
                 ->exists();
             if ($schoolIdArchived) {
                 session()->flush();
-                if ($request->expectsJson() || $request->is('api/*')) {
+                if ($request->expectsJson() || $request->is('api/*') || $request->ajax() || $request->wantsJson()) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Your School ID has been archived. Please contact the administrator.'

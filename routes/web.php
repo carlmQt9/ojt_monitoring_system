@@ -249,8 +249,14 @@ Route::post('/time-in', function () {
         abort(403, 'Access denied: only students can record time-in.');
     }
 
-    if (request()->filled('student_id') && (int) request()->input('student_id') !== (int) $studentUser->id) {
-        abort(403, 'You can only record time-in for yourself.');
+    // IDOR guard — fires BEFORE validation so student_id:999999 always returns 403.
+    // Uses request()->input() which reads JSON body correctly.
+    $postedId = request()->input('student_id');
+    if ($postedId !== null && $postedId !== '' && (int) $postedId !== (int) $studentUser->id) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Access Denied: You can only record time-in for yourself.',
+        ], 403);
     }
 
     $rules = [
@@ -655,23 +661,28 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
     $reviewer = User::findOrFail(session('user_id'));
 
     if (!in_array($reviewer->role, ['coordinator', 'supervisor'])) {
-        abort(403, 'Access denied: only coordinators and supervisors can approve time-in records.');
+        return response()->json([
+            'success' => false,
+            'message' => 'Access Denied: only coordinators and supervisors can approve time-in records.',
+        ], 403);
     }
 
     $record = \App\Models\TimeInRecord::find($recordId);
 
     if (!$record) {
-        if ($reviewer->role === 'supervisor') {
-            abort(403, 'You can only approve time-in records for students in your company.');
-        }
-
-        abort(404);
+        return response()->json([
+            'success' => false,
+            'message' => 'Access Denied: You can only approve time-in records for students in your company.',
+        ], 403);
     }
 
     if ($reviewer->role === 'supervisor') {
         $student = User::find($record->student_id);
         if (!$student || $student->company_id !== $reviewer->company_id) {
-            abort(403, 'You can only approve time-in records for students in your company.');
+            return response()->json([
+                'success' => false,
+                'message' => 'Access Denied: You can only approve time-in records for students in your company.',
+            ], 403);
         }
     }
 
@@ -1110,15 +1121,30 @@ Route::post('/save-evaluation/{studentId}', function ($studentId) {
     $reviewer = User::findOrFail(session('user_id'));
 
     if ($reviewer->role !== 'supervisor') {
-        abort(403, 'Access denied: only supervisors can evaluate students.');
+        return response()->json([
+            'success' => false,
+            'message' => 'Access Denied: only supervisors can evaluate students.',
+        ], 403);
     }
 
     $targetStudent = User::find($studentId);
+
+    // Company ownership: supervisor may only evaluate students in their own company
+    if (!$targetStudent || $targetStudent->company_id !== $reviewer->company_id) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Access Denied: You can only evaluate students in your company.',
+        ], 403);
+    }
+
     $completedHours = \App\Models\StudentHours::where('student_id', $studentId)
         ->value('hours_completed') ?? 0;
 
-    if (!$targetStudent || (float) $completedHours < 600) {
-        abort(403, 'Evaluation is not allowed until the student completes 600 hours.');
+    if ((float) $completedHours < 600) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Access Denied: Evaluation is not allowed until the student completes 600 hours.',
+        ], 403);
     }
 
     try {
@@ -1514,7 +1540,7 @@ Route::get('/api/school-ids', function () {
     if ($sy) $query->where('school_year', $sy);
     $ids = $query->get();
     return response()->json(['school_ids' => $ids]);
-});
+})->middleware('role:ccit_head');
 
 Route::post('/api/school-ids', function () {
     $number = trim(request()->input('school_id_number', ''));
@@ -1542,7 +1568,7 @@ Route::post('/api/school-ids', function () {
         'school_year'      => $validated['school_year'] ?? null,
     ]);
     return response()->json(['success' => true, 'school_id' => $id]);
-});
+})->middleware('role:ccit_head');
 
 Route::delete('/api/school-ids/{id}', function ($id) {
     $sid = \App\Models\StudentSchoolId::findOrFail($id);
@@ -1558,7 +1584,7 @@ Route::delete('/api/school-ids/{id}', function ($id) {
     }
 
     return response()->json(['success' => true]);
-});
+})->middleware('role:ccit_head');
 
 Route::post('/api/school-ids/{id}/restore', function ($id) {
     $sid = \App\Models\StudentSchoolId::withTrashed()->findOrFail($id);
@@ -1576,17 +1602,17 @@ Route::post('/api/school-ids/{id}/restore', function ($id) {
     }
 
     return response()->json(['success' => true]);
-});
+})->middleware('role:ccit_head');
 
 Route::delete('/api/school-ids/{id}/force', function ($id) {
     \App\Models\StudentSchoolId::withTrashed()->findOrFail($id)->forceDelete();
     return response()->json(['success' => true]);
-});
+})->middleware('role:ccit_head');
 
 Route::get('/api/school-ids/archived', function () {
     $archived = \App\Models\StudentSchoolId::onlyTrashed()->orderBy('deleted_at', 'desc')->get();
     return response()->json(['school_ids' => $archived]);
-});
+})->middleware('role:ccit_head');
 
 Route::put('/api/school-ids/{id}', function ($id) {
     $sid = \App\Models\StudentSchoolId::findOrFail($id);
@@ -1607,12 +1633,12 @@ Route::get('/api/companies', function () {
 Route::get('/api/school-years', function () {
     $years = \App\Models\SchoolYear::orderBy('label', 'desc')->get();
     return response()->json(['school_years' => $years]);
-})->middleware('role:ccit_head');
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::get('/api/school-years/archived', function () {
     $archived = \App\Models\SchoolYear::onlyTrashed()->orderBy('deleted_at', 'desc')->get();
     return response()->json(['school_years' => $archived]);
-})->middleware('role:ccit_head');
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::post('/api/school-years', function () {
     $validated = request()->validate([
@@ -1620,28 +1646,28 @@ Route::post('/api/school-years', function () {
     ]);
     $sy = \App\Models\SchoolYear::create(['label' => $validated['label'], 'is_active' => false]);
     return response()->json(['success' => true, 'school_year' => $sy]);
-});
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::delete('/api/school-years/{id}', function ($id) {
     \App\Models\SchoolYear::findOrFail($id)->delete();
     return response()->json(['success' => true]);
-});
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::post('/api/school-years/{id}/restore', function ($id) {
     \App\Models\SchoolYear::withTrashed()->findOrFail($id)->restore();
     return response()->json(['success' => true]);
-});
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::delete('/api/school-years/{id}/force', function ($id) {
     \App\Models\SchoolYear::withTrashed()->findOrFail($id)->forceDelete();
     return response()->json(['success' => true]);
-});
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::post('/api/school-years/{id}/activate', function ($id) {
     \App\Models\SchoolYear::query()->update(['is_active' => false]);
     \App\Models\SchoolYear::findOrFail($id)->update(['is_active' => true]);
     return response()->json(['success' => true]);
-});
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 // save global settings (required hours and email notification flag)
 Route::post('/api/settings', function () {
@@ -1682,14 +1708,14 @@ Route::post('/api/settings', function () {
     cache(['settings.email_notifications' => $notify]);
 
     return response()->json(['success' => true]);
-})->middleware('role:ccit_head');
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 // retrieve current settings
 Route::get('/api/settings', function () {
     $required = \App\Models\StudentHours::query()->value('total_hours_required') ?? 600;
     $email = cache('settings.email_notifications', true);
     return response()->json(['required_hours' => $required, 'email_notifications' => $email]);
-})->middleware('role:ccit_head');
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::get('/api/dashboard-stats', function () {
     $sy = request('school_year');
@@ -1780,7 +1806,7 @@ Route::get('/api/users', function () {
         ];
     });
     return response()->json(['users' => $usersData]);
-})->middleware('role:ccit_head');
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 // return single user for editing
 Route::get('/api/users/archived', function () {

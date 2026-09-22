@@ -55,7 +55,13 @@ class RoleMiddleware
 
         // Step 4: RBAC Algorithm - Check if user's role is in the allowed roles list
         if (!in_array($user->role, $roles)) {
-            // Access denied - role not authorized for this resource
+            // Access denied - return JSON 403 for API/JSON/AJAX requests, HTML abort for web
+            if ($request->expectsJson() || $request->is('api/*') || $request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Access Denied: Your role (' . $user->role . ') is not authorized to access this resource.',
+                ], 403);
+            }
             abort(403, 'Access Denied: Your role (' . $user->role . ') is not authorized to access this resource.');
         }
 
