@@ -1918,7 +1918,7 @@
                 <a id="narrativeDownloadLink" href="{{ route('narrative-report.download', $user->id) }}"
                     onclick="closeNarrativeDownloadModal(); setTimeout(() => { if(typeof showSuccess === 'function') showSuccess('📄 Narrative report downloaded successfully!'); }, 300);"
                     class="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-center transition-all">
-                    ⬇ Download .doc
+                    📄 Download Report
                 </a>
             </div>
         </div>

@@ -2295,7 +2295,6 @@ Route::get('/narrative-report/{studentId}', function ($studentId) {
     $viewer  = User::findOrFail(session('user_id'));
     $student = User::findOrFail($studentId);
 
-    // Authorization: student can only download their own; staff can download any
     if ($viewer->role === 'student' && $viewer->id !== $student->id) {
         abort(403, 'Access denied.');
     }
@@ -2304,78 +2303,253 @@ Route::get('/narrative-report/{studentId}', function ($studentId) {
         ->orderBy('day_number')
         ->get();
 
-    $sh       = \App\Models\StudentHours::where('student_id', $studentId)->first();
-    $required = $sh->total_hours_required ?? 600;
+    $sh        = \App\Models\StudentHours::where('student_id', $studentId)->first();
+    $required  = $sh->total_hours_required ?? 600;
     $completed = $sh->hours_completed ?? 0;
-    $company  = $student->company->name ?? 'N/A';
+    $company   = $student->company->name ?? 'N/A';
+    $safeName  = preg_replace('/[^A-Za-z0-9_]/', '', str_replace(' ', '_', $student->name));
 
-    // Build MHTML so images are bundled inline and Word renders them correctly
-    $boundary = 'NarrativeBoundary_' . md5(uniqid());
+    // ── DOCX via PHPWord (needs ZipArchive — available on Hostinger PHP 8.3) ──
+    if (class_exists('ZipArchive')) {
+        $phpWord = new \PhpOffice\PhpWord\PhpWord();
+        $phpWord->getSettings()->setUpdateFields(true);
+        $section = $phpWord->addSection([
+            'pageSizeW'    => \PhpOffice\PhpWord\Shared\Converter::inchToTwip(8.5),
+            'pageSizeH'    => \PhpOffice\PhpWord\Shared\Converter::inchToTwip(11),
+            'marginTop'    => \PhpOffice\PhpWord\Shared\Converter::inchToTwip(1),
+            'marginBottom' => \PhpOffice\PhpWord\Shared\Converter::inchToTwip(1),
+            'marginLeft'   => \PhpOffice\PhpWord\Shared\Converter::inchToTwip(1),
+            'marginRight'  => \PhpOffice\PhpWord\Shared\Converter::inchToTwip(1),
+        ]);
 
-    // Render the HTML view — images are referenced as cid: content IDs
-    $htmlContent = view('reports.narrative_word', compact(
-        'student', 'narratives', 'company', 'required', 'completed'
-    ))->render();
+        $ctr    = ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER, 'spaceAfter' => 0, 'spaceBefore' => 0];
+        $just   = ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::BOTH, 'spaceAfter' => 0, 'spaceBefore' => 0, 'lineHeight' => 1.15];
+        $normal = ['spaceAfter' => 0, 'spaceBefore' => 0];
 
-    // Collect all photo paths referenced in this report
-    $imageParts = [];
+        // ── Letterhead ──
+        $section->addText('Republic of the Philippines', ['name' => 'Times New Roman', 'size' => 9, 'allCaps' => true], $ctr);
+        $section->addText('President Ramon Magsaysay State University', ['name' => 'Times New Roman', 'size' => 12, 'bold' => true, 'allCaps' => true], $ctr);
+        $section->addText('Sta. Cruz Campus, Sta. Cruz, Zambales', ['name' => 'Times New Roman', 'size' => 9], $ctr);
+        $section->addText('OJT Narrative Report', ['name' => 'Times New Roman', 'size' => 12, 'bold' => true, 'allCaps' => true],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER, 'spaceAfter' => 120, 'spaceBefore' => 80,
+             'borderTopSize' => 8, 'borderTopColor' => '000000',
+             'borderBottomSize' => 8, 'borderBottomColor' => '000000']);
+
+        // ── Student info table ──
+        $tbl = $section->addTable(['borderSize' => 0, 'cellMargin' => 60]);
+        $tbl->addRow();
+        $c1 = $tbl->addCell(4500); $c1->addText('Student Name', ['name' => 'Times New Roman', 'size' => 7, 'color' => '666666', 'allCaps' => true]); $c1->addText(strtoupper($student->name), ['name' => 'Times New Roman', 'size' => 10, 'bold' => true], ['borderBottomSize' => 6, 'borderBottomColor' => '000000', 'spaceAfter' => 60]);
+        $c2 = $tbl->addCell(4500); $c2->addText('Company / Organization', ['name' => 'Times New Roman', 'size' => 7, 'color' => '666666', 'allCaps' => true]); $c2->addText(strtoupper($company), ['name' => 'Times New Roman', 'size' => 10, 'bold' => true], ['borderBottomSize' => 6, 'borderBottomColor' => '000000', 'spaceAfter' => 60]);
+        $tbl->addRow();
+        $c3 = $tbl->addCell(4500); $c3->addText('Course & School Year', ['name' => 'Times New Roman', 'size' => 7, 'color' => '666666', 'allCaps' => true]); $c3->addText('BSCS — ' . ($student->school_year ?? '—'), ['name' => 'Times New Roman', 'size' => 10], ['borderBottomSize' => 6, 'borderBottomColor' => '000000', 'spaceAfter' => 60]);
+        $c4 = $tbl->addCell(4500); $c4->addText('Date Generated', ['name' => 'Times New Roman', 'size' => 7, 'color' => '666666', 'allCaps' => true]); $c4->addText(now()->format('F d, Y'), ['name' => 'Times New Roman', 'size' => 10], ['borderBottomSize' => 6, 'borderBottomColor' => '000000', 'spaceAfter' => 60]);
+        $section->addTextBreak(1);
+
+        // ── Summary row ──
+        $sum = $section->addTable(['borderSize' => 6, 'borderColor' => 'AAAAAA', 'cellMargin' => 80]);
+        $sum->addRow();
+        foreach ([['Total Days', $narratives->count()], ['Hours Completed', number_format($completed, 2)], ['Hours Required', number_format($required, 2)]] as [$lbl, $val]) {
+            $sc = $sum->addCell(3000, ['bgColor' => 'F5F5F5']);
+            $sc->addText($lbl, ['name' => 'Times New Roman', 'size' => 8, 'color' => '555555'], $ctr);
+            $sc->addText((string)$val, ['name' => 'Times New Roman', 'size' => 11, 'bold' => true], $ctr);
+        }
+        $section->addTextBreak(1);
+
+        // ── Section heading ──
+        $section->addText('Daily Narrative Entries', ['name' => 'Times New Roman', 'size' => 10, 'bold' => true, 'allCaps' => true],
+            ['borderBottomSize' => 8, 'borderBottomColor' => '000000', 'spaceAfter' => 100]);
+
+        // ── Daily entries ──
+        if ($narratives->isEmpty()) {
+            $section->addText('No narrative entries have been submitted yet.', ['name' => 'Times New Roman', 'size' => 10, 'color' => '666666'], $ctr);
+        } else {
+            foreach ($narratives as $idx => $entry) {
+                if ($idx > 0 && $idx % 3 === 0) $section->addPageBreak();
+
+                $dateStr = \Carbon\Carbon::parse($entry->report_date)->format('l, F d, Y');
+
+                // Day header (blue bar)
+                $hdrTbl = $section->addTable(['borderSize' => 0]);
+                $hdrTbl->addRow();
+                $hdrCell = $hdrTbl->addCell(9000, ['bgColor' => '1A3A6B']);
+                $hdrCell->addText("Day {$entry->day_number} — {$dateStr}",
+                    ['name' => 'Times New Roman', 'size' => 10, 'bold' => true, 'color' => 'FFFFFF']);
+
+                // Content cell
+                $cntTbl = $section->addTable(['borderSize' => 6, 'borderColor' => 'CCCCCC', 'cellMargin' => 120]);
+                $cntTbl->addRow();
+                $cntCell = $cntTbl->addCell(9000);
+
+                // Photo
+                if ($entry->photo_path) {
+                    $imgPath = null;
+                    foreach ([
+                        storage_path('app/public/' . $entry->photo_path),
+                        public_path('storage/' . $entry->photo_path),
+                        storage_path('app/' . $entry->photo_path),
+                    ] as $p) {
+                        if (file_exists($p)) { $imgPath = $p; break; }
+                    }
+                    if ($imgPath) {
+                        try {
+                            $cntCell->addImage($imgPath, [
+                                'width'     => 200,
+                                'height'    => 150,
+                                'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER,
+                            ]);
+                            $cntCell->addText(
+                                'Figure ' . $entry->day_number . '. Photo — ' . \Carbon\Carbon::parse($entry->report_date)->format('M d, Y'),
+                                ['name' => 'Times New Roman', 'size' => 8, 'italic' => true, 'color' => '555555'],
+                                $ctr
+                            );
+                            $cntCell->addTextBreak(1);
+                        } catch (\Exception $e) {
+                            \Log::error('DOCX photo error', ['path' => $imgPath, 'err' => $e->getMessage()]);
+                        }
+                    }
+                }
+
+                // Description — join lines into one paragraph to avoid inter-line gaps
+                $descText = trim(implode(' ', array_filter(array_map('trim', explode("\n", $entry->description)))));
+                if ($descText !== '') {
+                    $cntCell->addText($descText, ['name' => 'Times New Roman', 'size' => 10], $just);
+                }
+
+                $section->addTextBreak(0);
+            }
+        }
+
+        // ── Signature ──
+        $section->addTextBreak(2);
+        $sigTbl = $section->addTable(['borderSize' => 0]);
+        $sigTbl->addRow();
+        $sL = $sigTbl->addCell(4500);
+        $sL->addTextBreak(2);
+        $sL->addText(strtoupper($student->name), ['name' => 'Times New Roman', 'size' => 10, 'bold' => true],
+            ['borderTopSize' => 6, 'borderTopColor' => '000000']);
+        $sL->addText('OJT Student', ['name' => 'Times New Roman', 'size' => 8, 'color' => '555555']);
+        $sR = $sigTbl->addCell(4500);
+        $sR->addTextBreak(2);
+        $sR->addText('', [], ['borderTopSize' => 6, 'borderTopColor' => '000000',
+            'alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+        $sR->addText('Noted by: Supervisor / OJT Coordinator',
+            ['name' => 'Times New Roman', 'size' => 8, 'color' => '555555'],
+            ['alignment' => \PhpOffice\PhpWord\SimpleType\Jc::CENTER]);
+
+        // ── Save & send ──
+        $tmp = storage_path('app/narrative_' . $studentId . '_' . time() . '.docx');
+        \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007')->save($tmp);
+
+        return response()->download($tmp, 'NarrativeReport_' . $safeName . '_' . now()->format('Y-m-d') . '.docx')
+            ->deleteFileAfterSend(true);
+    }
+
+    // ── Fallback: inline HTML .doc (local XAMPP without ZipArchive) ──
+    $html = '<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8">
+<style>
+@page Section1 { size:8.5in 11in; margin:.8in; }
+div.Section1 { page:Section1; }
+body  { font-family:"Times New Roman",serif; font-size:10pt; color:#000; margin:0; }
+.hdr  { text-align:center; margin-bottom:6pt; }
+.title{ font-size:11pt; font-weight:bold; text-transform:uppercase;
+        border-top:1.5px solid #000; border-bottom:1.5px solid #000;
+        padding:3pt 0; margin:4pt 0 8pt; text-align:center; }
+table.info td { width:50%; padding:5pt 6pt; border-bottom:1px solid #ddd; vertical-align:top; }
+.lbl  { font-size:7pt; color:#666; text-transform:uppercase; display:block; margin-bottom:3pt; }
+.val  { font-size:10pt; font-weight:bold; border-bottom:1px solid #000; display:block; padding-bottom:2pt; }
+table.sum td  { width:33%; text-align:center; padding:6pt 4pt; border:1px solid #aaa; font-size:9pt; }
+.sh   { font-size:9pt; font-weight:bold; text-transform:uppercase;
+        border-bottom:1.5px solid #000; margin:8pt 0 5pt; padding-bottom:2pt; }
+.dh   { background:#1a3a6b; color:#fff; padding:5pt 8pt; font-size:9.5pt; font-weight:bold; }
+.db   { border:1px solid #ccc; border-top:none; padding:8pt 10pt; }
+.desc { font-size:9pt; text-align:justify; line-height:1.4; margin:4pt 0 0; mso-line-height-rule:exactly; }
+table.sig td  { width:50%; padding:0 6pt; font-size:8pt; vertical-align:bottom; }
+.sln  { border-top:1px solid #000; padding-top:2pt; font-weight:bold;
+        margin-top:16pt; display:block; }
+</style></head>
+<body><div class="Section1">';
+
+    // Letterhead
+    $html .= '<div class="hdr">'
+           . '<div style="font-size:7.5pt;text-transform:uppercase;">Republic of the Philippines</div>'
+           . '<div style="font-size:11pt;font-weight:bold;text-transform:uppercase;">President Ramon Magsaysay State University</div>'
+           . '<div style="font-size:7.5pt;">Sta. Cruz Campus, Sta. Cruz, Zambales</div>'
+           . '</div>'
+           . '<div class="title">OJT Narrative Report</div>';
+
+    // Info table — label on its own line with <br>, value bold with underline
+    $html .= '<table width="100%" cellspacing="0" cellpadding="0" class="info"><tr>'
+           . '<td><span class="lbl">STUDENT NAME</span><br><span class="val">' . htmlspecialchars(strtoupper($student->name)) . '</span></td>'
+           . '<td style="border-left:1px solid #ddd;padding-left:12pt;"><span class="lbl">COMPANY / ORGANIZATION</span><br><span class="val">' . htmlspecialchars(strtoupper($company)) . '</span></td>'
+           . '</tr><tr>'
+           . '<td><span class="lbl">COURSE &amp; SCHOOL YEAR</span><br><span class="val">BSCS &mdash; ' . htmlspecialchars($student->school_year ?? '&mdash;') . '</span></td>'
+           . '<td style="border-left:1px solid #ddd;padding-left:12pt;"><span class="lbl">DATE GENERATED</span><br><span class="val">' . now()->format('F d, Y') . '</span></td>'
+           . '</tr></table>';
+
+    // Summary
+    $html .= '<table width="100%" cellspacing="0" cellpadding="0" style="margin:6pt 0 8pt;border-collapse:collapse;" class="sum"><tr>'
+           . '<td><strong>Total Days:</strong><br>' . $narratives->count() . '</td>'
+           . '<td><strong>Hours Completed:</strong><br>' . number_format($completed, 2) . '</td>'
+           . '<td><strong>Hours Required:</strong><br>' . number_format($required, 2) . '</td>'
+           . '</tr></table>';
+
+    $html .= '<div class="sh">Daily Narrative Entries</div>';
+
+    // Entries
     foreach ($narratives as $entry) {
-        if (!$entry->photo_path) continue;
-        $absPath = public_path('storage/' . $entry->photo_path);
-        if (!file_exists($absPath)) continue;
+        $dateStr = \Carbon\Carbon::parse($entry->report_date)->format('l, F d, Y');
+        $html .= '<div style="margin-bottom:8pt;">'
+               . '<div class="dh">Day ' . $entry->day_number . ' &mdash; ' . $dateStr . '</div>'
+               . '<div class="db">';
 
-        $ext  = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
-        $mime = match($ext) {
-            'png'  => 'image/png',
-            'gif'  => 'image/gif',
-            'webp' => 'image/webp',
-            default => 'image/jpeg',
-        };
-        $cid      = 'photo_day_' . $entry->day_number . '@narrative';
-        $b64      = base64_encode(file_get_contents($absPath));
-        $filename = basename($absPath);
+        if ($entry->photo_path) {
+            $imgPath = null;
+            foreach ([
+                storage_path('app/public/' . $entry->photo_path),
+                public_path('storage/'     . $entry->photo_path),
+                storage_path('app/'        . $entry->photo_path),
+            ] as $p) { if (file_exists($p)) { $imgPath = $p; break; } }
 
-        // Replace __CID__ placeholder in HTML with actual cid: reference
-        $htmlContent = str_replace(
-            'src="__CID__' . $cid . '"',
-            'src="cid:' . $cid . '"',
-            $htmlContent
-        );
+            if ($imgPath) {
+                $ext  = strtolower(pathinfo($imgPath, PATHINFO_EXTENSION));
+                $mime = match($ext) { 'png'=>'image/png','gif'=>'image/gif','webp'=>'image/webp', default=>'image/jpeg' };
+                $b64  = base64_encode(file_get_contents($imgPath));
+                $cap  = 'Figure ' . $entry->day_number . '. Photo &mdash; ' . \Carbon\Carbon::parse($entry->report_date)->format('M d, Y');
+                $html .= '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:5pt;">'
+                       . '<tr><td align="center">'
+                       . '<img src="data:' . $mime . ';base64,' . $b64 . '" width="240" style="border:1px solid #ccc;display:block;margin:0 auto;">'
+                       . '<br><span style="font-size:7pt;font-style:italic;color:#555;">' . $cap . '</span>'
+                       . '</td></tr></table>';
+            }
+        }
 
-        $imageParts[] = [
-            'cid'      => $cid,
-            'mime'     => $mime,
-            'filename' => $filename,
-            'b64'      => $b64,
-        ];
+        $descText = trim($entry->description);
+        $html .= '<p class="desc">' . nl2br(htmlspecialchars($descText)) . '</p>'
+               . '</div></div>';
     }
 
-    // Build the MHTML document
-    $mhtml  = "MIME-Version: 1.0\r\n";
-    $mhtml .= "Content-Type: multipart/related; boundary=\"{$boundary}\"\r\n\r\n";
+    // Signature
+    $html .= '<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:40pt;"><tr>'
+           . '<td width="45%" align="center" style="text-align:center;padding:0 6pt;">'
+           .   '<div style="font-size:10pt;font-weight:bold;letter-spacing:0.5pt;">' . htmlspecialchars(strtoupper($student->name)) . '</div>'
+           .   '<div style="border-top:1px solid #000;margin-top:2pt;padding-top:3pt;"></div>'
+           .   '<div style="font-size:8pt;color:#555;margin-top:2pt;">OJT Student</div>'
+           . '</td>'
+           . '<td width="10%"></td>'
+           . '<td width="45%" align="center" style="text-align:center;padding:0 6pt;">'
+           .   '<div style="font-size:10pt;">&nbsp;</div>'
+           .   '<div style="border-top:1px solid #000;margin-top:2pt;padding-top:3pt;"></div>'
+           .   '<div style="font-size:8pt;color:#555;margin-top:2pt;">Supervisor / OJT Coordinator</div>'
+           . '</td>'
+           . '</tr></table>'
+           . '</div></body></html>';
 
-    // Part 1: HTML
-    $mhtml .= "--{$boundary}\r\n";
-    $mhtml .= "Content-Type: text/html; charset=\"utf-8\"\r\n";
-    $mhtml .= "Content-Transfer-Encoding: quoted-printable\r\n\r\n";
-    $mhtml .= quoted_printable_encode($htmlContent) . "\r\n";
-
-    // Parts 2+: Images
-    foreach ($imageParts as $img) {
-        $mhtml .= "--{$boundary}\r\n";
-        $mhtml .= "Content-Type: {$img['mime']}; name=\"{$img['filename']}\"\r\n";
-        $mhtml .= "Content-Transfer-Encoding: base64\r\n";
-        $mhtml .= "Content-ID: <{$img['cid']}>\r\n";
-        $mhtml .= "Content-Disposition: inline; filename=\"{$img['filename']}\"\r\n\r\n";
-        $mhtml .= chunk_split($img['b64'], 76, "\r\n") . "\r\n";
-    }
-
-    $mhtml .= "--{$boundary}--\r\n";
-
-    $safeName = preg_replace('/[^A-Za-z0-9_]/', '', str_replace(' ', '_', $student->name));
-    $filename = 'NarrativeReport_' . $safeName . '_' . now()->format('Y-m-d') . '.doc';
-
-    return response($mhtml)
-        ->header('Content-Type', 'multipart/related; boundary="' . $boundary . '"')
-        ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+    return response($html)
+        ->header('Content-Type', 'application/msword')
+        ->header('Content-Disposition', 'attachment; filename="NarrativeReport_' . $safeName . '_' . now()->format('Y-m-d') . '.doc"')
+        ->header('Cache-Control', 'max-age=0');
 })->name('narrative-report.download')->middleware('auth.custom');
