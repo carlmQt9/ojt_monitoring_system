@@ -1,3 +1,26 @@
+@php
+    // ── Supervisor nav badge counts (computed before sidebar renders) ─────
+    $_supUser    = $user ?? auth()->user();
+    $_supCompId  = $_supUser->company_id ?? null;
+    // Students assigned to this supervisor (by supervisor_id OR same company)
+    $_supStudentIds = \App\Models\User::where('role', 'student')
+        ->where(function($q) use ($_supUser, $_supCompId) {
+            $q->where('supervisor_id', $_supUser->id);
+            if ($_supCompId) $q->orWhere('company_id', $_supCompId);
+        })->pluck('id');
+    // Interns badge: pending time-in approvals + pending requirements
+    $_navBadgeInterns = \App\Models\TimeInRecord::whereIn('student_id', $_supStudentIds)
+        ->whereNotNull('time_out')->where('status', 'pending')->count()
+        + \App\Models\StudentRequirement::whereIn('student_id', $_supStudentIds)
+            ->where('status', 'pending')->count();
+    // Certificates badge: students who finished hours but have no certificate yet
+    $_completedStudentIds = \App\Models\StudentHours::whereIn('student_id', $_supStudentIds)
+        ->whereRaw('hours_completed >= total_hours_required')
+        ->pluck('student_id');
+    $_navBadgeCerts = \App\Models\User::whereIn('id', $_completedStudentIds)
+        ->whereNull('certificate_awarded_at')
+        ->count();
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -227,11 +250,17 @@
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">👥</span>
                 <span class="nav-label">Interns</span>
+                @if($_navBadgeInterns > 0)
+                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeInterns }}</span>
+                @endif
             </button>
             <button onclick="showSection('certificates')" data-section="certificates"
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">🏅</span>
                 <span class="nav-label">Certificates</span>
+                @if($_navBadgeCerts > 0)
+                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-amber-400 text-slate-900 text-[10px] font-bold leading-none">{{ $_navBadgeCerts }}</span>
+                @endif
             </button>
         </nav>
 

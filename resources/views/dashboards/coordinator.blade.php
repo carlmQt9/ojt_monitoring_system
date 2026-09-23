@@ -1,3 +1,12 @@
+@php
+    // ── Nav badge counts (computed before sidebar renders) ────────────────
+    $_navBadgeStudents  = \App\Models\TimeInRecord::where('status', 'pending')
+        ->whereNotNull('time_out')->whereHas('student')->count();
+    $_navBadgeReports   = \App\Models\StudentRequirement::where('status', 'pending')
+        ->whereHas('student')->count();
+    // Total pending shown on both nav items
+    $_navBadgeTotal     = $_navBadgeStudents + $_navBadgeReports;
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -225,11 +234,17 @@
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">🎓</span>
                 <span class="nav-label">Student Tracking</span>
+                @if($_navBadgeStudents > 0)
+                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeStudents }}</span>
+                @endif
             </button>
             <button onclick="showSection('reports')" data-section="reports"
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">📋</span>
                 <span class="nav-label">Reports & Requirements</span>
+                @if($_navBadgeReports > 0)
+                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-orange-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeReports }}</span>
+                @endif
             </button>
         </nav>
 

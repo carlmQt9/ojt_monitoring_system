@@ -193,6 +193,21 @@
             ->whereNotNull('time_out')->where('status', 'pending')->get()
             ->sum(fn($r) => max(0, floatval($r->regular_hours ?? 0))), 2);
         $_progress = $_required > 0 ? min(100, round(($_completed / $_required) * 100, 1)) : 0;
+
+        // ── Nav badge counts ──────────────────────────────────────────────
+        // Time In/Out: records pending approval (timed out, awaiting review)
+        $_navBadgeTimein = \App\Models\TimeInRecord::where('student_id', $user->id)
+            ->whereNotNull('time_out')->where('status', 'pending')->count();
+        // Attendance History: denied records that may need attention
+        $_navBadgeHistory = \App\Models\TimeInRecord::where('student_id', $user->id)
+            ->where('status', 'denied')->count();
+        // Requirements: pending (awaiting approval) + denied (needs resubmission)
+        $_navBadgeRequirements = \App\Models\StudentRequirement::where('student_id', $user->id)
+            ->whereIn('status', ['pending', 'denied'])->count();
+        // Reports / Narratives: remind the student when today's entry is missing
+        $_today = \Carbon\Carbon::now('Asia/Manila')->toDateString();
+        $_navBadgeReports = \App\Models\DailyNarrative::where('student_id', $user->id)
+            ->whereDate('report_date', $_today)->doesntExist() ? 1 : 0;
     ?>
 
     @include('partials.success-popup')
@@ -259,21 +274,33 @@
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">⏱️</span>
                 <span class="nav-label">Time In / Out</span>
+                @if($_navBadgeTimein > 0)
+                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeTimein }}</span>
+                @endif
             </button>
             <button onclick="showSection('history')" data-section="history"
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">📅</span>
                 <span class="nav-label">Attendance History</span>
+                @if($_navBadgeHistory > 0)
+                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeHistory }}</span>
+                @endif
             </button>
             <button onclick="showSection('requirements')" data-section="requirements"
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">📁</span>
                 <span class="nav-label">Requirements</span>
+                @if($_navBadgeRequirements > 0)
+                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-orange-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeRequirements }}</span>
+                @endif
             </button>
             <button onclick="showSection('reports')" data-section="reports"
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">📋</span>
                 <span class="nav-label">Reports</span>
+                @if($_navBadgeReports > 0)
+                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-green-600 text-white text-[10px] font-bold leading-none">{{ $_navBadgeReports }}</span>
+                @endif
             </button>
         </nav>
 
@@ -870,6 +897,25 @@
                             </div>{{-- end otGateWrapper --}}
 
                             <script>
+                            function syncUploadBtn(totalMins) {
+                                var btn = document.getElementById('otUploadBtn');
+                                var msg = document.getElementById('otEmptyMsg');
+                                if (totalMins >= 480) {
+                                    if (btn) {
+                                        btn.disabled = false;
+                                        btn.title = '';
+                                        btn.className = 'px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all cursor-pointer';
+                                    }
+                                    if (msg) msg.innerHTML = 'No OT letters submitted yet. Click <strong>+ Upload</strong> to submit an OT letter.';
+                                } else {
+                                    if (btn) {
+                                        btn.disabled = true;
+                                        btn.title = 'Complete 8 hours today to unlock upload';
+                                        btn.className = 'px-2.5 py-1.5 bg-slate-700 text-gray-500 rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all cursor-not-allowed opacity-50';
+                                    }
+                                    if (msg) msg.innerHTML = 'Complete <strong>8 hours</strong> today to unlock OT letter submission.';
+                                }
+                            }
                             (function() {
                                 // prevMins = total minutes already logged in completed sessions today
                                 var prevMins       = {{ $_prevMins }};
@@ -904,6 +950,8 @@
                                         normalBtn.classList.remove('hidden');
                                         otPrompt.classList.add('hidden');
                                     }
+
+                                    syncUploadBtn(totalDayMins);
                                 }
 
                                 // Run immediately and every 30 seconds
@@ -1237,15 +1285,10 @@
         <?php
             $requirements = \App\Models\StudentRequirement::where('student_id', $user->id)->orderBy('created_at', 'desc')->get();
             $submittedTitles = $requirements->pluck('title')->map(fn($t)=>strtolower($t))->toArray();
-            // Load from DB templates; fall back to defaults if none configured yet
+            // Load from DB templates set by CCIT head
             $tplOnboarding = \App\Models\RequirementTemplate::where('category','onboarding')->orderBy('sort_order')->orderBy('name')->get();
             $tplDaily      = \App\Models\RequirementTemplate::where('category','daily')->orderBy('sort_order')->orderBy('name')->get();
-            if ($tplOnboarding->isEmpty()) {
-                // legacy fallback
-                $onboarding = ['Internship Application Form'=>3,'Letter of Acceptance'=>1,'Parental Consent'=>1,'School ID'=>1,'Government ID'=>1,'Vaccination Card'=>1,'Medical Report'=>5,'Insurance'=>3];
-            } else {
-                $onboarding = $tplOnboarding->pluck('max_files','name')->toArray();
-            }
+            $onboarding = $tplOnboarding->pluck('max_files','name')->toArray();
         ?>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
@@ -1253,6 +1296,9 @@
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
                 <h3 class="text-lg font-bold text-white mb-4">📂 Onboarding Requirements</h3>
                 <p class="text-gray-400 text-xs mb-4">Documents required to begin OJT</p>
+                @if(empty($onboarding))
+                <p class="text-gray-500 text-sm text-center py-4">No requirements have been set up yet. Please check back later.</p>
+                @else
                 <ul class="space-y-3">
                     @foreach($onboarding as $item => $maxFiles)
                         <?php $found = $requirements->first(fn($r)=> stripos($r->title, $item) !== false); $exists = (bool)$found; ?>
@@ -1275,6 +1321,7 @@
                         </li>
                     @endforeach
                 </ul>
+                @endif
             </div>
 
             <!-- Daily Submissions Cabinet -->
@@ -1297,7 +1344,7 @@
                         </button>
                         @endif
                         <button type="button"
-                            onclick="openNarrativeModal({{ $todayNarrative ? $todayNarrative->id : 'null' }}, '{{ $todayNarrative ? addslashes($todayNarrative->description) : '' }}')"
+                            onclick="openNarrativeModal({{ $todayNarrative ? $todayNarrative->id : 'null' }}, {{ $todayNarrative ? json_encode($todayNarrative->description) : "''" }})"
                             class="px-3 py-1.5 {{ $todayNarrative ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-green-600 hover:bg-green-700' }} text-white rounded-lg text-xs font-semibold whitespace-nowrap">
                             {{ $todayNarrative ? '✏ Edit Today' : '+ Daily Report' }}
                         </button>
@@ -1321,7 +1368,7 @@
                             <p class="text-gray-400 text-xs mt-0.5 truncate">{{ Str::limit($n->description, 80) }}</p>
                         </div>
                         <button type="button"
-                            onclick="event.stopPropagation(); openNarrativeModal({{ $n->id }}, '{{ addslashes($n->description) }}')"
+                            onclick="event.stopPropagation(); openNarrativeModal({{ $n->id }}, {{ json_encode($n->description) }})"
                             class="shrink-0 px-2 py-1 bg-slate-600 hover:bg-slate-500 text-gray-300 rounded text-xs">✏</button>
                     </div>
                     @endforeach
@@ -1339,7 +1386,7 @@
         <?php
             $allSubmitted = \App\Models\StudentRequirement::where('student_id', $user->id)->orderBy('created_at','desc')->get();
             $dbOnboardingKeys = \App\Models\RequirementTemplate::where('category','onboarding')->pluck('name')->toArray();
-            $onboardingKeys = !empty($dbOnboardingKeys) ? $dbOnboardingKeys : ['Internship Application Form','Letter of Acceptance','Parental Consent','School ID','Government ID','Vaccination Card','Medical Report','Insurance'];
+            $onboardingKeys = $dbOnboardingKeys;
             $onboardingReports = $allSubmitted->filter(fn($r) => collect($onboardingKeys)->contains(fn($k) => stripos($r->title, $k) !== false));
 
             // Daily template keys from DB
@@ -1460,12 +1507,32 @@
         </div>
 
         <!-- Daily Submissions — OT Letters Only (Responsive) -->
+        @php
+            // Keep the OT upload gate available even when the time-in card branch did not run.
+            $totalDayMinutes = \App\Models\TimeInRecord::where('student_id', $user->id)
+                ->whereDate('date', \Carbon\Carbon::now('Asia/Manila')->toDateString())
+                ->whereNotNull('time_out')
+                ->get()
+                ->sum(function ($record) {
+                    $timeIn = \Carbon\Carbon::parse($record->time_in);
+                    $timeOut = \Carbon\Carbon::parse($record->time_out);
+                    if ($timeOut->lte($timeIn)) {
+                        $timeOut->addDay();
+                    }
+                    return max(0, $timeIn->diffInMinutes($timeOut));
+                });
+        @endphp
         <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3 sm:p-5 mb-5">
             <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
                 <h3 class="text-sm sm:text-base font-bold text-white">📋 Daily Submissions
                     <span class="ml-1 px-1.5 py-0.5 bg-slate-700 text-gray-400 text-[10px] rounded-full font-normal">{{ $otLetters->count() }}</span>
                 </h3>
-                <button type="button" onclick="openUploadModal('OT Letter')" class="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap">+ Upload</button>
+                <button type="button" id="otUploadBtn" onclick="openUploadModal('OT Letter')"
+                    class="px-2.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap transition-all
+                        {{ $totalDayMinutes >= 480 ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' : 'bg-slate-700 text-gray-500 cursor-not-allowed opacity-50' }}"
+                    {{ $totalDayMinutes < 480 ? 'disabled title="Complete 8 hours today to unlock upload"' : '' }}>
+                    + Upload
+                </button>
             </div>
 
             @if($otLetters->isNotEmpty())
@@ -1577,7 +1644,11 @@
             </div>
             
             @else
-            <p class="text-gray-400 text-xs sm:text-sm text-center py-4 sm:py-6">No OT letters submitted yet. Click <strong>+ Upload</strong> to submit an OT letter.</p>
+            @if($totalDayMinutes >= 480)
+                <p id="otEmptyMsg" class="text-gray-400 text-xs sm:text-sm text-center py-4 sm:py-6">No OT letters submitted yet. Click <strong>+ Upload</strong> to submit an OT letter.</p>
+            @else
+                <p id="otEmptyMsg" class="text-gray-400 text-xs sm:text-sm text-center py-4 sm:py-6">Complete <strong>8 hours</strong> today to unlock OT letter submission.</p>
+            @endif
             @endif
         </div>
 
@@ -1585,6 +1656,10 @@
         @php
             $narrativeReports = \App\Models\DailyNarrative::where('student_id', $user->id)
                 ->orderBy('day_number', 'desc')->get();
+            $todayNarrativeReport = $narrativeReports->first(function ($narrative) {
+                return \Carbon\Carbon::parse($narrative->report_date, 'Asia/Manila')
+                    ->isSameDay(\Carbon\Carbon::now('Asia/Manila'));
+            });
         @endphp
         <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3 sm:p-5">
             <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -1595,7 +1670,16 @@
                     @if($narrativeReports->isNotEmpty())
                     <button type="button" onclick="openNarrativeDownloadModal()" class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap">⬇ Download</button>
                     @endif
-                    <button type="button" onclick="openNarrativeModal(null,'')" class="px-2.5 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap">+ Daily Report</button>
+                    <button type="button"
+                        @if(!$todayNarrativeReport)
+                        onclick="openNarrativeModal(null,'')"
+                        @endif
+                        class="px-2.5 py-1.5 {{ $todayNarrativeReport ? 'bg-slate-600 text-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 text-white' }} rounded-lg text-[11px] sm:text-xs font-semibold whitespace-nowrap"
+                        @if($todayNarrativeReport)
+                        disabled title="Today's narrative has already been submitted"
+                        @endif>
+                        {{ $todayNarrativeReport ? 'Submitted Today' : '+ Daily Report' }}
+                    </button>
                 </div>
             </div>
 
@@ -1628,7 +1712,7 @@
                     {{-- Actions --}}
                     <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
                         <button type="button"
-                            onclick="openNarrativeModal({{ $nr->id }},'{{ addslashes($nr->description) }}')"
+                            onclick="openNarrativeModal({{ $nr->id }}, {{ json_encode($nr->description) }})"
                             class="w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center bg-slate-600 hover:bg-slate-500 text-gray-300 rounded text-[10px] sm:text-xs">✏</button>
                     </div>
                 </div>
@@ -3115,6 +3199,11 @@
 
         // ===== UPLOAD MODAL =====
         function openUploadModal(title, maxFiles) {
+            // Guard: if called from the OT upload button, check it's enabled
+            if (title === 'OT Letter') {
+                var btn = document.getElementById('otUploadBtn');
+                if (btn && btn.disabled) return;
+            }
             maxFiles = maxFiles || 1;
             _maxFilesAllowed = maxFiles;
             _selectedFiles = [];

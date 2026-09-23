@@ -1,3 +1,11 @@
+@php
+    // ── CCIT Head nav badge counts (computed before sidebar renders) ──────
+    // Users badge: non-student accounts awaiting approval
+    $_navBadgeUsers = \App\Models\User::where('is_approved', false)
+        ->where('role', '!=', 'student')
+        ->whereNull('deleted_at')
+        ->count();
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,6 +13,7 @@
     <link rel="icon" type="image/jpeg" href="/logo.jpg">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="current-user-id" content="{{ session('user_id') }}">
     <title>CCIT Head Dashboard - OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -234,7 +243,11 @@
                 <span class="nav-icon">📊</span><span class="nav-label">Overview</span>
             </button>
             <button class="nav-item" onclick="showSection('users'); closeSidebar();" data-section="users">
-                <span class="nav-icon">👥</span><span class="nav-label">Users</span>
+                <span class="nav-icon">👥</span>
+                <span class="nav-label">Users</span>
+                @if($_navBadgeUsers > 0)
+                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeUsers }}</span>
+                @endif
             </button>
             <button class="nav-item" onclick="showSection('analytics'); closeSidebar();" data-section="analytics">
                 <span class="nav-icon">📈</span><span class="nav-label">Analytics</span>
@@ -819,11 +832,7 @@
                                         @csrf
                                         <button type="submit" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded font-semibold">Restore</button>
                                     </form>
-                                    <form method="POST" action="/requirement-templates/{{ $at->id }}/force" style="display:inline;" onsubmit="return confirm('Permanently delete this requirement?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold ml-1">Delete</button>
-                                    </form>
+                                    <button type="button" onclick="showForceDeleteTemplateModal({{ $at->id }}, '{{ addslashes($at->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold ml-1">Delete</button>
                                 </td>
                             </tr>
                         @endforeach
@@ -947,6 +956,21 @@
                     <button type="submit" class="flex-1 px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-lg font-semibold">Delete Forever</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Generic Confirm Modal -->
+    <div id="genericConfirmModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-[300] p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div class="text-center mb-6">
+                <div id="genericConfirmIcon" class="text-5xl mb-3">⚠️</div>
+                <h3 id="genericConfirmTitle" class="text-xl font-bold text-white mb-2"></h3>
+                <p id="genericConfirmMessage" class="text-gray-300 text-sm"></p>
+            </div>
+            <div class="flex gap-3">
+                <button type="button" onclick="closeGenericConfirm()" class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">Cancel</button>
+                <button type="button" id="genericConfirmOkBtn" class="flex-1 px-4 py-2.5 bg-red-700 hover:bg-red-800 text-white rounded-xl font-semibold transition-all">Confirm</button>
+            </div>
         </div>
     </div>
 
@@ -1302,6 +1326,7 @@
                 : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.477 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
         }
         let allUsers = [];
+        const CURRENT_USER_ID = parseInt(document.querySelector('meta[name="current-user-id"]')?.content || '0', 10);
         let editingUserId = null;
         let currentSchoolYear = '';
 
@@ -1606,6 +1631,10 @@
                 const roleOrder = { ccit_head: 1, coordinator: 2, supervisor: 3, student: 4 };
                 // sort: pending first, then by your custom role priority
                 const sorted = [...users].sort((a, b) => {
+                    // Logged-in user always first
+                    if (a.id === CURRENT_USER_ID) return -1;
+                    if (b.id === CURRENT_USER_ID) return 1;
+
                     const aPending = !a.is_approved && a.role !== 'student';
                     const bPending = !b.is_approved && b.role !== 'student';
                     if (bPending !== aPending) return bPending - aPending;
@@ -1626,6 +1655,8 @@
                                <button onclick="approveUser(${user.id})" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold whitespace-nowrap">Approve</button>
                                <button onclick="denyUser(${user.id}, '${user.name}')" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold whitespace-nowrap">Deny</button>
                            </div>`
+                        : user.id === CURRENT_USER_ID
+                        ? `<span class="px-2 py-1 text-gray-400 text-xs italic whitespace-nowrap">You</span>`
                         : `<div class="flex gap-1">
                                <button onclick="editUser(${user.id})" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs whitespace-nowrap">Edit</button>
                                <button onclick="removeUser(${user.id})" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs whitespace-nowrap">Archive</button>
@@ -1650,6 +1681,8 @@
                                    <button onclick="approveUser(${user.id})" class="py-2 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold">Approve</button>
                                    <button onclick="denyUser(${user.id}, '${user.name}')" class="py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Deny</button>
                                </div>`
+                            : user.id === CURRENT_USER_ID
+                            ? `<p class="text-gray-400 text-xs italic text-center mt-3">You</p>`
                             : `<div class="grid grid-cols-2 gap-2 mt-3">
                                    <button onclick="editUser(${user.id})" class="py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold">Edit</button>
                                    <button onclick="removeUser(${user.id})" class="py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold">Archive</button>
@@ -1770,15 +1803,21 @@
         function approveAll() {
             const pending = allUsers.filter(u => !u.is_approved && u.role !== 'student');
             if (!pending.length) return;
-            if (!confirm(`Approve all ${pending.length} pending user(s)?`)) return;
-            pixelAction('APPROVING', () =>
-                Promise.all(pending.map(u =>
-                    fetch(`/api/users/${u.id}/approve`, {
-                        method: 'POST',
-                        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
-                    }).then(r => r.json())
-                )).then(() => loadUsers())
-            , `ALL ${pending.length} APPROVED!`);
+            showGenericConfirm({
+                icon: '✅',
+                title: 'Approve All Pending?',
+                message: `This will approve all ${pending.length} pending user(s).`,
+                confirmText: 'Approve All',
+                confirmClass: 'bg-green-700 hover:bg-green-800',
+                onConfirm: () => pixelAction('APPROVING', () =>
+                    Promise.all(pending.map(u =>
+                        fetch(`/api/users/${u.id}/approve`, {
+                            method: 'POST',
+                            headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+                        }).then(r => r.json())
+                    )).then(() => loadUsers())
+                , `ALL ${pending.length} APPROVED!`)
+            });
         }
 
         function denyUser(id, name) {
@@ -2823,6 +2862,30 @@
         function closeForceDeleteTemplateModal() {
             document.getElementById('forceDeleteTemplateModal').classList.add('hidden');
         }
+
+        // ── Generic Confirm Modal ─────────────────────────────────────
+        let _genericConfirmCallback = null;
+        function showGenericConfirm({ icon = '⚠️', title = 'Are you sure?', message = '', confirmText = 'Confirm', confirmClass = 'bg-red-700 hover:bg-red-800', onConfirm }) {
+            document.getElementById('genericConfirmIcon').textContent = icon;
+            document.getElementById('genericConfirmTitle').textContent = title;
+            document.getElementById('genericConfirmMessage').textContent = message;
+            const btn = document.getElementById('genericConfirmOkBtn');
+            btn.textContent = confirmText;
+            btn.className = `flex-1 px-4 py-2.5 ${confirmClass} text-white rounded-xl font-semibold transition-all`;
+            _genericConfirmCallback = onConfirm;
+            document.getElementById('genericConfirmModal').classList.remove('hidden');
+        }
+        function closeGenericConfirm() {
+            document.getElementById('genericConfirmModal').classList.add('hidden');
+            _genericConfirmCallback = null;
+        }
+        document.getElementById('genericConfirmOkBtn').addEventListener('click', function () {
+            closeGenericConfirm();
+            if (typeof _genericConfirmCallback === 'function') _genericConfirmCallback();
+        });
+        document.getElementById('genericConfirmModal').addEventListener('click', function (e) {
+            if (e.target === this) closeGenericConfirm();
+        });
         function toggleArchivedTemplates() {
             const modal = document.getElementById('archivedTemplatesModal');
             modal.classList.remove('hidden');
@@ -2898,9 +2961,14 @@
             , 'SCHOOL YEAR RESTORED!');
         }
         function forceDeleteSchoolYear(id) {
-            if (!confirm('Permanently delete this school year? This cannot be undone.')) return;
-            fetch(`/api/school-years/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
-                .then(r => r.json()).then(d => { if (d.success) loadArchivedSchoolYears(); });
+            showGenericConfirm({
+                icon: '🗑️',
+                title: 'Delete School Year?',
+                message: 'This will permanently delete this school year. This cannot be undone.',
+                confirmText: 'Delete Forever',
+                onConfirm: () => fetch(`/api/school-years/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                    .then(r => r.json()).then(d => { if (d.success) loadArchivedSchoolYears(); })
+            });
         }
 
         // ===== ARCHIVED SCHOOL IDs =====
@@ -3052,16 +3120,26 @@
             , 'USER RESTORED!');
         }
         function forceDeleteUser(id, name) {
-            if (!confirm(`Permanently delete "${name}"? This cannot be undone.`)) return;
-            pixelAction('DELETING', () =>
-                fetch(`/api/users/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
-                    .then(r => r.json()).then(d => { if (d.success) loadArchivedUsers(); })
-            , 'USER DELETED!');
+            showGenericConfirm({
+                icon: '🗑️',
+                title: 'Delete User?',
+                message: `Permanently delete "${name}"? This cannot be undone.`,
+                confirmText: 'Delete Forever',
+                onConfirm: () => pixelAction('DELETING', () =>
+                    fetch(`/api/users/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                        .then(r => r.json()).then(d => { if (d.success) loadArchivedUsers(); })
+                , 'USER DELETED!')
+            });
         }
         function forceDeleteSchoolId(id) {
-            if (!confirm('Permanently delete this school ID? This cannot be undone.')) return;
-            fetch(`/api/school-ids/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
-                .then(r => r.json()).then(d => { if (d.success) loadArchivedSchoolIds(); });
+            showGenericConfirm({
+                icon: '🗑️',
+                title: 'Delete School ID?',
+                message: 'This will permanently delete this school ID. This cannot be undone.',
+                confirmText: 'Delete Forever',
+                onConfirm: () => fetch(`/api/school-ids/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                    .then(r => r.json()).then(d => { if (d.success) loadArchivedSchoolIds(); })
+            });
         }
 
         // ── Theme toggle ─────────────────────────────────────────────
