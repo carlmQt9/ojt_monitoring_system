@@ -1536,7 +1536,8 @@ Route::get('/api/school-ids', function () {
         ->update(['is_used' => false]);
 
     $sy = request('school_year');
-    $query = \App\Models\StudentSchoolId::orderBy('created_at', 'desc');
+    $query = \App\Models\StudentSchoolId::orderByDesc('is_used')
+        ->orderByDesc('created_at');
     if ($sy) $query->where('school_year', $sy);
     $ids = $query->get();
     return response()->json(['school_ids' => $ids]);

@@ -9,6 +9,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    @include('partials.pagination')
     <style>
         /* ===== SIDEBAR ===== */
         #sidebar {
@@ -1159,7 +1160,7 @@
             ?>
 
             @if($groupedRecords->isNotEmpty())
-            <div class="space-y-4">
+            <div class="space-y-4" data-pagination-list data-page-size="3">
                 @foreach($groupedRecords as $date => $sessions)
                 @php
                     $morning   = $sessions->firstWhere('session', 'morning');
@@ -1299,7 +1300,7 @@
                 @if(empty($onboarding))
                 <p class="text-gray-500 text-sm text-center py-4">No requirements have been set up yet. Please check back later.</p>
                 @else
-                <ul class="space-y-3">
+                <ul class="space-y-3" data-pagination-list>
                     @foreach($onboarding as $item => $maxFiles)
                         <?php $found = $requirements->first(fn($r)=> stripos($r->title, $item) !== false); $exists = (bool)$found; ?>
                         <li class="flex justify-between items-center p-3 bg-slate-700/40 rounded-lg">
@@ -1352,7 +1353,7 @@
                 </div>
 
                 @if($narratives->isNotEmpty())
-                <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                <div class="space-y-2 max-h-72 overflow-y-auto pr-1" data-pagination-list data-page-size="10">
                     @foreach($narratives as $n)
                     <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-lg cursor-pointer hover:bg-slate-700/60 transition-colors"
                          onclick="openNarrativeViewModal({{ $n->id }}, '{{ addslashes($n->description) }}', '{{ $n->photo_url }}', {{ $n->day_number }}, '{{ \Carbon\Carbon::parse($n->report_date)->format('M d, Y') }}')">
@@ -1685,9 +1686,9 @@
 
             @if($narrativeReports->isNotEmpty())
             <!-- Mobile-friendly card list -->
-            <div class="space-y-1.5 sm:space-y-2">
+            <div class="space-y-1.5 sm:space-y-2" data-pagination-list data-page-size="10">
                 @foreach($narrativeReports as $i => $nr)
-                <div class="narrative-entry-row @if($i >= 10) hidden @endif
+                <div class="narrative-entry-row
                     flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-slate-700/30 rounded-lg border border-slate-700/50
                     hover:bg-slate-700/50 transition-colors cursor-pointer"
                     data-narrative-id="{{ $nr->id }}"
@@ -1719,15 +1720,6 @@
                 @endforeach
             </div>
             </div>
-
-            @if($narrativeReports->count() > 10)
-            <div class="mt-2 sm:mt-3 text-center">
-                <button id="showMoreNarrativeBtn" onclick="showMoreNarratives()"
-                    class="px-3 sm:px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-gray-300 rounded-lg text-[11px] sm:text-xs">
-                    Show more ({{ $narrativeReports->count() - 10 }} remaining)
-                </button>
-            </div>
-            @endif
 
             @else
             <p class="text-gray-400 text-xs sm:text-sm text-center py-4 sm:py-6">No narrative entries yet. Click <strong>+ Daily Report</strong> to start.</p>
@@ -3247,17 +3239,6 @@
         }
         document.getElementById('uploadModal')?.addEventListener('click', function(e){ if(e.target===this) closeUploadModal(); });
         // ===== END UPLOAD MODAL =====
-
-        function showMoreNarratives() {
-            const hidden = [...document.querySelectorAll('.narrative-entry-row.hidden')];
-            hidden.slice(0, 20).forEach(r => r.classList.remove('hidden'));
-            const btn = document.getElementById('showMoreNarrativeBtn');
-            if (btn) {
-                const remaining = document.querySelectorAll('.narrative-entry-row.hidden').length;
-                if (remaining <= 0) btn.classList.add('hidden');
-                else btn.textContent = 'Show more (' + remaining + ' remaining)';
-            }
-        }
 
         // ===== DAILY SUBMISSIONS FILTER =====
         function filterDailySubmissions(status) {

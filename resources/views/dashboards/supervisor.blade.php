@@ -31,6 +31,7 @@
     <title>Supervisor Dashboard - OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    @include('partials.pagination')
     <style>
         /* ===== SIDEBAR ===== */
         #sidebar {
@@ -535,7 +536,7 @@
                 <p class="text-gray-400">No interns assigned to your company. Interns will appear here once they register.</p>
             </div>
             @else
-            <div class="space-y-4">
+            <div class="space-y-4" data-pagination-list data-page-size="3">
                 @foreach($supervisorStudents as $student)
                     <?php
                     $studentHours = \App\Models\StudentHours::where('student_id', $student->id)->firstOrCreate(
@@ -1061,7 +1062,7 @@
             @else
                 @if($completedCert->isNotEmpty())
                 <h3 class="text-sm font-semibold text-green-400 uppercase tracking-wider mb-3">✅ Completed — Ready for Certificate</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8" data-pagination-list>
                     @foreach($completedCert as $s)
                     <div class="bg-slate-800/50 border border-green-500/40 rounded-xl p-5">
                         <!-- Student info row -->
@@ -1123,7 +1124,7 @@
 
                 @if($notDone->isNotEmpty())
                 <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">⏳ In Progress</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" data-pagination-list>
                     @foreach($notDone as $s)
                     <div class="bg-slate-800/30 border border-slate-700 rounded-xl p-5 flex items-center justify-between gap-4 opacity-60">
                         <div class="min-w-0">

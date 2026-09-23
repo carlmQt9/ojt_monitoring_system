@@ -20,6 +20,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.min.js"></script>
+    @include('partials.pagination')
     <style>
         /* LIGHT MODE - Beautiful soft design */
         /* ===== SECTION VISIBILITY CONTROL ===== */
@@ -445,13 +446,13 @@
                                 <th class="px-3 py-3">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="userTable" class="divide-y divide-slate-700/50">
+                        <tbody id="userTable" data-pagination-list data-page-size="10" class="divide-y divide-slate-700/50">
                             <tr><td colspan="8" class="px-4 py-4 text-center text-gray-400">Loading users...</td></tr>
                         </tbody>
                     </table>
                 </div>
                 <!-- Mobile cards -->
-                <div class="md:hidden" id="userTableMobile">
+                <div class="md:hidden" id="userTableMobile" data-pagination-list data-page-size="10">
                     <p class="text-gray-400 text-sm text-center py-4">Loading users...</p>
                 </div>
             </div>
@@ -494,12 +495,12 @@
                                 <th class="px-4 py-2">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="analyticsTable" class="divide-y divide-slate-700">
+                        <tbody id="analyticsTable" data-pagination-list data-page-size="10" class="divide-y divide-slate-700">
                             <tr class="bg-slate-800/50"><td colspan="5" class="px-4 py-4 text-center text-gray-400">Loading analytics...</td></tr>
                         </tbody>
                     </table>
                 </div>
-                <div class="md:hidden" id="analyticsTableMobile">
+                <div class="md:hidden" id="analyticsTableMobile" data-pagination-list data-page-size="10">
                     <p class="text-gray-400 text-sm text-center py-4">Loading analytics...</p>
                 </div>
             </div>
@@ -521,7 +522,7 @@
                     <button onclick="addSchoolYear()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm">Add</button>
                 </div>
                 <p id="syError" class="text-red-400 text-xs mb-3 hidden"></p>
-                <div id="schoolYearList" class="space-y-2 overflow-y-auto">
+                <div id="schoolYearList" data-pagination-list class="space-y-2 overflow-y-auto">
                     <p class="text-gray-400 text-sm text-center py-4">Loading...</p>
                 </div>
             </div>
@@ -2181,6 +2182,8 @@
             document.querySelectorAll('#schoolIdList [data-sid]').forEach(el => {
                 el.style.display = el.dataset.sid.toLowerCase().includes(q) ? '' : 'none';
             });
+            window.refreshDashboardPagination?.('#schoolIdList tbody[data-pagination-list]');
+            window.refreshDashboardPagination?.('#schoolIdList > .md\\:hidden[data-pagination-list]');
         }
         // Filter JS-rendered archive lists (school years, school IDs, users)
         function filterArchiveList(containerId, q) {
@@ -2215,7 +2218,11 @@
                 .then(r => r.json())
                 .then(data => {
                     const list = document.getElementById('schoolIdList');
-                    const ids = data.school_ids || [];
+                    const ids = (data.school_ids || []).sort((left, right) => {
+                        const usedOrder = Number(right.is_used || 0) - Number(left.is_used || 0);
+                        if (usedOrder !== 0) return usedOrder;
+                        return new Date(right.created_at || 0) - new Date(left.created_at || 0);
+                    });
                     if (!ids.length) {
                         list.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No school IDs found.</p>';
                         return;
@@ -2232,7 +2239,7 @@
                                     <th class="px-4 py-2">Action</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-700">
+                            <tbody class="divide-y divide-slate-700" data-pagination-list data-page-size="10">
                                 ${ids.map(sid => `
                                 <tr class="bg-slate-800/50 hover:bg-slate-700/50" data-sid="${sid.school_id_number} ${sid.school_year || ''}">
                                     <td class="px-4 py-2 font-mono font-semibold text-white">${sid.school_id_number}</td>
@@ -2249,7 +2256,7 @@
                             </tbody>
                         </table>
                         </div>
-                        <div class="md:hidden space-y-3">
+                        <div class="md:hidden space-y-3" data-pagination-list data-page-size="10">
                             ${ids.map(sid => `
                             <div class="bg-slate-700/30 rounded-xl p-4 border border-slate-700" data-sid="${sid.school_id_number} ${sid.school_year || ''}">
                                 <div class="flex justify-between items-start mb-2">

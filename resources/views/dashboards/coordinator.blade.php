@@ -17,6 +17,7 @@
     <title>Coordinator Dashboard - OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    @include('partials.pagination')
     <style>
         /* ===== SIDEBAR ===== */
         #sidebar {
@@ -497,7 +498,7 @@
                                 <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody data-pagination-list>
                             @foreach($allCompanies as $company)
                             <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors">
                                 <td class="py-3 px-3 text-gray-300">{{ $company->name }}</td>
@@ -529,7 +530,7 @@
                     </table>
                 </div>
                 {{-- Mobile card list --}}
-                <div class="sm:hidden space-y-3">
+                <div class="sm:hidden space-y-3" data-pagination-list>
                     @foreach($allCompanies as $company)
                     <div class="bg-slate-700/30 border border-slate-600/50 rounded-xl p-4">
                         <div class="flex items-start justify-between gap-2 mb-2">
@@ -685,7 +686,7 @@
                                     <th class="py-2 px-3 text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody data-pagination-list data-page-size="10">
                                 <?php foreach($students as $student): ?>
                                     <?php 
                                         $studentHours = \App\Models\StudentHours::where('student_id', $student->id)->firstOrCreate(
@@ -701,7 +702,7 @@
                                         $requirements = \App\Models\StudentRequirement::where('student_id', $student->id)->get();
                                         $pendingReq = $requirements->where('status', 'pending')->count();
                                     ?>
-                                    <tr class="compact-row" data-student-name="{{ strtolower($student->name) }}" data-student-id="{{ $student->id }}">
+                                    <tr class="compact-row" data-pagination-group="student-{{ $student->id }}" data-student-name="{{ strtolower($student->name) }}" data-student-id="{{ $student->id }}">
                                         <td class="py-2 px-3">{{ $student->name }}<div class="text-xs text-gray-400">{{ $student->email }}</div></td>
                                         <td class="py-2 px-3 text-gray-400 text-sm">{{ $student->company ? $student->company->name : '-' }}</td>
                                         <td class="py-2 px-3">
@@ -723,7 +724,7 @@
                                         </td>
                                     </tr>
 
-                                    <tr id="details-{{ $student->id }}" class="hidden bg-slate-900/40">
+                                    <tr id="details-{{ $student->id }}" data-pagination-group="student-{{ $student->id }}" class="hidden bg-slate-900/40">
                                         <td colspan="5" class="p-4">
                                             @php
                                                 $coordEval = class_exists('App\\Models\\StudentEvaluation')
@@ -820,7 +821,7 @@
                 </div><!-- end desktop container -->
 
                     <!-- Mobile card list (visible only on mobile) -->
-                    <div class="md:hidden space-y-3 mt-2" id="studentsTable">
+                    <div class="md:hidden space-y-3 mt-2" id="studentsTable" data-pagination-list data-page-size="10">
                         <?php foreach($students as $student): ?>
                         <?php
                             $studentHours2 = \App\Models\StudentHours::where('student_id', $student->id)->firstOrCreate(
@@ -946,7 +947,7 @@
 
             @if($reportsByStudent->isNotEmpty())
                 <!-- Cabinet grid -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" data-pagination-list>
                         @foreach($reportsByStudent as $studentId => $reports)
                             <?php $student = $reports->first()->student ?? null; ?>
                             <!-- Each cabinet is fully self-contained -->
