@@ -23,169 +23,112 @@
   div.Section1 { page: Section1; }
 
   * { box-sizing: border-box; }
+
   body {
     font-family: "Times New Roman", serif;
     font-size: 12pt;
     color: #000;
     margin: 0;
     padding: 0;
-    line-height: 1.5;
+    line-height: 1.6;
   }
 
-  /* ─── Header ─── */
-  .hdr {
-    text-align: center;
-    margin-bottom: 6pt;
-  }
-  .hdr .republic {
-    font-size: 11pt;
-    font-weight: normal;
-    color: #000;
-    text-transform: uppercase;
-    letter-spacing: 0.5pt;
-  }
-  .hdr .univ {
-    font-size: 13pt;
-    font-weight: bold;
-    color: #000;
-    text-transform: uppercase;
-  }
-  .hdr .address {
-    font-size: 10pt;
-    color: #333;
-    margin: 1pt 0 6pt;
-  }
+  /* ── Letterhead ── */
+  .hdr { text-align: center; margin-bottom: 8pt; }
+  .hdr .republic  { font-size: 10.5pt; text-transform: uppercase; letter-spacing: 0.4pt; }
+  .hdr .univ      { font-size: 13pt; font-weight: bold; text-transform: uppercase; }
+  .hdr .address   { font-size: 10pt; color: #333; margin: 2pt 0 6pt; }
   .hdr .title-box {
-    font-size: 13pt;
-    font-weight: bold;
-    text-transform: uppercase;
+    font-size: 13pt; font-weight: bold; text-transform: uppercase;
     letter-spacing: 1.5pt;
-    border-top: 1.5pt solid #000;
-    border-bottom: 1.5pt solid #000;
-    padding: 4pt 0;
-    margin: 4pt 0 8pt;
+    border-top: 1.5pt solid #000; border-bottom: 1.5pt solid #000;
+    padding: 4pt 0; margin: 4pt 0 10pt;
   }
 
-  /* ─── Divider ─── */
-  hr.divider {
-    border: none;
-    border-top: 1pt solid #000;
-    margin: 4pt 0 8pt;
-  }
-
-  /* ─── Info table ─── */
+  /* ── Info table ── */
   table.info {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 8pt;
-    font-size: 11pt;
+    width: 100%; border-collapse: collapse; margin-bottom: 10pt; font-size: 11pt;
   }
   table.info td {
-    width: 50%;
-    padding: 3pt 4pt 6pt 4pt;
-    vertical-align: top;
-    border-bottom: 1pt solid #ccc;
+    width: 50%; padding: 4pt 6pt 7pt 6pt;
+    vertical-align: top; border-bottom: 1pt solid #ccc;
   }
-  table.info td:first-child { padding-right: 16pt; }
-  table.info td:last-child  { padding-left: 16pt; border-left: 1pt solid #ccc; }
-  .lbl { font-size: 8.5pt; color: #555; text-transform: uppercase; letter-spacing: 0.3pt; display: block; }
-  .val { font-size: 11pt; font-weight: bold; border-bottom: 1pt solid #000; padding-bottom: 1pt; display: block; margin-top: 1pt; }
-  .val-n { font-size: 11pt; border-bottom: 1pt solid #000; padding-bottom: 1pt; display: block; margin-top: 1pt; }
+  table.info td:last-child { border-left: 1pt solid #ccc; }
+  .lbl {
+    font-size: 8pt; color: #666; text-transform: uppercase;
+    letter-spacing: 0.4pt; display: block; margin-bottom: 2pt;
+  }
+  .val   { font-size: 11pt; font-weight: bold; border-bottom: 1pt solid #000; display: block; padding-bottom: 1pt; }
+  .val-n { font-size: 11pt; border-bottom: 1pt solid #000; display: block; padding-bottom: 1pt; }
 
-  /* ─── Summary row ─── */
+  /* ── Summary ── */
   table.sumrow {
-    width: 100%;
-    border-collapse: collapse;
-    border: 1pt solid #999;
-    margin: 6pt 0 10pt;
-    font-size: 10pt;
+    width: 100%; border-collapse: collapse;
+    border: 1pt solid #aaa; margin: 6pt 0 12pt; font-size: 10.5pt;
   }
   table.sumrow td {
-    width: 33.33%;
-    text-align: center;
-    padding: 4pt 6pt;
-    border-right: 1pt solid #ccc;
-    vertical-align: middle;
+    width: 33.33%; text-align: center; padding: 5pt 8pt;
+    border-right: 1pt solid #ccc; vertical-align: middle;
   }
   table.sumrow td:last-child { border-right: none; }
-  .s-lbl { font-size: 8pt; color: #444; text-transform: uppercase; display: block; }
-  .s-val { font-size: 11pt; font-weight: bold; color: #000; display: block; }
+  .s-lbl { font-size: 8pt; color: #555; text-transform: uppercase; display: block; margin-bottom: 1pt; }
+  .s-val { font-size: 12pt; font-weight: bold; display: block; }
 
-  /* ─── Section heading ─── */
+  /* ── Section heading ── */
   .sec-heading {
-    font-size: 11pt;
-    font-weight: bold;
-    text-transform: uppercase;
-    letter-spacing: 0.5pt;
-    border-bottom: 1pt solid #000;
-    padding-bottom: 2pt;
-    margin: 8pt 0 6pt;
+    font-size: 11pt; font-weight: bold; text-transform: uppercase;
+    letter-spacing: 0.5pt; border-bottom: 1.5pt solid #000;
+    padding-bottom: 3pt; margin: 10pt 0 8pt;
   }
 
-  /* ─── Day entry ─── */
-  .day-block {
-    margin-bottom: 10pt;
-    page-break-inside: avoid;
-  }
+  /* ── Day block ── */
+  .day-block { margin-bottom: 14pt; page-break-inside: avoid; }
+
   .day-hdr-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: #1a3a6b;
-    margin-bottom: 0;
+    width: 100%; border-collapse: collapse;
+    background: #1a3a6b; margin-bottom: 0;
   }
   .day-hdr-table td {
-    padding: 3pt 6pt;
-    color: #fff;
-    font-size: 10pt;
-    vertical-align: middle;
+    padding: 4pt 8pt; color: #fff; font-size: 10.5pt; vertical-align: middle;
   }
-  .day-hdr-table .day-num { font-weight: bold; width: 60pt; }
-  .day-hdr-table .day-dt  { font-size: 9pt; font-weight: normal; text-align: right; }
+  .day-hdr-table .day-num { font-weight: bold; width: 70pt; }
+  .day-hdr-table .day-dt  { font-size: 9.5pt; text-align: right; }
+
   .day-content {
-    border: 1pt solid #bbb;
-    border-top: none;
-    padding: 5pt 8pt;
+    border: 1pt solid #bbb; border-top: none; padding: 8pt 10pt;
   }
+
+  /* ── Photo (centered via table) ── */
+  table.photo-tbl {
+    width: 100%; border-collapse: collapse;
+    margin-bottom: 8pt; border-bottom: 1pt solid #ddd; padding-bottom: 6pt;
+  }
+  table.photo-tbl td { text-align: center; padding-bottom: 4pt; }
+  .photo-cap {
+    font-size: 8.5pt; color: #555; font-style: italic;
+    text-align: center; display: block; margin-top: 3pt;
+  }
+
+  /* ── Description ── */
   .day-desc {
-    font-size: 11pt;
-    line-height: 1.6;
+    font-size: 11.5pt;
+    line-height: 1.7;
     color: #000;
     margin: 0;
-    padding: 0;
+    padding: 4pt 0 0;
+    text-align: justify;
+    text-justify: inter-word;
   }
 
-  /* ─── Photo ─── */
-  .photo-wrap {
-    text-align: center;
-    padding: 4pt 0 5pt;
-    border-bottom: 1pt solid #e0e0e0;
-    margin-bottom: 4pt;
-  }
-  .photo-wrap img {
-    max-width: 2.8in;
-    max-height: 2in;
-    border: 1pt solid #bbb;
-    display: block;
-    margin: 0 auto 2pt;
-  }
-  .photo-cap {
-    font-size: 8pt;
-    color: #666;
-    font-style: italic;
-  }
-
-  /* ─── Signature ─── */
+  /* ── Signature ── */
   table.sig {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 28pt;
-    font-size: 11pt;
+    width: 100%; border-collapse: collapse; margin-top: 32pt; font-size: 11pt;
   }
-  table.sig td { width: 50%; padding: 0 6pt; vertical-align: bottom; }
+  table.sig td { width: 50%; padding: 0 8pt; vertical-align: bottom; }
   table.sig td:last-child { text-align: center; }
-  .sig-name { font-weight: bold; font-size: 11pt; border-top: 1pt solid #000; padding-top: 2pt; display: block; }
-  .sig-role { font-size: 9pt; color: #444; display: block; margin-top: 1pt; }
-  .sig-blank { border-top: 1pt solid #000; display: block; padding-top: 2pt; height: 16pt; }
+  .sig-name  { font-weight: bold; border-top: 1pt solid #000; padding-top: 2pt; display: block; }
+  .sig-role  { font-size: 9pt; color: #555; display: block; margin-top: 2pt; }
+  .sig-blank { border-top: 1pt solid #000; display: block; height: 18pt; }
 
   .page-break { page-break-before: always; }
 </style>
@@ -256,7 +199,7 @@
 
 <div class="day-block">
 
-  {{-- header bar --}}
+  {{-- Day header bar --}}
   <table class="day-hdr-table">
     <tr>
       <td class="day-num">Day {{ $entry->day_number }}</td>
@@ -266,89 +209,28 @@
 
   <div class="day-content">
 
-    {{-- Photo — base64 embedded, resized to max 800px wide for faster load --}}
+    {{-- Photo centered using a table row (Word-safe) --}}
     @if($entry->photo_path)
     @php
-      $absPath = storage_path('app/public/' . $entry->photo_path);
-      $photoB64 = '';
-      $mime = 'image/jpeg';
-      
-      if (file_exists($absPath)) {
-        $ext = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
-        
-        // Resize and compress the image to reduce document size
-        try {
-          $img = null;
-          if (extension_loaded('gd')) {
-            // Use GD
-            switch($ext) {
-              case 'png':  $img = @imagecreatefrompng($absPath); break;
-              case 'webp': $img = @imagecreatefromwebp($absPath); break;
-              case 'gif':  $img = @imagecreatefromgif($absPath); break;
-              default:     $img = @imagecreatefromjpeg($absPath); break;
-            }
-            
-            if ($img) {
-              $origWidth  = imagesx($img);
-              $origHeight = imagesy($img);
-              $maxWidth   = 800;
-              
-              // Resize if wider than 800px
-              if ($origWidth > $maxWidth) {
-                $ratio     = $maxWidth / $origWidth;
-                $newWidth  = $maxWidth;
-                $newHeight = (int)($origHeight * $ratio);
-                $resized   = imagecreatetruecolor($newWidth, $newHeight);
-                
-                // Preserve transparency for PNG/GIF
-                if ($ext === 'png' || $ext === 'gif') {
-                  imagealphablending($resized, false);
-                  imagesavealpha($resized, true);
-                  $transparent = imagecolorallocatealpha($resized, 0, 0, 0, 127);
-                  imagefill($resized, 0, 0, $transparent);
-                }
-                
-                imagecopyresampled($resized, $img, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
-                imagedestroy($img);
-                $img = $resized;
-              }
-              
-              // Capture output
-              ob_start();
-              switch($ext) {
-                case 'png':  imagepng($img, null, 6); $mime = 'image/png'; break;
-                case 'webp': imagewebp($img, null, 80); $mime = 'image/webp'; break;
-                case 'gif':  imagegif($img); $mime = 'image/gif'; break;
-                default:     imagejpeg($img, null, 75); $mime = 'image/jpeg'; break;
-              }
-              $photoB64 = base64_encode(ob_get_clean());
-              imagedestroy($img);
-            }
-          } else {
-            // Fallback: just read the file (no resize)
-            $photoB64 = base64_encode(file_get_contents($absPath));
-            $mime = match($ext) {
-              'png'  => 'image/png',
-              'webp' => 'image/webp',
-              'gif'  => 'image/gif',
-              default => 'image/jpeg',
-            };
-          }
-        } catch (\Exception $e) {
-          // Silent fail — just skip the photo
-        }
-      }
+      $cid     = 'photo_day_' . $entry->day_number . '@narrative';
+      $absPath = public_path('storage/' . $entry->photo_path);
     @endphp
-    @if($photoB64)
-    <div class="photo-wrap">
-      <img src="data:{{ $mime }};base64,{{ $photoB64 }}" alt="Day {{ $entry->day_number }}">
-      <span class="photo-cap">Figure {{ $entry->day_number }}. Photo — {{ \Carbon\Carbon::parse($entry->report_date)->format('M d, Y') }}</span>
-    </div>
+    @if(file_exists($absPath))
+    <table class="photo-tbl">
+      <tr>
+        <td>
+          <img src="__CID__{{ $cid }}" width="211" height="158"
+               style="border:1pt solid #bbb;display:block;margin:0 auto;"
+               alt="Day {{ $entry->day_number }} photo"><br>
+          <span class="photo-cap">Figure {{ $entry->day_number }}. Photo — {{ \Carbon\Carbon::parse($entry->report_date)->format('M d, Y') }}</span>
+        </td>
+      </tr>
+    </table>
     @endif
     @endif
 
-    {{-- Description --}}
-    <p class="day-desc">{!! nl2br(e($entry->description)) !!}</p>
+    {{-- Narrative description --}}
+    <p class="day-desc" style="text-align:justify;mso-line-height-rule:exactly;">{!! nl2br(e($entry->description)) !!}</p>
 
   </div>
 </div>

@@ -2225,9 +2225,6 @@ Route::post('/daily-narrative', function () {
     // Store photo if provided
     $photoPath = null;
     if (request()->hasFile('photo')) {
-        // Ensure directory exists
-        $dir = storage_path('app/public/narratives');
-        if (!file_exists($dir)) @mkdir($dir, 0755, true);
         $photoPath = request()->file('photo')->store('narratives', 'public');
     }
 
@@ -2272,8 +2269,6 @@ Route::put('/daily-narrative/{id}', function ($id) {
         if ($narrative->photo_path) {
             \Illuminate\Support\Facades\Storage::disk('public')->delete($narrative->photo_path);
         }
-        $dir = storage_path('app/public/narratives');
-        if (!file_exists($dir)) @mkdir($dir, 0755, true);
         $narrative->photo_path = request()->file('photo')->store('narratives', 'public');
     }
 
@@ -2313,14 +2308,73 @@ Route::get('/narrative-report/{studentId}', function ($studentId) {
     $completed = $sh->hours_completed ?? 0;
     $company  = $student->company->name ?? 'N/A';
 
-    $content = view('reports.narrative_word', compact(
+    // Build MHTML so images are bundled inline and Word renders them correctly
+    $boundary = 'NarrativeBoundary_' . md5(uniqid());
+
+    // Render the HTML view — images are referenced as cid: content IDs
+    $htmlContent = view('reports.narrative_word', compact(
         'student', 'narratives', 'company', 'required', 'completed'
     ))->render();
+
+    // Collect all photo paths referenced in this report
+    $imageParts = [];
+    foreach ($narratives as $entry) {
+        if (!$entry->photo_path) continue;
+        $absPath = public_path('storage/' . $entry->photo_path);
+        if (!file_exists($absPath)) continue;
+
+        $ext  = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
+        $mime = match($ext) {
+            'png'  => 'image/png',
+            'gif'  => 'image/gif',
+            'webp' => 'image/webp',
+            default => 'image/jpeg',
+        };
+        $cid      = 'photo_day_' . $entry->day_number . '@narrative';
+        $b64      = base64_encode(file_get_contents($absPath));
+        $filename = basename($absPath);
+
+        // Replace __CID__ placeholder in HTML with actual cid: reference
+        $htmlContent = str_replace(
+            'src="__CID__' . $cid . '"',
+            'src="cid:' . $cid . '"',
+            $htmlContent
+        );
+
+        $imageParts[] = [
+            'cid'      => $cid,
+            'mime'     => $mime,
+            'filename' => $filename,
+            'b64'      => $b64,
+        ];
+    }
+
+    // Build the MHTML document
+    $mhtml  = "MIME-Version: 1.0\r\n";
+    $mhtml .= "Content-Type: multipart/related; boundary=\"{$boundary}\"\r\n\r\n";
+
+    // Part 1: HTML
+    $mhtml .= "--{$boundary}\r\n";
+    $mhtml .= "Content-Type: text/html; charset=\"utf-8\"\r\n";
+    $mhtml .= "Content-Transfer-Encoding: quoted-printable\r\n\r\n";
+    $mhtml .= quoted_printable_encode($htmlContent) . "\r\n";
+
+    // Parts 2+: Images
+    foreach ($imageParts as $img) {
+        $mhtml .= "--{$boundary}\r\n";
+        $mhtml .= "Content-Type: {$img['mime']}; name=\"{$img['filename']}\"\r\n";
+        $mhtml .= "Content-Transfer-Encoding: base64\r\n";
+        $mhtml .= "Content-ID: <{$img['cid']}>\r\n";
+        $mhtml .= "Content-Disposition: inline; filename=\"{$img['filename']}\"\r\n\r\n";
+        $mhtml .= chunk_split($img['b64'], 76, "\r\n") . "\r\n";
+    }
+
+    $mhtml .= "--{$boundary}--\r\n";
 
     $safeName = preg_replace('/[^A-Za-z0-9_]/', '', str_replace(' ', '_', $student->name));
     $filename = 'NarrativeReport_' . $safeName . '_' . now()->format('Y-m-d') . '.doc';
 
-    return response($content)
-        ->header('Content-Type', 'application/msword')
+    return response($mhtml)
+        ->header('Content-Type', 'multipart/related; boundary="' . $boundary . '"')
         ->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
 })->name('narrative-report.download')->middleware('auth.custom');
