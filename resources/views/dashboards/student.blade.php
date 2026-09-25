@@ -9,6 +9,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     @include('partials.pagination')
     <style>
         /* ===== SIDEBAR ===== */
@@ -1657,6 +1658,14 @@
         @php
             $narrativeReports = \App\Models\DailyNarrative::where('student_id', $user->id)
                 ->orderBy('day_number', 'desc')->get();
+            $narrativePdfEntries = $narrativeReports->map(function ($entry) {
+                return [
+                    'day' => $entry->day_number,
+                    'date' => \Carbon\Carbon::parse($entry->report_date)->format('F d, Y'),
+                    'description' => $entry->description,
+                    'photo' => $entry->photo_url,
+                ];
+            })->values()->all();
             $todayNarrativeReport = $narrativeReports->first(function ($narrative) {
                 return \Carbon\Carbon::parse($narrative->report_date, 'Asia/Manila')
                     ->isSameDay(\Carbon\Carbon::now('Asia/Manila'));
@@ -1902,23 +1911,23 @@
                 <div class="bg-slate-700/40 rounded-xl p-4 text-center">
                     <div class="text-4xl mb-2">📄</div>
                     <p class="text-white font-semibold text-sm">OJT Narrative Report</p>
-                    <p class="text-gray-400 text-xs mt-1">All <span id="dlDayCount" class="text-indigo-400 font-bold"></span> narrative entries compiled into one Word document</p>
+                    <p class="text-gray-400 text-xs mt-1">All <span id="dlDayCount" class="text-indigo-400 font-bold"></span> narrative entries compiled into one PDF</p>
                 </div>
                 <div class="bg-slate-700/20 rounded-lg p-3 space-y-1 text-xs text-gray-400">
                     <p>✓ University header &amp; student info</p>
                     <p>✓ Day-by-day entries with dates</p>
                     <p>✓ Photos embedded per day</p>
                     <p>✓ Signature block</p>
-                    <p>✓ Compatible with Microsoft Word</p>
+                    <p>✓ Opens on mobile phones</p>
                 </div>
             </div>
             <div class="flex gap-3 px-6 pb-5">
                 <button type="button" onclick="closeNarrativeDownloadModal()"
                     class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold">Cancel</button>
-                <a id="narrativeDownloadLink" href="{{ route('narrative-report.download', $user->id) }}"
-                    onclick="closeNarrativeDownloadModal(); setTimeout(() => { if(typeof showSuccess === 'function') showSuccess('📄 Narrative report downloaded successfully!'); }, 300);"
+                <a id="narrativeDownloadLink" href="#"
+                    onclick="event.preventDefault(); generateNarrativePdf();"
                     class="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-center transition-all">
-                    📄 Download Report
+                    📄 Download PDF
                 </a>
             </div>
         </div>
@@ -3450,6 +3459,201 @@
         }
         function closeNarrativeDownloadModal() {
             document.getElementById('narrativeDownloadModal').classList.add('hidden');
+        }
+
+        function showNarrativeDownloadToast() {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-6 right-6 z-[200] flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl text-sm font-medium';
+            toast.style.cssText = 'background:linear-gradient(135deg,#1d4ed8,#2563eb);border:1px solid rgba(191,219,254,0.8);color:#ffffff;animation:slideInRight .3s ease;box-shadow:none';
+            toast.innerHTML = `
+                <div class="flex items-center justify-center w-9 h-9 rounded-full bg-white/12 border border-white/25 shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div class="leading-tight text-left">
+                    <div class="toast-title font-black text-[16px] tracking-tight">Download Successful!</div>
+                    <div class="toast-subtitle text-[14px] font-semibold">Narrative report saved as PDF</div>
+                </div>
+                <button type="button" class="toast-close ml-2 inline-flex items-center justify-center w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-xl leading-none border border-white/20">&times;</button>
+            `;
+
+            const toastTitle = toast.querySelector('.toast-title');
+            const toastSubtitle = toast.querySelector('.toast-subtitle');
+            const toastClose = toast.querySelector('.toast-close');
+            if (toastTitle) toastTitle.style.color = '#ffffff';
+            if (toastSubtitle) toastSubtitle.style.color = '#dbeafe';
+            if (toastClose) toastClose.style.color = '#ffffff';
+
+            toast.querySelector('button').onclick = () => toast.remove();
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3500);
+        }
+
+        async function generateNarrativePdf() {
+            closeNarrativeDownloadModal();
+
+            if (!window.jspdf?.jsPDF) {
+                alert('The PDF generator is unavailable. Please check your internet connection and try again.');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 14;
+            const contentWidth = pageWidth - (margin * 2);
+            const innerPadding = 10;
+            const narratives = @json($narrativePdfEntries);
+
+            const imageData = async (url) => {
+                if (!url) return null;
+                try {
+                    const response = await fetch(url);
+                    if (!response.ok) return null;
+                    const blob = await response.blob();
+                    return await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.onerror = () => resolve(null);
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (error) {
+                    return null;
+                }
+            };
+
+            let firstPageHeaderShown = false;
+
+            const drawHeader = () => {
+                if (firstPageHeaderShown) return;
+
+                doc.setFillColor(240, 245, 250);
+                doc.roundedRect(margin - 2, 6, contentWidth + 4, 22, 2.5, 2.5, 'F');
+                doc.setDrawColor(192, 204, 220);
+                doc.setLineWidth(0.3);
+                doc.line(margin, 12, pageWidth - margin, 12);
+
+                doc.setTextColor(32, 61, 102);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(16);
+                doc.text('OJT Narrative Report', margin, 18);
+
+                doc.setTextColor(90, 104, 124);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.text('Student: {{ addslashes(strtoupper($user->name)) }}', margin, 27);
+                doc.text(new Date().toLocaleDateString('en-US'), pageWidth - margin, 27, { align: 'right' });
+
+                firstPageHeaderShown = true;
+            };
+
+            const footer = () => {
+                const page = doc.internal.getCurrentPageInfo().pageNumber;
+                const total = doc.internal.getNumberOfPages();
+                doc.setDrawColor(220, 224, 230);
+                doc.setLineWidth(0.3);
+                doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(140, 140, 140);
+                doc.text('Generated by OJT Monitoring System', margin, pageHeight - 8);
+                doc.text(`Page ${page} of ${total}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
+            };
+
+            const textBlockX = margin + 4;
+            const textBlockWidth = contentWidth - 8;
+
+            drawHeader();
+            let y = 36;
+            doc.setTextColor(30, 30, 30);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(12);
+            doc.text('Student Narrative Report', margin, y);
+            y += 7;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.text('Student: {{ addslashes(strtoupper($user->name)) }}', margin, y);
+            doc.text(`Total Days: ${narratives.length}`, pageWidth - margin - 2, y, { align: 'right' });
+            y += 8;
+            doc.setDrawColor(180, 180, 180);
+            doc.line(margin, y, pageWidth - margin, y);
+            y += 8;
+
+            for (const entry of narratives) {
+                const photo = await imageData(entry.photo);
+                const descriptionLines = doc.splitTextToSize(entry.description || '', textBlockWidth);
+                const photoHeight = photo ? 48 : 0;
+                const blockHeight = 20 + photoHeight + (descriptionLines.length * 4.5);
+
+                if (y + blockHeight > pageHeight - 18 && y > 50) {
+                    footer();
+                    doc.addPage();
+                    y = 18;
+                }
+
+                doc.setDrawColor(200, 210, 220);
+                doc.setFillColor(244, 247, 251);
+                doc.roundedRect(margin, y, contentWidth, 9, 1.5, 1.5, 'FD');
+                doc.setTextColor(30, 30, 30);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(10);
+                doc.text(`Day ${entry.day}`, margin + 4, y + 6);
+                doc.setFont('helvetica', 'normal');
+                doc.text(entry.date, pageWidth - margin - 2, y + 6, { align: 'right' });
+                y += 12;
+
+                if (photo) {
+                    try {
+                        const photoFormat = photo.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+                        const photoX = margin + ((contentWidth - 64) / 2);
+                        doc.addImage(photo, photoFormat, photoX, y, 64, 44, undefined, 'FAST');
+                        doc.setTextColor(85, 85, 85);
+                        doc.setFontSize(8);
+                        doc.text('Photo', pageWidth / 2, y + 47, { align: 'center' });
+                        y += 53;
+                    } catch (error) {
+                        // Continue with the text when a mobile browser rejects the image format.
+                    }
+                }
+
+                doc.setTextColor(30, 30, 30);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(10);
+                descriptionLines.forEach((line) => {
+                    if (y > pageHeight - 20) {
+                        footer();
+                        doc.addPage();
+                        y = 18;
+                    }
+                    doc.text(line, textBlockX, y + 5, { maxWidth: textBlockWidth });
+                    y += 4.5;
+                });
+                y += 5;
+                doc.setDrawColor(210, 210, 210);
+                doc.line(margin, y, pageWidth - margin, y);
+                y += 7;
+            }
+
+            if (y + 20 > pageHeight - 18) {
+                footer();
+                doc.addPage();
+                y = 18;
+            }
+            doc.setFillColor(245, 247, 250);
+            doc.roundedRect(margin, y, 70, 18, 2, 2, 'F');
+            doc.setTextColor(30, 30, 30);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.text('{{ addslashes(strtoupper($user->name)) }}', margin + 10, y + 8);
+            doc.setDrawColor(60, 80, 110);
+            doc.line(margin + 5, y + 13, margin + 65, y + 13);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(90, 104, 124);
+            doc.text('OJT Student', margin + 10, y + 16);
+            footer();
+            doc.save(`NarrativeReport_{{ $user->id }}-${new Date().toISOString().slice(0, 10)}.pdf`);
+            showNarrativeDownloadToast();
         }
         // ===== END NARRATIVE REPORT =====
 
