@@ -670,3 +670,57 @@ Note: Settings changes apply system-wide and affect all users immediately.
 •	The system uses one consistent full-screen spinner for save, approval, upload, and navigation actions.
 •	The dashboard loading skeleton appears only while the initial dashboard is loading.
 •	Search fields check all pagination pages. If a result is on another page, the list moves to the page containing the result.
+
+SPECIAL FEATURES
+
+The OJT Monitoring System includes a range of innovative and practical features designed to streamline internship management and improve user experience across all roles. These features strengthen the system’s reliability, accountability, and efficiency in supporting both academic and administrative processes.
+
+•	Role-Based Access Control — Each user type has a dedicated dashboard and permissions tailored to their responsibilities.
+•	Automated Face Capture for Time-In and Time-Out — Students can log attendance using camera-based verification for accuracy and accountability.
+•	Smart Approval Workflow — Supervisors and coordinators can approve or deny time records, requirements, and reports in an organized review process.
+•	Real-Time Progress Tracking — Students, supervisors, and administrators can monitor completed hours, remaining hours, and progress percentage conveniently.
+•	Requirement Management System — Students can upload onboarding and daily requirements, while admins can manage and track these submissions.
+•	Bulk Review and Approval Functions — Quick actions help administrators and coordinators process multiple records efficiently.
+•	Evaluation and DTR Generation — Supervisors can evaluate interns and generate final daily time records for reporting and documentation.
+•	School Year and School ID Management — The system supports academic cohort tracking and verified student registration control.
+•	System-Wide Reporting — Reports can be exported for monitoring, evaluation, and decision-making purposes.
+•	Email Notification Support — Users receive relevant notifications for approval, registration, and account-related updates.
+•	Search and Filtering Capabilities — Users can quickly locate records, students, companies, and requirements using built-in search features.
+
+These features make the system more effective, transparent, and user-friendly while supporting the overall goal of efficient OJT supervision and academic monitoring.
+
+APPENDIX D
+THE FUTURE OF OJT MONITORING
+
+This manual serves as a practical and user-friendly guide to the OJT Monitoring System, designed to support internship monitoring, documentation, evaluation, and administrative reporting for students, supervisors, coordinators, and CCIT Head personnel. It reflects the system’s purpose of improving the visibility, accuracy, and efficiency of OJT tracking in a secure and organized digital environment.
+
+System Information
+•	System Name: OJT Monitoring System
+•	Version: 1.0
+•	Development Year: 2026
+•	Institution: PRMSU
+•	Purpose: To monitor and manage student OJT performance, attendance, documentation, and evaluation.
+
+Developer Information
+•	Developer Name: [Your Full Name]
+•	Course / Program: [Your Program / Course]
+•	School / University: [Your School or University]
+•	Department: [Your Department]
+•	Email Address: [your.email@example.com]
+•	Contact Number: [Your Contact Number]
+•	Role: System Developer / Thesis Project Developer
+•	Project Title: OJT Monitoring System
+
+Closing Statement
+This system was developed to strengthen the efficiency, transparency, and accountability of OJT monitoring within the academic setting. By integrating attendance tracking, requirement management, supervisor evaluation, and report generation into one platform, it enables better decision-making, reduces administrative workload, and promotes a more organized and responsive internship experience for all stakeholders.
+
+The OJT Monitoring System stands as a practical step toward digital transformation in academic supervision, helping students, mentors, and administrators work together more effectively and confidently throughout the internship journey.
+
+Prepared and developed by:
+[Your Full Name]
+Developer, OJT Monitoring System
+[School Name / Institution]
+
+For questions, technical concerns, or system support, please contact the developer or the assigned system administrator.
+
+© 2026. All rights reserved.

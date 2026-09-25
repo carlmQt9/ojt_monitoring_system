@@ -188,6 +188,15 @@
         body.light button.bg-green-600,body.light button.bg-green-700,
         body.light button.bg-orange-600,body.light button.bg-orange-700,
         body.light button.bg-purple-600,body.light button.bg-purple-700 { color: #fff !important; }
+        body.light button.bg-green-600,
+        body.light button.bg-green-700,
+        body.light button.bg-green-500,
+        body.light button.bg-green-600:hover,
+        body.light button.bg-green-700:hover {
+            background-color: #16a34a !important;
+            border-color: #16a34a !important;
+            color: #ffffff !important;
+        }
         body.light [class*="bg-slate-900"] { background: linear-gradient(135deg, #faf9fc 0%, #f5f3f9 100%) !important; }
         body.light [class*="bg-slate-800"] { background: rgba(255,255,255,0.85) !important; box-shadow: 0 1px 3px rgba(124,58,237,0.08) !important; }
         body.light [class*="bg-slate-700"] { background: rgba(250,249,252,0.9) !important; }
