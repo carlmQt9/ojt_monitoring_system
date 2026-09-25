@@ -242,7 +242,7 @@
             <button onclick="showSection('reports')" data-section="reports"
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">📋</span>
-                <span class="nav-label">Reports & Requirements</span>
+                <span class="nav-label flex-1 text-left">Reports & Requirements</span>
                 @if($_navBadgeReports > 0)
                     <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-orange-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeReports }}</span>
                 @endif
@@ -307,8 +307,8 @@
                 ->when($activeSY, fn($q) => $q->where('school_year', $activeSY->label))
                 ->count();
             $_totalCompanies = \App\Models\Company::count();
-            $_pendingReports = \App\Models\StudentRequirement::where('status', 'pending')->whereHas('student')->count();
-            $_pendingTimeIns = \App\Models\TimeInRecord::where('status', 'pending')->whereHas('student')->count();
+            $_pendingReports = $_navBadgeReports;
+            $_pendingTimeIns = $_navBadgeStudents;
         @endphp
 
         <!-- Header Info Card -->
@@ -364,7 +364,7 @@
             }
             // Reports status counts
             $_repApproved = \App\Models\StudentRequirement::where('status','approved')->whereHas('student')->count();
-            $_repPending  = \App\Models\StudentRequirement::where('status','pending')->whereHas('student')->count();
+            $_repPending  = $_navBadgeReports;
             $_repRejected = \App\Models\StudentRequirement::where('status','denied')->whereHas('student')->count();
             // Top 5 companies by intern count
             $_topCompanies = \App\Models\Company::withCount('students')->orderByDesc('students_count')->limit(5)->get();
@@ -698,7 +698,7 @@
                                         $required = $studentHours->total_hours_required ?? 600;
                                         $progressPct = round(($displayCompleted / $required) * 100, 2);
                                         $pendingLogs = \App\Models\DailyHourLog::where('student_id', $student->id)->where('status', 'pending')->count();
-                                        $pendingTimeIns = \App\Models\TimeInRecord::where('student_id', $student->id)->where('status', 'pending')->count();
+                                        $pendingTimeIns = \App\Models\TimeInRecord::where('student_id', $student->id)->whereNotNull('time_out')->where('status', 'pending')->count();
                                         $requirements = \App\Models\StudentRequirement::where('student_id', $student->id)->get();
                                         $pendingReq = $requirements->where('status', 'pending')->count();
                                     ?>
@@ -832,7 +832,7 @@
                             $required2 = $studentHours2->total_hours_required ?? 600;
                             $progressPct2 = round(($displayCompleted2 / $required2) * 100, 2);
                             $pendingTotal2 = \App\Models\DailyHourLog::where('student_id',$student->id)->where('status','pending')->count()
-                                + \App\Models\TimeInRecord::where('student_id',$student->id)->where('status','pending')->count()
+                                + \App\Models\TimeInRecord::where('student_id',$student->id)->whereNotNull('time_out')->where('status','pending')->count()
                                 + \App\Models\StudentRequirement::where('student_id',$student->id)->where('status','pending')->count();
                         ?>
                         <div class="bg-slate-800/60 rounded-xl p-4 border border-slate-700/60" data-student-name="{{ strtolower($student->name) }}">
@@ -1941,22 +1941,17 @@
         
         document.getElementById('studentSearch')?.addEventListener('input', function() {
             const q = (this.value || '').trim().toLowerCase();
-            // Desktop rows
-            document.querySelectorAll('#studentsTable tbody tr[data-student-name]').forEach(r => {
-                const name = (r.getAttribute('data-student-name') || '');
-                if (!q || name.includes(q)) {
-                    r.style.display = '';
-                } else {
-                    r.style.display = 'none';
-                    const next = r.nextElementSibling;
-                    if (next && next.id && next.id.startsWith('details-')) next.classList.add('hidden');
-                }
-            });
-            // Mobile cards
-            document.querySelectorAll('.md\\:hidden [data-student-name]').forEach(card => {
-                const name = (card.getAttribute('data-student-name') || '');
-                card.style.display = (!q || name.includes(q)) ? '' : 'none';
-            });
+            const matches = group => !q || group.some(item =>
+                (item.getAttribute('data-student-name') || '').includes(q)
+            );
+            window.filterDashboardPagination(
+                document.querySelector('#section-students table tbody'),
+                matches
+            );
+            window.filterDashboardPagination(
+                document.querySelector('#section-students .md\\:hidden[data-pagination-list]'),
+                matches
+            );
         });
 
         // Close cabinets on outside click (optional: keeps UI tidy)

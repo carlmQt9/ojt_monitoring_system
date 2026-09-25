@@ -547,7 +547,7 @@
                         ? ($studentHours->hours_completed / ($studentHours->total_hours_required ?? 600)) * 100
                         : 0;
                     $dailyLogs = \App\Models\DailyHourLog::where('student_id', $student->id)->orderBy('log_date', 'desc')->limit(7)->get();
-                    $pendingTimeEdits = \App\Models\TimeInRecord::where('student_id', $student->id)->where('status', 'pending')->count();
+                    $pendingTimeEdits = \App\Models\TimeInRecord::where('student_id', $student->id)->whereNotNull('time_out')->where('status', 'pending')->count();
                     $timeInRecords = \App\Models\TimeInRecord::where('student_id', $student->id)->orderBy('date', 'desc')->limit(5)->get();
                     $requirements = \App\Models\StudentRequirement::where('student_id', $student->id)->get();
                     $pendingRequirements = $requirements->where('status', 'pending')->count();
@@ -1651,11 +1651,11 @@
 
         // Toggle student card expansion — collapse others first
         function filterInterns(q) {
-            q = q.toLowerCase();
-            document.querySelectorAll('.student-card').forEach(card => {
-                const match = (card.dataset.intern || '').includes(q);
-                card.style.display = match ? '' : 'none';
-            });
+            q = (q || '').trim().toLowerCase();
+            window.filterDashboardPagination(
+                document.querySelector('#section-interns [data-pagination-list]'),
+                group => !q || group.some(card => (card.dataset.intern || '').includes(q))
+            );
         }
 
         function filterTimeEdits(input, studentId) {

@@ -87,11 +87,27 @@
             groups[groupIndexes.get(key)].push(item);
         });
 
-        if (groups.length <= pageSize) return;
+        if (groups.length <= pageSize) {
+            list._dashboardPagination = {
+                setFilter(nextFilter) {
+                    const activeFilter = typeof nextFilter === 'function' ? nextFilter : null;
+                    groups.forEach(group => {
+                        const matches = !activeFilter || activeFilter(group);
+                        group[0]?.classList.toggle('hidden', !matches);
+                        group.slice(1).forEach(item => {
+                            if (matches) item.classList.add('hidden');
+                            else item.classList.add('hidden');
+                        });
+                    });
+                }
+            };
+            return;
+        }
         list.dataset.paginationReady = 'true';
 
         const totalPages = Math.ceil(groups.length / pageSize);
         let currentPage = 1;
+        let filter = null;
         const controls = document.createElement('div');
         controls.className = 'dashboard-pagination';
         controls.id = `dashboard-pagination-${++paginationId}`;
@@ -106,15 +122,21 @@
         }
 
         function render() {
+            const visibleGroups = filter ? groups.filter(filter) : groups;
+            const visiblePageCount = Math.max(1, Math.ceil(visibleGroups.length / pageSize));
+            currentPage = Math.min(currentPage, visiblePageCount);
             const first = (currentPage - 1) * pageSize;
-            groups.forEach((group, index) => {
+            groups.forEach(group => {
+                const index = visibleGroups.indexOf(group);
                 group.forEach(item => item.classList.toggle('hidden', index < first || index >= first + pageSize));
             });
 
             controls.innerHTML = '';
             const summary = document.createElement('span');
             summary.className = 'dashboard-pagination__summary';
-            summary.textContent = `Showing ${first + 1}-${Math.min(first + pageSize, groups.length)} of ${groups.length}`;
+            summary.textContent = visibleGroups.length
+                ? `Showing ${first + 1}-${Math.min(first + pageSize, visibleGroups.length)} of ${visibleGroups.length}`
+                : 'No matching items';
             controls.appendChild(summary);
 
             const pages = document.createElement('div');
@@ -126,9 +148,9 @@
             previous.addEventListener('click', () => { currentPage--; render(); });
             pages.appendChild(previous);
 
-            const visiblePages = new Set([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
+            const visiblePages = new Set([1, visiblePageCount, currentPage - 1, currentPage, currentPage + 1]);
             [...visiblePages].sort((a, b) => a - b).forEach(page => {
-                if (page < 1 || page > totalPages) return;
+                if (page < 1 || page > visiblePageCount) return;
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'dashboard-pagination__page';
@@ -143,12 +165,19 @@
             const next = document.createElement('button');
             next.type = 'button';
             next.textContent = 'Next';
-            next.disabled = currentPage === totalPages;
+            next.disabled = currentPage === visiblePageCount;
             next.addEventListener('click', () => { currentPage++; render(); });
             pages.appendChild(next);
             controls.appendChild(pages);
         }
 
+        list._dashboardPagination = {
+            setFilter(nextFilter) {
+                filter = typeof nextFilter === 'function' ? nextFilter : null;
+                currentPage = 1;
+                render();
+            }
+        };
         render();
     }
 
@@ -157,6 +186,7 @@
         if (controlsId) document.getElementById(controlsId)?.remove();
         delete list.dataset.paginationReady;
         delete list.dataset.paginationControls;
+        delete list._dashboardPagination;
         paginateList(list);
     }
 
@@ -167,6 +197,11 @@
     window.refreshDashboardPagination = function (selector) {
         const list = typeof selector === 'string' ? document.querySelector(selector) : selector;
         if (list?.matches('[data-pagination-list]')) resetPaginationList(list);
+    };
+
+    window.filterDashboardPagination = function (selector, filter) {
+        const list = typeof selector === 'string' ? document.querySelector(selector) : selector;
+        list?._dashboardPagination?.setFilter(filter);
     };
 
     function startDashboardPagination() {

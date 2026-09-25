@@ -394,8 +394,8 @@
                 <p class="text-xs text-gray-500 mt-2">of {{ $_required }} required</p>
             </div>
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 hover:border-orange-500/50 transition-colors">
-                <div class="text-gray-400 text-sm font-medium mb-2">📋 Pending Reports</div>
-                <div class="text-3xl font-bold text-yellow-400">{{ $pendingReqs }}</div>
+                <div class="text-gray-400 text-sm font-medium mb-2">📋 Pending Items</div>
+                <div class="text-3xl font-bold text-yellow-400">{{ $_navBadgeRequirements }}</div>
                 <p class="text-xs text-gray-500 mt-2">{{ $approvedReqs }} approved</p>
             </div>
             <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-6 hover:border-green-500/50 transition-colors">
