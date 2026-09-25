@@ -25,10 +25,22 @@ return new class extends Migration
             }
         });
 
-        DB::statement('ALTER TABLE time_in_records DROP FOREIGN KEY time_in_records_student_id_foreign');
-        DB::statement('ALTER TABLE time_in_records DROP INDEX time_in_records_student_id_date_unique');
-        DB::statement('ALTER TABLE time_in_records ADD UNIQUE KEY time_in_records_student_id_date_session_unique (student_id, date, session)');
-        DB::statement('ALTER TABLE time_in_records ADD CONSTRAINT time_in_records_student_id_foreign FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE');
+        DB::statement('ALTER TABLE time_in_records DROP FOREIGN KEY IF EXISTS time_in_records_student_id_foreign');
+        // Only drop the old unique index if it exists
+        $indexExists = DB::select("SHOW INDEX FROM time_in_records WHERE Key_name = 'time_in_records_student_id_date_unique'");
+        if (!empty($indexExists)) {
+            DB::statement('ALTER TABLE time_in_records DROP INDEX time_in_records_student_id_date_unique');
+        }
+        // Only add the new unique key if it doesn't exist yet
+        $newIndexExists = DB::select("SHOW INDEX FROM time_in_records WHERE Key_name = 'time_in_records_student_id_date_session_unique'");
+        if (empty($newIndexExists)) {
+            DB::statement('ALTER TABLE time_in_records ADD UNIQUE KEY time_in_records_student_id_date_session_unique (student_id, date, session)');
+        }
+        // Only add FK if it doesn't exist
+        $fkExists = DB::select("SELECT * FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'time_in_records' AND CONSTRAINT_NAME = 'time_in_records_student_id_foreign'");
+        if (empty($fkExists)) {
+            DB::statement('ALTER TABLE time_in_records ADD CONSTRAINT time_in_records_student_id_foreign FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE');
+        }
     }
 
     public function down(): void
