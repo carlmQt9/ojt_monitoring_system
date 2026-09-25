@@ -1544,27 +1544,9 @@
             document.getElementById('bulkTimeApprovalModal').classList.add('hidden');
         };
 
-        window.coordBulkApproveAll = function(btn) {
         window.coordBulkApproveAll = async function(btn) {
             btn.disabled = true;
             btn.textContent = 'Approving…';
-            const token = document.querySelector('meta[name="csrf-token"]').content;
-            const fd = new FormData();
-            fd.append('_token', token);
-            fetch('{{ route("approve-all-pending-time-in") }}', { method: 'POST', body: fd, headers: { 'X-CSRF-TOKEN': token, 'Accept': 'text/html' } })
-                .then(r => {
-                    if (r.redirected) { window.location.href = r.url; return; }
-                    if (r.ok) { window.location.reload(); return; }
-                    return Promise.reject(r);
-                })
-                .catch(() => {
-                    // Fallback: submit via hidden form
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = '{{ route("approve-all-pending-time-in") }}';
-                    form.innerHTML = '<input type="hidden" name="_token" value="{{ csrf_token() }}">';
-                    document.body.appendChild(form);
-                    form.submit();
             const studentIds = @json($_coordPendingTimeRecords->pluck('student_id')->unique()->values());
             if (!studentIds || !studentIds.length) {
                 closeBulkTimeApprovalModal();
