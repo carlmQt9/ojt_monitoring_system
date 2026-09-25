@@ -1245,9 +1245,7 @@
             </div>
             <div class="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 p-3 sm:p-5 border-t border-slate-700 shrink-0 bg-slate-900">
                 <button type="button" onclick="closeBulkTimeApprovalModal()" class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">Cancel</button>
-                <form method="POST" action="{{ url('/approve-all-pending-time-in') }}" class="flex-1">@csrf
-                    <button type="submit" @disabled($_supPendingTimeRecords->isEmpty()) class="w-full px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold">Approve All</button>
-                </form>
+                <button type="button" id="supBulkApproveAllBtn" @disabled($_supPendingTimeRecords->isEmpty()) onclick="supBulkApproveAll(this)" class="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold">Approve All</button>
             </div>
         </div>
     </div>
@@ -1710,6 +1708,35 @@
         }
         function closeBulkTimeApprovalModal() {
             document.getElementById('bulkTimeApprovalModal').classList.add('hidden');
+        }
+
+        async function supBulkApproveAll(btn) {
+            btn.disabled = true;
+            btn.textContent = 'Approving…';
+            const studentIds = @json($_supPendingTimeRecords->pluck('student_id')->unique()->values());
+            if (!studentIds || !studentIds.length) {
+                closeBulkTimeApprovalModal();
+                btn.disabled = false;
+                btn.textContent = 'Approve All';
+                return;
+            }
+            const token = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
+            try {
+                const requests = studentIds.map(id => {
+                    const fd = new FormData();
+                    fd.append('_token', token);
+                    return fetch('{{ url("/approve-all-time-in") }}/' + id, {
+                        method: 'POST',
+                        body: fd,
+                        headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json, text/html' }
+                    });
+                });
+                await Promise.all(requests);
+                window.location.reload();
+            } catch (err) {
+                console.error('Bulk approve error:', err);
+                window.location.reload();
+            }
         }
 
         function filterInterns(q) {

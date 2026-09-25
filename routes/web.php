@@ -872,6 +872,18 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
 // Bulk approve all pending time-in records for a student
 Route::post('/approve-all-time-in/{studentId}', function ($studentId) {
     $reviewer = User::findOrFail(session('user_id'));
+
+    if ($reviewer->role === 'supervisor') {
+        $studentCheck = User::find($studentId);
+        if (!$studentCheck || ($studentCheck->supervisor_id !== $reviewer->id && (empty($reviewer->company_id) || $studentCheck->company_id !== $reviewer->company_id))) {
+            $msg = 'Access Denied: You can only approve time records for students in your company.';
+            if (request()->wantsJson() || request()->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 403);
+            }
+            return back()->withErrors(['error' => $msg]);
+        }
+    }
+
     $pendingRecords = \App\Models\TimeInRecord::where('student_id', $studentId)
         ->where('status', 'pending')
         ->whereNotNull('time_out')
@@ -914,8 +926,13 @@ Route::post('/approve-all-time-in/{studentId}', function ($studentId) {
     register_shutdown_function(function() use ($student, $totalToCredit, $dateStr) {
         try { \App\Helpers\MailHelper::sendTimeInApproved($student->email, $student->name, $dateStr, round($totalToCredit, 2)); } catch (\Throwable) {}
     });
-    return back()->with('success', 'All pending time-in records approved!');
-});
+
+    $msg = 'All pending time-in records approved!';
+    if (request()->wantsJson() || request()->ajax()) {
+        return response()->json(['success' => true, 'message' => $msg]);
+    }
+    return back()->with('success', $msg);
+})->name('approve-all-time-in')->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
 // Review and approve every pending timed-out record visible to the reviewer.
 Route::post('/approve-all-pending-time-in', function () {
@@ -1004,9 +1021,15 @@ Route::post('/approve-all-pending-time-in', function () {
         }
     }
 
-    return back()->with('success', $approvedCount
+    $msg = $approvedCount
         ? "Approved {$approvedCount} pending time-out record(s)."
-        : 'There are no pending timed-out records to approve.');
+        : 'There are no pending timed-out records to approve.';
+
+    if (request()->wantsJson() || request()->ajax()) {
+        return response()->json(['success' => true, 'message' => $msg]);
+    }
+
+    return back()->with('success', $msg);
 })->name('approve-all-pending-time-in')->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
 // Bulk deny all pending time-in records for a student

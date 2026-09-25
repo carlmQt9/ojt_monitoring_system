@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Http\Request;
 
 class AppServiceProvider extends ServiceProvider
@@ -18,6 +19,15 @@ class AppServiceProvider extends ServiceProvider
         date_default_timezone_set('Asia/Manila');
         \Carbon\Carbon::setTestNow(null); // clear any test now
         \Carbon\Carbon::now()->setTimezone('Asia/Manila');
+
+        // Keep generated URLs consistent on shared hosting and subfolder deployments.
+        $appUrl = rtrim((string) config('app.url'), '/');
+        if (!empty($appUrl)) {
+            URL::forceRootUrl($appUrl);
+            if (str_starts_with(strtolower($appUrl), 'https://')) {
+                URL::forceScheme('https');
+            }
+        }
 
         // 1. Login — 5 attempts per minute per IP
         RateLimiter::for('login', function (Request $request) {

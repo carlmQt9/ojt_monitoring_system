@@ -1491,9 +1491,7 @@
             </div>
             <div class="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 p-3 sm:p-5 border-t border-slate-700 shrink-0 bg-slate-900">
                 <button type="button" onclick="closeBulkTimeApprovalModal()" class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">Cancel</button>
-                <form method="POST" action="{{ url('/approve-all-pending-time-in') }}" class="flex-1">@csrf
-                    <button type="submit" @disabled($_coordPendingTimeRecords->isEmpty()) class="w-full px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold">Approve All</button>
-                </form>
+                <button type="button" id="coordBulkApproveAllBtn" @disabled($_coordPendingTimeRecords->isEmpty()) onclick="coordBulkApproveAll(this)" class="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold">Approve All</button>
             </div>
         </div>
     </div>
@@ -1544,6 +1542,53 @@
         };
         window.closeBulkTimeApprovalModal = function() {
             document.getElementById('bulkTimeApprovalModal').classList.add('hidden');
+        };
+
+        window.coordBulkApproveAll = function(btn) {
+        window.coordBulkApproveAll = async function(btn) {
+            btn.disabled = true;
+            btn.textContent = 'Approving…';
+            const token = document.querySelector('meta[name="csrf-token"]').content;
+            const fd = new FormData();
+            fd.append('_token', token);
+            fetch('{{ route("approve-all-pending-time-in") }}', { method: 'POST', body: fd, headers: { 'X-CSRF-TOKEN': token, 'Accept': 'text/html' } })
+                .then(r => {
+                    if (r.redirected) { window.location.href = r.url; return; }
+                    if (r.ok) { window.location.reload(); return; }
+                    return Promise.reject(r);
+                })
+                .catch(() => {
+                    // Fallback: submit via hidden form
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = '{{ route("approve-all-pending-time-in") }}';
+                    form.innerHTML = '<input type="hidden" name="_token" value="{{ csrf_token() }}">';
+                    document.body.appendChild(form);
+                    form.submit();
+            const studentIds = @json($_coordPendingTimeRecords->pluck('student_id')->unique()->values());
+            if (!studentIds || !studentIds.length) {
+                closeBulkTimeApprovalModal();
+                btn.disabled = false;
+                btn.textContent = 'Approve All';
+                return;
+            }
+            const token = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
+            try {
+                const requests = studentIds.map(id => {
+                    const fd = new FormData();
+                    fd.append('_token', token);
+                    return fetch('{{ url("/approve-all-time-in") }}/' + id, {
+                        method: 'POST',
+                        body: fd,
+                        headers: { 'X-CSRF-TOKEN': token, 'Accept': 'application/json, text/html' }
+                    });
+                });
+                await Promise.all(requests);
+                window.location.reload();
+            } catch (err) {
+                console.error('Bulk approve error:', err);
+                window.location.reload();
+            }
         };
             const tickColor = '#94a3b8';
 
