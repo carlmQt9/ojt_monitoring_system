@@ -14,7 +14,7 @@ Route::get('/', function () {
 // Storage file serve route — fallback for hosts without symlink support (e.g. InfinityFree)
 Route::get('/storage/{path}', function ($path) {
     // Only allow serving from safe directories
-    $allowed = ['certificates', 'time-in-photos', 'time-out-photos'];
+    $allowed = ['certificates', 'narratives', 'time-in-photos', 'time-out-photos'];
     $dir = explode('/', $path)[0];
     if (!in_array($dir, $allowed)) {
         abort(404);
@@ -916,6 +916,98 @@ Route::post('/approve-all-time-in/{studentId}', function ($studentId) {
     });
     return back()->with('success', 'All pending time-in records approved!');
 });
+
+// Review and approve every pending timed-out record visible to the reviewer.
+Route::post('/approve-all-pending-time-in', function () {
+    $reviewer = User::findOrFail(session('user_id'));
+    $studentQuery = User::where('role', 'student');
+
+    if ($reviewer->role === 'supervisor') {
+        $studentQuery->where(function ($query) use ($reviewer) {
+            $query->where('supervisor_id', $reviewer->id);
+            if ($reviewer->company_id) {
+                $query->orWhere('company_id', $reviewer->company_id);
+            }
+        });
+    }
+
+    $studentIds = $studentQuery->pluck('id');
+    $pendingRecords = \App\Models\TimeInRecord::whereIn('student_id', $studentIds)
+        ->where('status', 'pending')
+        ->whereNotNull('time_out')
+        ->orderBy('student_id')
+        ->orderBy('date')
+        ->get();
+
+    $approvedCount = 0;
+    foreach ($pendingRecords->groupBy('student_id') as $studentId => $studentRecords) {
+        $otLetterCache = [];
+        $studentCredited = 0;
+
+        foreach ($studentRecords as $record) {
+            $dateKey = $record->date->toDateString();
+            if (!array_key_exists($dateKey, $otLetterCache)) {
+                $otLetterCache[$dateKey] = \App\Models\StudentRequirement::where('student_id', $studentId)
+                    ->whereDate('created_at', $dateKey)
+                    ->where('status', 'approved')
+                    ->where(fn($query) => $query->where('title', 'like', '%OT%')
+                        ->orWhere('title', 'like', '%overtime%')
+                        ->orWhere('title', 'like', '%over time%'))
+                    ->exists();
+            }
+
+            $regularHours = floatval($record->regular_hours ?? 0);
+            $otHours = floatval($record->ot_hours ?? 0);
+            $studentCredited += $regularHours;
+            if ($otHours > 0 && $otLetterCache[$dateKey]) {
+                $studentCredited += $otHours;
+                $record->update(['ot_status' => 'approved']);
+            } elseif ($otHours > 0) {
+                $record->update(['ot_status' => 'pending']);
+            }
+            $record->update([
+                'verified' => true,
+                'status' => 'approved',
+                'approved_by' => $reviewer->id,
+                'approved_at' => now(),
+                'denial_reason' => null,
+            ]);
+            $approvedCount++;
+        }
+
+        if ($studentCredited > 0) {
+            $studentHours = \App\Models\StudentHours::where('student_id', $studentId)
+                ->firstOrCreate(['student_id' => $studentId], ['total_hours_required' => 600]);
+            $newCompleted = round(max(0, $studentHours->hours_completed + $studentCredited), 2);
+            $studentHours->update([
+                'hours_completed' => $newCompleted,
+                'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
+            ]);
+        }
+
+        foreach ($studentRecords->pluck('date') as $date) {
+            \App\Models\DailyHourLog::where('student_id', $studentId)
+                ->whereDate('log_date', $date)
+                ->where('status', 'pending')
+                ->update(['status' => 'approved']);
+        }
+
+        $student = User::find($studentId);
+        if ($student) {
+            register_shutdown_function(function () use ($student, $studentCredited) {
+                try {
+                    \App\Helpers\MailHelper::sendTimeInApproved(
+                        $student->email, $student->name, 'Multiple dates', round($studentCredited, 2)
+                    );
+                } catch (\Throwable) {}
+            });
+        }
+    }
+
+    return back()->with('success', $approvedCount
+        ? "Approved {$approvedCount} pending time-out record(s)."
+        : 'There are no pending timed-out records to approve.');
+})->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
 // Bulk deny all pending time-in records for a student
 Route::post('/deny-all-time-in/{studentId}', function ($studentId) {
@@ -2308,6 +2400,7 @@ Route::get('/narrative-report/{studentId}', function ($studentId) {
     $completed = $sh->hours_completed ?? 0;
     $company   = $student->company->name ?? 'N/A';
     $safeName  = preg_replace('/[^A-Za-z0-9_]/', '', str_replace(' ', '_', $student->name));
+    $temporaryImageFiles = [];
 
     // ── DOCX via PHPWord (needs ZipArchive — available on Hostinger PHP 8.3) ──
     if (class_exists('ZipArchive')) {
@@ -2383,12 +2476,34 @@ Route::get('/narrative-report/{studentId}', function ($studentId) {
                 // Photo
                 if ($entry->photo_path) {
                     $imgPath = null;
+                    $imageBytes = null;
+                    try {
+                        $disk = \Illuminate\Support\Facades\Storage::disk('public');
+                        if ($disk->exists($entry->photo_path)) {
+                            $imageBytes = $disk->get($entry->photo_path);
+                        }
+                    } catch (\Throwable $exception) {
+                        $imageBytes = null;
+                    }
+
                     foreach ([
                         storage_path('app/public/' . $entry->photo_path),
                         public_path('storage/' . $entry->photo_path),
                         storage_path('app/' . $entry->photo_path),
                     ] as $p) {
-                        if (file_exists($p)) { $imgPath = $p; break; }
+                        if ($imageBytes === null && is_readable($p)) {
+                            $imageBytes = file_get_contents($p);
+                        }
+                        if ($imageBytes !== null) break;
+                    }
+
+                    if ($imageBytes !== null) {
+                        $extension = strtolower(pathinfo($entry->photo_path, PATHINFO_EXTENSION)) ?: 'jpg';
+                        $temporaryBase = tempnam(storage_path('app'), 'narrative_photo_');
+                        $imgPath = $temporaryBase . '.' . $extension;
+                        rename($temporaryBase, $imgPath);
+                        file_put_contents($imgPath, $imageBytes);
+                        $temporaryImageFiles[] = $imgPath;
                     }
                     if ($imgPath) {
                         try {
@@ -2404,7 +2519,7 @@ Route::get('/narrative-report/{studentId}', function ($studentId) {
                             );
                             $cntCell->addTextBreak(1);
                         } catch (\Exception $e) {
-                            \Log::error('DOCX photo error', ['path' => $imgPath, 'err' => $e->getMessage()]);
+                            \Illuminate\Support\Facades\Log::error('DOCX photo error', ['path' => $imgPath, 'err' => $e->getMessage()]);
                         }
                     }
                 }
@@ -2439,12 +2554,95 @@ Route::get('/narrative-report/{studentId}', function ($studentId) {
         // ── Save & send ──
         $tmp = storage_path('app/narrative_' . $studentId . '_' . time() . '.docx');
         \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007')->save($tmp);
+        foreach ($temporaryImageFiles as $temporaryImageFile) {
+            @unlink($temporaryImageFile);
+        }
 
         return response()->download($tmp, 'NarrativeReport_' . $safeName . '_' . now()->format('Y-m-d') . '.docx')
             ->deleteFileAfterSend(true);
     }
 
-    // ── Fallback: inline HTML .doc (local XAMPP without ZipArchive) ──
+    // ── Fallback: embedded RTF for hosts without ZipArchive ──
+    // RTF stores the image bytes inside the document, so Word never needs to follow a URL.
+    $rtfText = static function ($value): string {
+        return str_replace(
+            ['\\', '{', '}', "\r", "\n"],
+            ['\\\\', '\\{', '\\}', '', '\\line '],
+            (string) $value
+        );
+    };
+
+    $rtf = "{\\rtf1\\ansi\\deff0\n"
+        . "{\\fonttbl{\\f0 Times New Roman;}}\n"
+        . "\\paperw12240\\paperh15840\\margl1440\\margr1440\\margt1440\\margb1440\n"
+        . "\\f0\\fs20\n";
+    $rtf .= "\\qc\\fs18 Republic of the Philippines\\par\n"
+        . "\\b\\fs24 President Ramon Magsaysay State University\\b0\\par\n"
+        . "\\fs18 Sta. Cruz Campus, Sta. Cruz, Zambales\\par\n"
+        . "\\brdrt\\brdrs\\brdrw10\\brdrb\\brdrs\\brdrw10\\sa120\\b\\fs24 OJT Narrative Report\\b0\\par\n";
+    $rtf .= "\\ql\\fs16 Student Name: \\b " . $rtfText(strtoupper($student->name)) . "\\b0\\tab Company / Organization: \\b " . $rtfText(strtoupper($company)) . "\\b0\\par\n"
+        . "Course & School Year: \\b BSCS — " . $rtfText($student->school_year ?? '—') . "\\b0\\tab Date Generated: " . now()->format('F d, Y') . "\\par\n"
+        . "\\brdrt\\brdrs\\brdrw5\\brdrb\\brdrs\\brdrw5\\sa120\\par\n"
+        . "\\qc\\b Total Days: " . $narratives->count() . "\\tab Hours Completed: " . number_format($completed, 2) . "\\tab Hours Required: " . number_format($required, 2) . "\\b0\\par\n"
+        . "\\ql\\sa120\\b\\fs20 DAILY NARRATIVE ENTRIES\\b0\\par\n";
+
+    foreach ($narratives as $entry) {
+        $dateText = \Carbon\Carbon::parse($entry->report_date)->format('l, F d, Y');
+        $rtf .= "\\highlight1\\cf1\\b Day " . (int) $entry->day_number . "\\tab\\tab " . $rtfText($dateText) . "\\b0\\highlight0\\cf0\\par\n";
+
+        if ($entry->photo_path) {
+            $photoBytes = null;
+            try {
+                $disk = \Illuminate\Support\Facades\Storage::disk('public');
+                if ($disk->exists($entry->photo_path)) {
+                    $photoBytes = $disk->get($entry->photo_path);
+                }
+            } catch (\Throwable $exception) {
+                $photoBytes = null;
+            }
+            if ($photoBytes === null) {
+                foreach ([
+                    storage_path('app/public/' . $entry->photo_path),
+                    public_path('storage/' . $entry->photo_path),
+                    storage_path('app/' . $entry->photo_path),
+                ] as $photoCandidate) {
+                    if (is_readable($photoCandidate)) {
+                        $photoBytes = file_get_contents($photoCandidate);
+                        break;
+                    }
+                }
+            }
+            if ($photoBytes !== null) {
+                $extension = strtolower(pathinfo($entry->photo_path, PATHINFO_EXTENSION));
+                $pictureType = $extension === 'png' ? '\\pngblip' : '\\jpegblip';
+                $imageSize = @getimagesizefromstring($photoBytes);
+                $pixelWidth = $imageSize[0] ?? 800;
+                $pixelHeight = $imageSize[1] ?? 600;
+                $goalWidth = 4320;
+                $goalHeight = max(1, (int) round($goalWidth * $pixelHeight / $pixelWidth));
+                $rtf .= "\\qc{\\pict" . $pictureType . "\\picw" . $pixelWidth . "\\pich" . $pixelHeight
+                    . "\\picwgoal" . $goalWidth . "\\pichgoal" . $goalHeight . "\n";
+                $rtf .= chunk_split(bin2hex($photoBytes), 128, "\n") . "}\\par\n";
+                $rtf .= "\\i Photo - " . $rtfText($dateText) . "\\i0\\par\n";
+            }
+        }
+
+        $description = trim($entry->description);
+        if ($description !== '') {
+            $rtf .= "\\ql\\sa80 " . $rtfText($description) . "\\par\n";
+        }
+        $rtf .= "\\sa160\\par\n";
+    }
+
+    $rtf .= "\\sa240\\b " . $rtfText(strtoupper($student->name)) . "\\b0\\par\\fs16 OJT Student\\par\n"
+        . "\\tab\\tab\\tab\\tab Noted by: Supervisor / OJT Coordinator\\par}";
+
+    return response($rtf)
+        ->header('Content-Type', 'application/rtf')
+        ->header('Content-Disposition', 'attachment; filename="NarrativeReport_' . $safeName . '_' . now()->format('Y-m-d') . '.rtf"')
+        ->header('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+    // ── Legacy HTML fallback retained below for reference ──
     $html = '<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office"
       xmlns:w="urn:schemas-microsoft-com:office:word"
@@ -2500,6 +2698,7 @@ table.sig td  { width:50%; padding:0 6pt; font-size:8pt; vertical-align:bottom; 
     $html .= '<div class="sh">Daily Narrative Entries</div>';
 
     // Entries
+    $mhtmlImages = [];
     foreach ($narratives as $entry) {
         $dateStr = \Carbon\Carbon::parse($entry->report_date)->format('l, F d, Y');
         $html .= '<div style="margin-bottom:8pt;">'
@@ -2518,12 +2717,16 @@ table.sig td  { width:50%; padding:0 6pt; font-size:8pt; vertical-align:bottom; 
                 $ext  = strtolower(pathinfo($imgPath, PATHINFO_EXTENSION));
                 $mime = match($ext) { 'png'=>'image/png','gif'=>'image/gif','webp'=>'image/webp', default=>'image/jpeg' };
                 $b64  = base64_encode(file_get_contents($imgPath));
+                  $cid  = 'photo_day_' . $entry->day_number . '@narrative';
+                  $imageName = basename($imgPath);
                 $cap  = 'Figure ' . $entry->day_number . '. Photo &mdash; ' . \Carbon\Carbon::parse($entry->report_date)->format('M d, Y');
-                $html .= '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:5pt;">'
+                  $photoUrl = url('storage/' . $entry->photo_path);
+                  $html .= '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:5pt;">'
                        . '<tr><td align="center">'
-                       . '<img src="data:' . $mime . ';base64,' . $b64 . '" width="240" style="border:1px solid #ccc;display:block;margin:0 auto;">'
+                      . '<img src="' . htmlspecialchars($photoUrl, ENT_QUOTES, 'UTF-8') . '" width="240" style="border:1px solid #ccc;display:block;margin:0 auto;">'
                        . '<br><span style="font-size:7pt;font-style:italic;color:#555;">' . $cap . '</span>'
                        . '</td></tr></table>';
+                  $mhtmlImages[] = ['cid' => $cid, 'mime' => $mime, 'name' => $imageName, 'b64' => $b64];
             }
         }
 
@@ -2547,6 +2750,24 @@ table.sig td  { width:50%; padding:0 6pt; font-size:8pt; vertical-align:bottom; 
            . '</td>'
            . '</tr></table>'
            . '</div></body></html>';
+
+    $boundary = 'NarrativeBoundary_' . md5(uniqid('', true));
+    $mhtml = "MIME-Version: 1.0\r\n";
+    $mhtml .= "Content-Type: multipart/related; type=\"text/html\"; boundary=\"{$boundary}\"\r\n\r\n";
+    $mhtml .= "--{$boundary}\r\n";
+    $mhtml .= "Content-Type: text/html; charset=\"utf-8\"\r\n";
+    $mhtml .= "Content-Location: narrative-report.html\r\n";
+    $mhtml .= "Content-Transfer-Encoding: base64\r\n\r\n";
+    $mhtml .= chunk_split(base64_encode($html), 76, "\r\n") . "\r\n";
+    foreach ($mhtmlImages as $image) {
+        $mhtml .= "--{$boundary}\r\n";
+        $mhtml .= "Content-Type: {$image['mime']}; name=\"{$image['name']}\"\r\n";
+        $mhtml .= "Content-Transfer-Encoding: base64\r\n";
+        $mhtml .= "Content-ID: <{$image['cid']}>\r\n";
+        $mhtml .= "Content-Location: {$image['name']}\r\n\r\n";
+        $mhtml .= chunk_split($image['b64'], 76, "\r\n") . "\r\n";
+    }
+    $mhtml .= "--{$boundary}--\r\n";
 
     return response($html)
         ->header('Content-Type', 'application/msword')

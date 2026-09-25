@@ -532,7 +532,9 @@
         <section id="section-schoolids" class="dash-section hidden">
             <div class="mb-6 flex justify-between items-start">
                 <div>
-                    <h2 class="text-2xl font-bold text-white mb-1">🪪 Student School IDs</h2>
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <h2 class="text-2xl font-bold text-white mb-1">🪪 Student School IDs</h2>
+                    </div>
                     <p class="text-gray-400 text-sm">Manage approved school ID numbers for student registration</p>
                 </div>
                 <button onclick="openArchivedSchoolIdsModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm transition-colors">🗑 Archive Trash</button>
@@ -561,6 +563,7 @@
                     <input type="text" id="schoolIdSearch" placeholder="Search school IDs…"
                         class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none font-mono"
                         oninput="filterSchoolIdList(this.value)">
+                    <span id="schoolIdUsageSummary" class="shrink-0 text-xs font-semibold text-gray-300 bg-slate-600/80 border border-slate-500 rounded-full px-2.5 py-1">Used: 0 / 0</span>
                 </div>
                 <div id="schoolIdList" class="space-y-2 overflow-y-auto">
                     <p class="text-gray-400 text-sm text-center py-4">Loading...</p>
@@ -2178,12 +2181,21 @@
         }
         // ===== SEARCH / FILTER HELPERS =====
         function filterSchoolIdList(q) {
-            q = q.toLowerCase();
-            document.querySelectorAll('#schoolIdList [data-sid]').forEach(el => {
-                el.style.display = el.dataset.sid.toLowerCase().includes(q) ? '' : 'none';
+            q = (q || '').trim().toLowerCase();
+            const container = document.querySelector('#section-schoolids #schoolIdList');
+            if (!container) return;
+            const matches = group => !q || group.some(item =>
+                (item.dataset.sid || '').toLowerCase().includes(q)
+            );
+            const lists = container.querySelectorAll('[data-pagination-list]');
+            lists.forEach(list => {
+                window.filterDashboardPagination?.(list, matches);
+                if (!list._dashboardPagination) {
+                    list.querySelectorAll(':scope > [data-sid]').forEach(item => {
+                        item.classList.toggle('hidden', !matches([item]));
+                    });
+                }
             });
-            window.refreshDashboardPagination?.('#schoolIdList tbody[data-pagination-list]');
-            window.refreshDashboardPagination?.('#schoolIdList > .md\\:hidden[data-pagination-list]');
         }
         // Filter JS-rendered archive lists (school years, school IDs, users)
         function filterArchiveList(containerId, q) {
@@ -2223,6 +2235,11 @@
                         if (usedOrder !== 0) return usedOrder;
                         return new Date(right.created_at || 0) - new Date(left.created_at || 0);
                     });
+                    const usageSummary = document.getElementById('schoolIdUsageSummary');
+                    if (usageSummary) {
+                        const usedCount = ids.filter(sid => Number(sid.is_used || 0) === 1).length;
+                        usageSummary.textContent = `Used: ${usedCount} / ${ids.length}`;
+                    }
                     if (!ids.length) {
                         list.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">No school IDs found.</p>';
                         return;
@@ -2276,6 +2293,7 @@
                             </div>`).join('')}
                         </div>
                     `;
+                    setTimeout(() => filterSchoolIdList(document.getElementById('schoolIdSearch')?.value || ''), 0);
                 });
         }
         function addSchoolId() {

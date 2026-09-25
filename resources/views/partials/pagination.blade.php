@@ -63,7 +63,7 @@
 
     function getPaginationItems(list) {
         return Array.from(list.querySelectorAll(':scope > [data-pagination-item], :scope > tr, :scope > div, :scope > li'))
-            .filter(item => item.textContent.trim() !== 'Loading...' && item.style.display !== 'none');
+            .filter(item => item.textContent.trim() !== 'Loading...');
     }
 
     function paginateList(list) {
@@ -93,10 +93,9 @@
                     const activeFilter = typeof nextFilter === 'function' ? nextFilter : null;
                     groups.forEach(group => {
                         const matches = !activeFilter || activeFilter(group);
-                        group[0]?.classList.toggle('hidden', !matches);
-                        group.slice(1).forEach(item => {
-                            if (matches) item.classList.add('hidden');
-                            else item.classList.add('hidden');
+                        group.forEach((item, itemIndex) => {
+                            if (itemIndex > 0 && item.id?.startsWith('details-') && matches) return;
+                            item.classList.toggle('hidden', !matches);
                         });
                     });
                 }
@@ -128,7 +127,11 @@
             const first = (currentPage - 1) * pageSize;
             groups.forEach(group => {
                 const index = visibleGroups.indexOf(group);
-                group.forEach(item => item.classList.toggle('hidden', index < first || index >= first + pageSize));
+                group.forEach((item, itemIndex) => {
+                    const outsidePage = index < first || index >= first + pageSize || index === -1;
+                    if (itemIndex > 0 && item.id?.startsWith('details-') && !outsidePage) return;
+                    item.classList.toggle('hidden', outsidePage);
+                });
             });
 
             controls.innerHTML = '';

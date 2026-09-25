@@ -6,6 +6,9 @@
         ->whereHas('student')->count();
     // Total pending shown on both nav items
     $_navBadgeTotal     = $_navBadgeStudents + $_navBadgeReports;
+    $_coordPendingTimeRecords = \App\Models\TimeInRecord::with('student')
+        ->where('status', 'pending')->whereNotNull('time_out')->whereHas('student')
+        ->orderBy('date')->get();
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -650,12 +653,15 @@
         <section id="section-students" class="dash-section hidden student-tracking-section">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 shrink-0">
                 <h2 class="text-2xl font-bold text-white">Student Hours Tracking</h2>
-                <div class="w-full sm:max-w-sm">
-                    <div class="flex items-center gap-2 px-3 py-2.5 bg-slate-700/50 border border-slate-600 rounded-xl focus-within:border-indigo-500 transition-colors">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                    <div class="flex items-center gap-2 px-3 py-2.5 w-full sm:w-72 bg-slate-700/50 border border-slate-600 rounded-xl focus-within:border-indigo-500 transition-colors">
                         <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/></svg>
                         <input id="studentSearch" type="search" placeholder="Search student by name..."
                             class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none">
                     </div>
+                    <button type="button" onclick="openBulkTimeApprovalModal()" class="w-full sm:w-auto px-3 py-2 {{ $_coordPendingTimeRecords->isNotEmpty() ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-700 hover:bg-slate-600' }} text-white rounded-lg text-sm font-semibold whitespace-nowrap transition-colors">
+                        ✅ Review Time-Outs ({{ $_coordPendingTimeRecords->count() }})
+                    </button>
                 </div>
             </div>
 
@@ -1443,6 +1449,45 @@
             </div>
         </div>
     </div>
+
+    <div id="bulkTimeApprovalModal" class="hidden fixed inset-0 z-[80] flex items-start sm:items-center justify-center overflow-y-auto bg-black/70 p-3 sm:p-6">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl max-w-3xl w-full max-h-[calc(100vh-1.5rem)] sm:max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+            <div class="flex items-center justify-between px-4 py-3 sm:px-5 border-b border-slate-700 shrink-0">
+                <div>
+                    <h3 class="text-lg sm:text-xl font-bold text-white">Review Pending Time-Outs</h3>
+                    <p class="text-xs sm:text-sm text-gray-400 mt-1">Check the records before approving.</p>
+                </div>
+                <button type="button" onclick="closeBulkTimeApprovalModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+            </div>
+            <div class="p-3 sm:p-5 overflow-y-auto min-h-0">
+                <div class="space-y-2">
+                        @if($_coordPendingTimeRecords->isEmpty())
+                            <div class="p-6 text-center text-gray-400 border border-slate-700 rounded-lg">No eligible pending timed-out records found.</div>
+                        @endif
+                        @foreach($_coordPendingTimeRecords as $record)
+                            <div class="rounded-lg border border-slate-700 bg-slate-800/60 p-3 text-sm text-gray-200">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <div><p class="font-semibold">{{ $record->student->name }}</p><p class="text-xs text-gray-500">{{ $record->student->email }}</p></div>
+                                    <button type="button" onclick="closeBulkTimeApprovalModal(); showLogsModal({{ $record->student_id }}, '{{ addslashes($record->student->name) }}')" class="self-start sm:self-auto px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold">View Logs</button>
+                                </div>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 text-xs">
+                                    <div><span class="block text-gray-500">Date</span>{{ $record->date->format('M d, Y') }}</div>
+                                    <div><span class="block text-gray-500">Session</span>{{ ucfirst($record->session ?? '-') }}</div>
+                                    <div><span class="block text-gray-500">Time</span>{{ \Carbon\Carbon::parse($record->time_in)->format('h:i A') }} - {{ \Carbon\Carbon::parse($record->time_out)->format('h:i A') }}</div>
+                                    <div><span class="block text-gray-500">Hours</span>{{ number_format($record->regular_hours ?? 0, 2) }}h @if(floatval($record->ot_hours ?? 0) > 0)<span class="text-yellow-400">+{{ number_format($record->ot_hours, 2) }} OT</span>@endif</div>
+                                </div>
+                            </div>
+                        @endforeach
+                </div>
+            </div>
+            <div class="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 p-3 sm:p-5 border-t border-slate-700 shrink-0 bg-slate-900">
+                <button type="button" onclick="closeBulkTimeApprovalModal()" class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">Cancel</button>
+                <form method="POST" action="{{ url('/approve-all-pending-time-in') }}" class="flex-1">@csrf
+                    <button type="submit" @disabled($_coordPendingTimeRecords->isEmpty()) class="w-full px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-slate-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold">Approve All</button>
+                </form>
+            </div>
+        </div>
+    </div>
     <script>
         // Global error handler to prevent navigation breaking
         window.addEventListener('error', function(e) {
@@ -1485,6 +1530,12 @@
         // ===== OVERVIEW CHARTS =====
         (function(){
             const gridColor = 'rgba(148,163,184,0.1)';
+        window.openBulkTimeApprovalModal = function() {
+            document.getElementById('bulkTimeApprovalModal').classList.remove('hidden');
+        };
+        window.closeBulkTimeApprovalModal = function() {
+            document.getElementById('bulkTimeApprovalModal').classList.add('hidden');
+        };
             const tickColor = '#94a3b8';
 
             // Bar: student progress buckets
