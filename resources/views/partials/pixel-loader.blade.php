@@ -1,59 +1,28 @@
-{{-- Pixel Loader & Success Overlay --}}
+{{-- Shared action loader --}}
 <style>
-    @font-face {
-        font-family: 'Press Start 2P';
-        src: url('https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2') format('woff2');
-    }
-    #pixelLoader, #pixelSuccess { font-family: 'Press Start 2P', monospace; }
-    .pixel-bar-wrap { display:flex; gap:4px; align-items:center; }
-    .pixel-cell { width:28px; height:28px; border:3px solid #1a1a1a; image-rendering:pixelated; transition:background .1s; }
-    .pixel-cell.filled { background:#4ade80; box-shadow:inset -4px -4px 0 #16a34a, inset 4px 4px 0 #86efac; }
-    .pixel-cell.empty  { background:#d1d5db; box-shadow:inset -4px -4px 0 #9ca3af, inset 4px 4px 0 #f3f4f6; }
-    .pixel-cell.cap-l  { border-radius:6px 0 0 6px; }
-    .pixel-cell.cap-r  { border-radius:0 6px 6px 0; }
-    @keyframes pixelDots { 0%{content:'.'} 25%{content:'..'} 50%{content:'...'} 75%{content:'....'} 100%{content:'.'} }
-    #pixelDots::after { content:'.'; animation:pixelDots 1s steps(1) infinite; }
-    @keyframes popIn { 0%{transform:scale(0) rotate(-20deg);opacity:0} 70%{transform:scale(1.2) rotate(5deg)} 100%{transform:scale(1) rotate(0);opacity:1} }
-    @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-    .pixel-check { image-rendering:pixelated; font-size:3rem; animation:popIn .5s cubic-bezier(.36,.07,.19,.97) forwards; }
-    .pixel-success-text { animation:fadeUp .4s .3s ease forwards; opacity:0; }
+    #pixelLoader, #pixelSuccess { font-family: system-ui, sans-serif; }
+    .action-loader-spinner { width: 2.75rem; height: 2.75rem; border: 3px solid rgba(148,163,184,.3); border-top-color: #60a5fa; border-radius: 999px; animation: actionLoaderSpin .8s linear infinite; }
+    @keyframes actionLoaderSpin { to { transform: rotate(360deg); } }
 </style>
 
-<div id="pixelLoader" class="hidden fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black/80">
-    <div class="bg-slate-900 border-4 border-slate-600 rounded-2xl px-10 py-8 flex flex-col items-center gap-5" style="box-shadow:0 0 40px rgba(74,222,128,0.3)">
-        <div class="pixel-bar-wrap" id="pixelBarCells"></div>
-        <div class="text-green-400 text-sm tracking-widest" id="pixelLoaderLabel">LOADING<span id="pixelDots"></span></div>
+<div id="pixelLoader" class="hidden fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl px-8 py-6 flex flex-col items-center gap-4 shadow-2xl">
+        <div class="action-loader-spinner" aria-hidden="true"></div>
+        <div class="text-gray-200 text-sm font-semibold" id="pixelLoaderLabel">Loading...</div>
     </div>
 </div>
 
-<div id="pixelSuccess" class="hidden fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black/80">
-    <div class="bg-slate-900 border-4 border-green-500 rounded-2xl px-12 py-8 flex flex-col items-center gap-4" style="box-shadow:0 0 40px rgba(74,222,128,0.4)">
-        <div class="pixel-check">✅</div>
-        <div class="pixel-success-text text-green-400 text-sm tracking-widest text-center" id="pixelSuccessMsg">SUCCESS!</div>
-    </div>
+<div id="pixelSuccess" class="hidden fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-green-500/50 rounded-xl px-8 py-6 text-green-300 text-sm font-semibold shadow-2xl" id="pixelSuccessMsg">Completed</div>
 </div>
 
 <script>
-    const PIXEL_TOTAL = 8;
     let _pixelInterval = null;
 
     function showPixelLoader(label) {
         label = label || 'LOADING';
-        const wrap = document.getElementById('pixelBarCells');
-        document.getElementById('pixelLoaderLabel').firstChild.textContent = label;
-        wrap.innerHTML = '';
-        for (let i = 0; i < PIXEL_TOTAL; i++) {
-            const d = document.createElement('div');
-            d.className = 'pixel-cell empty' + (i===0?' cap-l':'') + (i===PIXEL_TOTAL-1?' cap-r':'');
-            wrap.appendChild(d);
-        }
+        document.getElementById('pixelLoaderLabel').textContent = label;
         document.getElementById('pixelLoader').classList.remove('hidden');
-        let filled = 0;
-        _pixelInterval = setInterval(() => {
-            const cells = wrap.querySelectorAll('.pixel-cell');
-            if (filled < PIXEL_TOTAL) { cells[filled].classList.replace('empty','filled'); filled++; }
-            else { cells.forEach(c => c.classList.replace('filled','empty')); filled = 0; }
-        }, 120);
     }
 
     function hidePixelLoader() {
@@ -66,11 +35,7 @@
         duration = duration || 800;
         const el = document.getElementById('pixelSuccess');
         document.getElementById('pixelSuccessMsg').textContent = msg;
-        const check = el.querySelector('.pixel-check');
-        const txt = el.querySelector('.pixel-success-text');
-        check.style.animation = 'none'; txt.style.animation = 'none';
         el.classList.remove('hidden');
-        requestAnimationFrame(() => { check.style.animation = ''; txt.style.animation = ''; });
         setTimeout(() => el.classList.add('hidden'), duration);
     }
 

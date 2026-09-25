@@ -151,6 +151,15 @@
             0%, 80%, 100% { opacity: 0; }
             40% { opacity: 1; }
         }
+        .action-loader-spinner {
+            width: 2.75rem;
+            height: 2.75rem;
+            border: 3px solid rgba(148,163,184,.3);
+            border-top-color: #60a5fa;
+            border-radius: 999px;
+            animation: actionLoaderSpin .8s linear infinite;
+        }
+        @keyframes actionLoaderSpin { to { transform: rotate(360deg); } }
         
         /* PIXEL LOADING - Modernized */
         #pixelLoader { font-family: system-ui, -apple-system, sans-serif; }
@@ -1256,19 +1265,17 @@
         </div>
     </div>
 
-    <!-- Pixel Loader Overlay -->
-    <div id="pixelLoader" class="hidden fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
-        <div class="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-600/50 rounded-2xl px-12 py-10 flex flex-col items-center gap-6 shadow-2xl">
-            <div class="pixel-bar-wrap" id="pixelBarCells"></div>
-            <div class="text-green-400 text-base font-semibold tracking-wider" id="pixelLoaderLabel">LOADING<span id="pixelDots"></span></div>
+    <!-- Shared action loader -->
+    <div id="pixelLoader" class="hidden fixed inset-0 z-[300] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-xl px-8 py-6 flex flex-col items-center gap-4 shadow-2xl">
+            <div class="action-loader-spinner" aria-hidden="true"></div>
+            <div class="text-gray-200 text-sm font-semibold" id="pixelLoaderLabel">Loading...</div>
         </div>
     </div>
 
     <!-- Pixel Success Overlay -->
     <div id="pixelSuccess" class="hidden fixed inset-0 z-[300] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
-        <div class="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-green-500/50 rounded-2xl px-14 py-10 flex flex-col items-center gap-5 shadow-2xl" style="box-shadow:0 0 60px rgba(74,222,128,0.3)">
-            <div class="pixel-check">✅</div>
-            <div class="pixel-success-text text-green-400 text-base tracking-wider text-center" id="pixelSuccessMsg">SUCCESS!</div>
+            <div class="bg-slate-900 border border-green-500/50 rounded-xl px-8 py-6 text-green-300 text-sm font-semibold shadow-2xl" id="pixelSuccessMsg">Completed</div>
         </div>
     </div>
 
@@ -1742,47 +1749,18 @@
             renderUsers(filtered);
         }
 
-        // ── Pixel Loader ─────────────────────────────────────────────
-        const TOTAL_CELLS = 8;
-        let _loaderInterval = null;
+        // ── Shared action loader ──────────────────────────────────────
         function showPixelLoader(label = 'LOADING') {
-            const wrap = document.getElementById('pixelBarCells');
-            document.getElementById('pixelLoaderLabel').firstChild.textContent = label;
-            wrap.innerHTML = '';
-            for (let i = 0; i < TOTAL_CELLS; i++) {
-                const d = document.createElement('div');
-                d.className = 'pixel-cell empty' + (i===0?' cap-l':'') + (i===TOTAL_CELLS-1?' cap-r':'');
-                wrap.appendChild(d);
-            }
+            document.getElementById('pixelLoaderLabel').textContent = label;
             document.getElementById('pixelLoader').classList.remove('hidden');
-            let filled = 0;
-            _loaderInterval = setInterval(() => {
-                const cells = wrap.querySelectorAll('.pixel-cell');
-                if (filled < TOTAL_CELLS) {
-                    cells[filled].classList.replace('empty','filled');
-                    filled++;
-                } else {
-                    // reset
-                    cells.forEach(c => c.classList.replace('filled','empty'));
-                    filled = 0;
-                }
-            }, 120);
         }
         function hidePixelLoader() {
-            clearInterval(_loaderInterval);
             document.getElementById('pixelLoader').classList.add('hidden');
         }
         function showPixelSuccess(msg = 'SUCCESS!', duration = 1400) {
             const el = document.getElementById('pixelSuccess');
             document.getElementById('pixelSuccessMsg').textContent = msg;
-            // reset animations
-            const check = el.querySelector('.pixel-check');
-            const txt = el.querySelector('.pixel-success-text');
-            check.style.animation = 'none'; txt.style.animation = 'none';
             el.classList.remove('hidden');
-            requestAnimationFrame(() => {
-                check.style.animation = ''; txt.style.animation = '';
-            });
             setTimeout(() => el.classList.add('hidden'), duration);
         }
         function pixelAction(label, action, successMsg) {
