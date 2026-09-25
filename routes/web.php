@@ -1007,7 +1007,7 @@ Route::post('/approve-all-pending-time-in', function () {
     return back()->with('success', $approvedCount
         ? "Approved {$approvedCount} pending time-out record(s)."
         : 'There are no pending timed-out records to approve.');
-})->middleware(['auth.custom', 'role:coordinator,supervisor']);
+})->name('approve-all-pending-time-in')->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
 // Bulk deny all pending time-in records for a student
 Route::post('/deny-all-time-in/{studentId}', function ($studentId) {
