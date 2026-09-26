@@ -677,6 +677,12 @@
                     $inner->where('school_year', $activeSchoolYear)->orWhereNull('school_year');
                 }))
                 ->get();
+            
+            // Sort students by completed hours (highest to lowest)
+            $students = $students->sortByDesc(function($student) {
+                $studentHours = \App\Models\StudentHours::where('student_id', $student->id)->first();
+                return $studentHours ? $studentHours->hours_completed : 0;
+            });
             ?>
 
             @if($students->isEmpty())
@@ -935,11 +941,11 @@
 
         <!-- Reports Review Section -->
         <section id="section-reports" class="dash-section hidden">
-        <div class="mb-12 mx-6">
+        <div class="mb-12">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-white">📋 Student Reports &amp; Requirements</h2>
             </div>
-            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-8">
+            <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-8">
 
             <?php
             try {
@@ -958,19 +964,40 @@
 
             @if($reportsByStudent->isNotEmpty())
                 <!-- Cabinet grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" data-pagination-list>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6" data-pagination-list>
                         @foreach($reportsByStudent as $studentId => $reports)
                             <?php $student = $reports->first()->student ?? null; ?>
                             <!-- Each cabinet is fully self-contained -->
                             <div class="bg-slate-800/40 border border-slate-700 rounded-xl overflow-hidden hover:border-slate-600 transition-colors">
                                 <!-- Cabinet header -->
-                                <div class="flex items-center justify-between gap-4 p-4 hover:bg-slate-700/20 transition-colors">
-                                    <div class="min-w-0">
-                                        <p class="text-white font-semibold truncate">{{ $student->name ?? 'Unknown Student' }}</p>
-                                        <p class="text-gray-400 text-sm truncate">{{ $student?->company?->name ?? '' }}</p>
-                                        <p class="text-gray-400 text-xs mt-0.5">{{ $reports->count() }} item(s)</p>
+                                <div class="flex items-center justify-between gap-2 p-3 sm:gap-4 sm:p-4 hover:bg-slate-700/20 transition-colors">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs sm:text-sm shrink-0">
+                                                {{ strtoupper(substr($student->name ?? 'U', 0, 1)) }}
+                                            </div>
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-white font-semibold text-xs sm:text-base truncate">{{ $student->name ?? 'Unknown Student' }}</p>
+                                                <p class="text-gray-400 text-xs truncate hidden sm:block">{{ $student?->company?->name ?? 'No company' }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 mt-1.5">
+                                            <span class="px-1.5 py-0.5 bg-indigo-500/20 text-indigo-300 text-xs rounded font-medium">
+                                                {{ $reports->count() }} items
+                                            </span>
+                                            @php
+                                                $pendingCount = $reports->where('status', 'pending')->count();
+                                            @endphp
+                                            @if($pendingCount > 0)
+                                            <span class="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs rounded font-medium">
+                                                {{ $pendingCount }} pending
+                                            </span>
+                                            @endif
+                                        </div>
                                     </div>
-                                    <button onclick="toggleCabinet('{{ $studentId }}')" class="shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold">Open Cabinet</button>
+                                    <button onclick="toggleCabinet('{{ $studentId }}')" class="shrink-0 px-2.5 py-1.5 sm:px-4 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap">
+                                        Open
+                                    </button>
                                 </div>
                                 <!-- Cabinet body: separated by border, no extra margin -->
                                 <div id="cabinet-{{ $studentId }}" class="cabinet-body hidden border-t border-slate-700/60 bg-slate-900/30">
@@ -986,17 +1013,17 @@
                                         </thead>
                                         <tbody>
                                             @foreach($reports as $report)
-                                            <tr class="border-b border-slate-700/30 last:border-0">
+                                            <tr class="border-b border-slate-700/30 last:border-0 hover:bg-slate-800/30 transition-colors">
                                                 <td class="py-2 px-4 text-gray-300 text-sm">{{ $report->title }}</td>
                                                 <td class="py-2 px-2 text-gray-400 text-xs whitespace-nowrap">{{ $report->created_at->format('M d, Y') }}</td>
                                                 <td class="py-2 px-2">
-                                                    <span class="px-2 py-0.5 text-xs rounded-full @if($report->status === 'approved') bg-green-500/20 text-green-300 @elseif($report->status === 'rejected' || $report->status === 'denied') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
+                                                    <span class="px-2 py-0.5 text-xs rounded-full font-medium @if($report->status === 'approved') bg-green-500/20 text-green-300 @elseif($report->status === 'rejected' || $report->status === 'denied') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
                                                         {{ ucfirst($report->status) }}
                                                     </span>
                                                 </td>
                                                 <td class="py-2 px-3 text-right">
                                                     <button onclick="openFileViewer({{ $report->id }}, '{{ addslashes($report->title) }}', '{{ $report->file_path ? asset('storage/' . $report->file_path) : '' }}', '{{ $report->status }}')" 
-                                                        class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold whitespace-nowrap">
+                                                        class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold whitespace-nowrap transition-colors">
                                                         📄 View
                                                     </button>
                                                 </td>
@@ -1004,21 +1031,21 @@
                                             @endforeach
                                         </tbody>
                                     </table>
-                                    <!-- Mobile cards -->
+                                    <!-- Mobile cards - Simplified & Compact -->
                                     <div class="md:hidden divide-y divide-slate-700/40">
                                         @foreach($reports as $report)
-                                        <div class="px-4 py-3">
+                                        <div class="px-3 py-2.5">
                                             <div class="flex items-start justify-between gap-2 mb-2">
-                                                <div class="min-w-0">
-                                                    <p class="text-gray-300 text-sm font-medium">{{ $report->title }}</p>
+                                                <div class="min-w-0 flex-1">
+                                                    <p class="text-gray-200 text-sm font-medium leading-tight">{{ $report->title }}</p>
                                                     <p class="text-gray-500 text-xs mt-0.5">{{ $report->created_at->format('M d, Y') }}</p>
                                                 </div>
-                                                <span class="shrink-0 px-2 py-0.5 text-xs rounded-full @if($report->status === 'approved') bg-green-500/20 text-green-300 @elseif($report->status === 'rejected' || $report->status === 'denied') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
+                                                <span class="shrink-0 px-1.5 py-0.5 text-[10px] rounded font-medium @if($report->status === 'approved') bg-green-500/20 text-green-300 @elseif($report->status === 'rejected' || $report->status === 'denied') bg-red-500/20 text-red-300 @else bg-yellow-500/20 text-yellow-300 @endif">
                                                     {{ ucfirst($report->status) }}
                                                 </span>
                                             </div>
                                             <button onclick="openFileViewer({{ $report->id }}, '{{ addslashes($report->title) }}', '{{ $report->file_path ? asset('storage/' . $report->file_path) : '' }}', '{{ $report->status }}')" 
-                                                class="w-full py-2 bg-red-600 hover:bg-red-700 text-white text-xs rounded-lg font-semibold">
+                                                class="w-full py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold transition-colors">
                                                 📄 View &amp; Review
                                             </button>
                                         </div>

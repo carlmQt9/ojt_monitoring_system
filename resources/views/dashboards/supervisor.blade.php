@@ -550,8 +550,15 @@
                 <p class="text-gray-400">No interns assigned to your company. Interns will appear here once they register.</p>
             </div>
             @else
+            @php
+                // Sort students by completed hours (highest to lowest)
+                $sortedStudents = $supervisorStudents->sortByDesc(function($student) {
+                    $studentHours = \App\Models\StudentHours::where('student_id', $student->id)->first();
+                    return $studentHours ? $studentHours->hours_completed : 0;
+                });
+            @endphp
             <div class="space-y-4" data-pagination-list data-page-size="3">
-                @foreach($supervisorStudents as $student)
+                @foreach($sortedStudents as $student)
                     <?php
                     $studentHours = \App\Models\StudentHours::where('student_id', $student->id)->firstOrCreate(
                         ['student_id' => $student->id],
