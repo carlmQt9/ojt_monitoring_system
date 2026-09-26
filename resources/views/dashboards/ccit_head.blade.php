@@ -264,9 +264,7 @@
             <button class="nav-item" onclick="showSection('users'); closeSidebar();" data-section="users">
                 <span class="nav-icon">👥</span>
                 <span class="nav-label">Users</span>
-                @if($_navBadgeUsers > 0)
-                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeUsers }}</span>
-                @endif
+                <span id="ccitBadgeUsers" class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none {{ $_navBadgeUsers > 0 ? '' : 'hidden' }}">{{ $_navBadgeUsers }}</span>
             </button>
             <button class="nav-item" onclick="showSection('analytics'); closeSidebar();" data-section="analytics">
                 <span class="nav-icon">📈</span><span class="nav-label">Analytics</span>
@@ -3172,6 +3170,29 @@
                 document.getElementById('iconSun').classList.remove('hidden');
             }
         })();
+
+        // ===== REAL-TIME BACKGROUND POLLING (Every 30s) =====
+        function updateCcitHeadLiveCounts() {
+            fetch('{{ url("/api/live-counts") }}')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data || data.role !== 'ccit_head') return;
+                    const bUsers = document.getElementById('ccitBadgeUsers');
+                    if (bUsers) {
+                        const count = data.pending_users ?? 0;
+                        bUsers.textContent = count;
+                        bUsers.classList.toggle('hidden', count <= 0);
+                    }
+                    if (typeof refreshDashboardStats === 'function') {
+                        refreshDashboardStats();
+                    }
+                })
+                .catch(err => console.debug('CCIT Head live polling tick:', err));
+        }
+
+        setInterval(updateCcitHeadLiveCounts, 30000);
+        setTimeout(updateCcitHeadLiveCounts, 5000);
+        // ===== END REAL-TIME BACKGROUND POLLING =====
     </script>
     <!-- DTR Viewer Modal -->
     <div id="ccitDtrModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4" onclick="if(event.target===this)closeCcitDtrModal()">

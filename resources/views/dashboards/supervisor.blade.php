@@ -264,9 +264,7 @@
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">👥</span>
                 <span class="nav-label">Interns</span>
-                @if($_navBadgeInterns > 0)
-                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeInterns }}</span>
-                @endif
+                <span id="supBadgeInterns" class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold leading-none {{ $_navBadgeInterns > 0 ? '' : 'hidden' }}">{{ $_navBadgeInterns }}</span>
             </button>
             <button onclick="showSection('certificates')" data-section="certificates"
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
@@ -541,8 +539,8 @@
                             class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none"
                             oninput="filterInterns(this.value)">
                     </div>
-                    <button type="button" onclick="openBulkTimeApprovalModal()" class="w-full sm:w-auto px-3 py-2 {{ $_supPendingTimeRecords->isNotEmpty() ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-700 hover:bg-slate-600' }} text-white rounded-lg text-sm font-semibold whitespace-nowrap transition-colors">
-                        ✅ Review Time-Outs ({{ $_supPendingTimeRecords->count() }})
+                    <button type="button" id="supBulkReviewBtn" onclick="openBulkTimeApprovalModal()" class="w-full sm:w-auto px-3 py-2 {{ $_supPendingTimeRecords->isNotEmpty() ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-700 hover:bg-slate-600' }} text-white rounded-lg text-sm font-semibold whitespace-nowrap transition-colors">
+                        ✅ Review Time-Outs (<span id="supBulkReviewCount">{{ $_supPendingTimeRecords->count() }}</span>)
                     </button>
                 </div>
             </div>
@@ -2356,6 +2354,41 @@
         document.body.appendChild(n);
         setTimeout(() => { n.style.animation='slideOutRight .3s ease forwards'; setTimeout(()=>n.remove(),300); }, 4000);
     }
+
+    // ===== REAL-TIME BACKGROUND POLLING (Every 30s) =====
+    function updateSupervisorLiveCounts() {
+        fetch('{{ url("/api/live-counts") }}')
+            .then(r => r.json())
+            .then(data => {
+                if (!data || data.role !== 'supervisor') return;
+
+                const bInterns = document.getElementById('supBadgeInterns');
+                if (bInterns) {
+                    const total = data.total_pending ?? 0;
+                    bInterns.textContent = total;
+                    bInterns.classList.toggle('hidden', total <= 0);
+                }
+
+                const reviewCount = document.getElementById('supBulkReviewCount');
+                const reviewBtn = document.getElementById('supBulkReviewBtn');
+                const count = data.pending_time_records ?? 0;
+                if (reviewCount) reviewCount.textContent = count;
+                if (reviewBtn) {
+                    if (count > 0) {
+                        reviewBtn.classList.remove('bg-slate-700', 'hover:bg-slate-600');
+                        reviewBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                    } else {
+                        reviewBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                        reviewBtn.classList.add('bg-slate-700', 'hover:bg-slate-600');
+                    }
+                }
+            })
+            .catch(err => console.debug('Supervisor live polling tick:', err));
+    }
+
+    setInterval(updateSupervisorLiveCounts, 30000);
+    setTimeout(updateSupervisorLiveCounts, 5000);
+    // ===== END REAL-TIME BACKGROUND POLLING =====
     </script>
 
     <!-- Page loader overlay -->

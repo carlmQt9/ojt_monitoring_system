@@ -10,6 +10,7 @@
         border-top: 1px solid rgba(148, 163, 184, .15);
         color: #94a3b8;
         font-size: .75rem;
+        grid-column: 1 / -1; /* Span full width in grid */
     }
     .dashboard-pagination__pages {
         display: flex;
@@ -41,6 +42,24 @@
         cursor: not-allowed;
         opacity: .4;
     }
+    /* Pagination alignment for certificates section */
+    #section-certificates .dashboard-pagination {
+        justify-content: flex-end;
+    }
+    #section-certificates .dashboard-pagination__summary {
+        margin-left: auto;
+        order: 2; /* Move summary to end if needed */
+    }
+    #section-certificates .dashboard-pagination__pages {
+        order: 1;
+    }
+
+    @media (min-width: 481px) {
+        #section-certificates .dashboard-pagination__summary {
+            display: none; /* Hide summary on desktop for certificates */
+        }
+    }
+
     @media (max-width: 480px) {
         .dashboard-pagination {
             justify-content: center;
@@ -54,6 +73,15 @@
         }
         .dashboard-pagination__page:not(.is-active):not(.is-nearby) {
             display: none;
+        }
+        
+        /* Restore centered alignment for certificates on mobile */
+        #section-certificates .dashboard-pagination {
+            justify-content: center;
+        }
+        #section-certificates .dashboard-pagination__summary {
+            display: block; /* Show summary on mobile */
+            order: 0;
         }
     }
 </style>

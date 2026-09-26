@@ -247,17 +247,13 @@
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">🎓</span>
                 <span class="nav-label">Student Tracking</span>
-                @if($_navBadgeStudents > 0)
-                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeStudents }}</span>
-                @endif
+                <span id="coordBadgeStudents" class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-yellow-500 text-white text-[10px] font-bold leading-none {{ $_navBadgeStudents > 0 ? '' : 'hidden' }}">{{ $_navBadgeStudents }}</span>
             </button>
             <button onclick="showSection('reports')" data-section="reports"
                 class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-300 transition-all cursor-pointer">
                 <span class="nav-icon text-lg shrink-0">📋</span>
                 <span class="nav-label flex-1 text-left">Reports & Requirements</span>
-                @if($_navBadgeReports > 0)
-                    <span class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-orange-500 text-white text-[10px] font-bold leading-none">{{ $_navBadgeReports }}</span>
-                @endif
+                <span id="coordBadgeReports" class="nav-badge min-w-[1.25rem] h-5 px-1 flex items-center justify-center rounded-full bg-orange-500 text-white text-[10px] font-bold leading-none {{ $_navBadgeReports > 0 ? '' : 'hidden' }}">{{ $_navBadgeReports }}</span>
             </button>
         </nav>
 
@@ -668,8 +664,8 @@
                         <input id="studentSearch" type="search" placeholder="Search student by name..."
                             class="flex-1 bg-transparent text-white text-sm placeholder-gray-400 focus:outline-none">
                     </div>
-                    <button type="button" onclick="openBulkTimeApprovalModal()" class="w-full sm:w-auto px-3 py-2 {{ $_coordPendingTimeRecords->isNotEmpty() ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-700 hover:bg-slate-600' }} text-white rounded-lg text-sm font-semibold whitespace-nowrap transition-colors">
-                        ✅ Review Time-Outs ({{ $_coordPendingTimeRecords->count() }})
+                    <button type="button" id="coordBulkReviewBtn" onclick="openBulkTimeApprovalModal()" class="w-full sm:w-auto px-3 py-2 {{ $_coordPendingTimeRecords->isNotEmpty() ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-700 hover:bg-slate-600' }} text-white rounded-lg text-sm font-semibold whitespace-nowrap transition-colors">
+                        ✅ Review Time-Outs (<span id="coordBulkReviewCount">{{ $_coordPendingTimeRecords->count() }}</span>)
                     </button>
                 </div>
             </div>
@@ -2386,6 +2382,51 @@
         }
         document.getElementById('photoPopupModal')?.addEventListener('click', function(e){ if(e.target===this) closePhotoPopup(); });
         // ===== END PHOTO POPUP =====
+
+        // ===== REAL-TIME BACKGROUND POLLING (Every 30s) =====
+        function updateCoordinatorLiveCounts() {
+            fetch('{{ url("/api/live-counts") }}')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data || data.role !== 'coordinator') return;
+
+                    // Update Student Attendance Badge
+                    const bStudents = document.getElementById('coordBadgeStudents');
+                    if (bStudents) {
+                        bStudents.textContent = data.pending_students ?? 0;
+                        bStudents.classList.toggle('hidden', (data.pending_students ?? 0) <= 0);
+                    }
+
+                    // Update Reports Badge
+                    const bReports = document.getElementById('coordBadgeReports');
+                    if (bReports) {
+                        bReports.textContent = data.pending_reports ?? 0;
+                        bReports.classList.toggle('hidden', (data.pending_reports ?? 0) <= 0);
+                    }
+
+                    // Update Review Time-Outs Button
+                    const reviewCount = document.getElementById('coordBulkReviewCount');
+                    const reviewBtn = document.getElementById('coordBulkReviewBtn');
+                    const count = data.pending_students ?? 0;
+                    if (reviewCount) reviewCount.textContent = count;
+                    if (reviewBtn) {
+                        if (count > 0) {
+                            reviewBtn.classList.remove('bg-slate-700', 'hover:bg-slate-600');
+                            reviewBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                        } else {
+                            reviewBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                            reviewBtn.classList.add('bg-slate-700', 'hover:bg-slate-600');
+                        }
+                    }
+                })
+                .catch(err => console.debug('Live polling tick:', err));
+        }
+
+        // Start polling on load
+        setInterval(updateCoordinatorLiveCounts, 30000);
+        // Also run once after 5s initial load
+        setTimeout(updateCoordinatorLiveCounts, 5000);
+        // ===== END REAL-TIME BACKGROUND POLLING =====
     </script>
     <!-- Photo Popup Modal -->
     <div id="photoPopupModal" class="hidden fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4">

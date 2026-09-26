@@ -150,80 +150,11 @@ Route::get('/dashboard', function () {
 
     session(['user' => $user]); // keep session in sync
 
-    // ===== AUTO-TIMEOUT: if student forgot to time out before lunch =====
-    if ($user->role === 'student') {
-        $manilaTime = \Carbon\Carbon::now('Asia/Manila');
-        $today      = $manilaTime->toDateString();
-        $nowHour    = (int) $manilaTime->format('H');
-
-        // ── Morning auto-timeout at exactly 12:00 noon ──────────────────────
-        // ONLY fires when it is currently past 12:00 PM Manila time.
-        // ONLY targets morning session of TODAY.
-        // NEVER touches afternoon sessions.
-        if ($nowHour >= 12) {
-            $openMorning = \App\Models\TimeInRecord::where('student_id', $user->id)
-                ->whereDate('date', $today)
-                ->where('session', 'morning')
-                ->whereNull('time_out')
-                ->first();
-            if ($openMorning) {
-                $autoOut      = '12:00';
-                $inTime       = \Carbon\Carbon::createFromTimeString($openMorning->time_in);
-                $outTime      = \Carbon\Carbon::createFromTimeString($autoOut);
-                $hoursWorked  = round(max(0, $inTime->diffInMinutes($outTime)) / 60, 2);
-                $regularHours = min($hoursWorked, 8.0);
-                $otHours      = max(0, round($hoursWorked - 8.0, 2));
-                $openMorning->update([
-                    'time_out'      => $autoOut,
-                    'regular_hours' => $regularHours,
-                    'ot_hours'      => $otHours,
-                    'status'        => 'pending',
-                ]);
-                $sh = \App\Models\StudentHours::where('student_id', $user->id)
-                    ->firstOrCreate(['student_id' => $user->id], ['total_hours_required' => 600]);
-                $newCompleted = round(max(0, $sh->hours_completed + $regularHours), 2);
-                $sh->update([
-                    'hours_completed' => $newCompleted,
-                    'hours_remaining' => round(max(0, $sh->total_hours_required - $newCompleted), 2),
-                ]);
-                \App\Models\DailyHourLog::create([
-                    'student_id'   => $user->id,
-                    'log_date'     => $today,
-                    'hours_logged' => $regularHours,
-                    'is_overtime'  => false,
-                    'status'       => 'approved',
-                ]);
-            }
-        }
-
-        // ── Afternoon forgot to time out: ONLY deny on NEXT DAY login ────────
-        // Conditions that ALL must be true before denying:
-        //   1. Current Manila date is strictly AFTER the record's date (it is a new day)
-        //   2. The record's date is exactly yesterday Manila date
-        //   3. The record is afternoon session with no time_out and not already denied
-        //
-        // This block will NEVER fire while the student is still on the same calendar day
-        // in Manila time — even if InfinityFree server UTC thinks it is a different day.
-        $yesterday = $manilaTime->copy()->subDay()->toDateString();
-        $openAfternoonYesterday = \App\Models\TimeInRecord::where('student_id', $user->id)
-            ->where('session', 'afternoon')
-            ->whereNull('time_out')
-            ->where('status', '!=', 'denied')
-            ->whereDate('date', $yesterday)
-            ->whereDate('date', '<', $today)  // double guard: record must be before today Manila
-            ->first();
-        if ($openAfternoonYesterday) {
-            $openAfternoonYesterday->update([
-                'time_out'      => '00:00',
-                'regular_hours' => 0,
-                'ot_hours'      => 0,
-                'ot_status'     => null,
-                'status'        => 'denied',
-                'denial_reason' => 'Auto-denied: student did not time out before end of day. Only morning hours are recorded.',
-            ]);
-        }
-    }
-    // ===== END AUTO-TIMEOUT =====
+    // ===== AUTO-TIMEOUT & AUTO-DENY =====
+    // Automatically deny all unclosed records from past dates (date < today Manila)
+    // and handle lunch auto-timeouts. Runs system-wide for Admin, Coordinator, Supervisor, and Student!
+    \App\Helpers\AttendanceHelper::processAutoTimeoutsAndDenials();
+    // ===== END AUTO-TIMEOUT & AUTO-DENY =====
 
     if ($user->role === 'ccit_head') {
         return view('dashboards.ccit_head', ['user' => $user]);
@@ -1888,6 +1819,58 @@ Route::get('/api/dashboard-stats', function () {
         'student_trend'   => $trend,
     ]);
 });
+
+Route::get('/api/live-counts', function () {
+    if (!session('user_id')) {
+        return response()->json(['error' => 'Unauthenticated'], 401);
+    }
+    $user = User::find(session('user_id'));
+    if (!$user) {
+        return response()->json(['error' => 'User not found'], 401);
+    }
+
+    // Always sweep expired unclosed records & lunchtime timeouts in real-time
+    \App\Helpers\AttendanceHelper::processAutoTimeoutsAndDenials();
+
+    $response = [
+        'role' => $user->role,
+        'timestamp' => \Carbon\Carbon::now('Asia/Manila')->toIso8601String(),
+    ];
+
+    if ($user->role === 'coordinator') {
+        $pendingStudents = \App\Models\TimeInRecord::where('status', 'pending')
+            ->whereNotNull('time_out')
+            ->whereHas('student')
+            ->count();
+        $pendingReports = \App\Models\StudentRequirement::where('status', 'pending')
+            ->whereHas('student')
+            ->count();
+        $response['pending_students'] = $pendingStudents;
+        $response['pending_reports']  = $pendingReports;
+        $response['total_pending']    = $pendingStudents + $pendingReports;
+    } elseif ($user->role === 'supervisor') {
+        $studentIds = User::where('company_id', $user->company_id)
+            ->where('role', 'student')
+            ->pluck('id');
+        $pendingTime = \App\Models\TimeInRecord::whereIn('student_id', $studentIds)
+            ->whereNotNull('time_out')
+            ->where('status', 'pending')
+            ->count();
+        $pendingReqs = \App\Models\StudentRequirement::whereIn('student_id', $studentIds)
+            ->where('status', 'pending')
+            ->count();
+        $response['pending_time_records'] = $pendingTime;
+        $response['pending_reports']      = $pendingReqs;
+        $response['total_pending']        = $pendingTime + $pendingReqs;
+    } elseif ($user->role === 'ccit_head') {
+        $response['pending_users'] = User::where('is_approved', false)
+            ->where('role', '!=', 'student')
+            ->count();
+        $response['total_students'] = User::where('role', 'student')->count();
+    }
+
+    return response()->json($response);
+})->middleware('auth.custom');
 
 Route::get('/api/users', function () {
     $sy = request('school_year');
