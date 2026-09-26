@@ -550,15 +550,8 @@
                 <p class="text-gray-400">No interns assigned to your company. Interns will appear here once they register.</p>
             </div>
             @else
-            @php
-                // Sort students by completed hours (highest to lowest)
-                $sortedStudents = $supervisorStudents->sortByDesc(function($student) {
-                    $studentHours = \App\Models\StudentHours::where('student_id', $student->id)->first();
-                    return $studentHours ? $studentHours->hours_completed : 0;
-                });
-            @endphp
             <div class="space-y-4" data-pagination-list data-page-size="3">
-                @foreach($sortedStudents as $student)
+                @foreach($supervisorStudents as $student)
                     <?php
                     $studentHours = \App\Models\StudentHours::where('student_id', $student->id)->firstOrCreate(
                         ['student_id' => $student->id],
@@ -1052,6 +1045,26 @@
                             </div>
                         </div>
                     </div>
+                    @php
+                        $studentLogs = \App\Models\TimeInRecord::where('student_id', $student->id)
+                            ->orderBy('date', 'desc')
+                            ->limit(12)
+                            ->get()
+                            ->map(function($r) {
+                                return [
+                                    'id' => $r->id,
+                                    'date' => optional($r->date)->format('M d, Y'),
+                                    'time_in' => $r->time_in,
+                                    'time_out' => $r->time_out,
+                                    'status' => $r->status ?? '',
+                                    'photo' => $r->photo_path ? asset('storage/' . $r->photo_path) : null,
+                                    'session' => $r->session ?? null,
+                                ];
+                            })->toArray();
+                    @endphp
+                    <script type="application/json" id="studentLogsJson-{{ $student->id }}">
+                        {!! json_encode($studentLogs) !!}
+                    </script>
                 @endforeach
             </div>
             @endif
@@ -1168,16 +1181,11 @@
     </div><!-- end main-content -->
 
     <!-- ===== MEDIA POPUP MODAL ===== -->
-    <div id="mediaPopup" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4" onclick="if(event.target===this)closeMediaPopup()">
-        <div class="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-            <div class="flex justify-between items-center px-5 py-3 border-b border-slate-700 shrink-0">
-                <span id="mediaPopupTitle" class="text-sm font-semibold text-white truncate">Preview</span>
-                <div class="flex items-center gap-2">
-                    <a id="mediaPopupDownload" href="#" target="_blank" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">⬇ Open</a>
-                    <button onclick="closeMediaPopup()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white">✕</button>
-                </div>
+    <div id="mediaPopup" class="hidden fixed inset-0 z-[120] flex items-center justify-center bg-black/90 p-0 sm:p-4" onclick="if(event.target===this)closeMediaPopup()">
+        <div class="relative w-full max-w-[min(82vw,780px)] max-h-[90vh] flex items-center justify-center">
+            <div id="mediaPopupBody" class="relative flex items-center justify-center p-0 min-h-[300px]">
+                <button onclick="closeMediaPopup()" class="absolute -top-3 -right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-slate-700/90 hover:bg-slate-600 text-white text-xl leading-none shadow-lg">×</button>
             </div>
-            <div id="mediaPopupBody" class="flex-1 overflow-auto flex items-center justify-center p-4 min-h-[300px]"></div>
         </div>
     </div>
     <!-- ===== END MEDIA POPUP MODAL ===== -->
@@ -1458,6 +1466,17 @@
         </div>
     </div>
 
+    <!-- Student Logs Modal -->
+    <div id="logsModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[90] p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-5xl w-full max-h-[85vh] overflow-hidden shadow-2xl">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-700">
+                <h3 id="logsModalTitle" class="text-lg font-bold text-white">Recent Time Logs</h3>
+                <button type="button" onclick="closeLogsModal()" class="text-gray-400 hover:text-white text-xl">✕</button>
+            </div>
+            <div id="logsModalBody" class="p-4 sm:p-5 overflow-y-auto max-h-[70vh]"></div>
+        </div>
+    </div>
+
     <!-- Task Logs Modal -->
     <div id="taskLogsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop overflow-y-auto">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-2xl w-full mx-4 my-8">
@@ -1492,22 +1511,20 @@
 
         // ===== MEDIA POPUP =====
         function openMediaPopup(url, title) {
-            document.getElementById('mediaPopupTitle').textContent = title || 'Preview';
-            document.getElementById('mediaPopupDownload').href = url;
             const body = document.getElementById('mediaPopupBody');
             body.innerHTML = '';
             const ext = url.split('?')[0].split('.').pop().toLowerCase();
             if (['jpg','jpeg','png','gif','webp','bmp'].includes(ext)) {
                 const img = document.createElement('img');
                 img.src = url;
-                img.className = 'max-w-full max-h-[70vh] rounded-lg object-contain';
+                img.className = 'max-w-full max-h-[78vh] rounded-2xl object-contain shadow-2xl border border-slate-600 bg-slate-900';
                 body.appendChild(img);
             } else if (ext === 'pdf') {
                 const iframe = document.createElement('iframe');
                 iframe.src = url; iframe.className = 'w-full rounded-lg border-0';
                 iframe.style.height = '65vh'; body.appendChild(iframe);
             } else {
-                body.innerHTML = `<div class="text-center py-10"><div class="text-5xl mb-4">📄</div><p class="text-gray-300 font-semibold mb-1">${title}</p><p class="text-gray-500 text-sm mb-4">Preview not available.</p><a href="${url}" target="_blank" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">Open File</a></div>`;
+                body.innerHTML = `<div class="text-center py-10"><div class="text-5xl mb-4">📄</div><p class="text-gray-300 font-semibold mb-1">${title || 'Preview'}</p><p class="text-gray-500 text-sm mb-4">Preview not available.</p><a href="${url}" target="_blank" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">Open File</a></div>`;
             }
             document.getElementById('mediaPopup').classList.remove('hidden');
         }
@@ -1818,11 +1835,64 @@
             }
         }
 
+        function showSupervisorLogsModal(studentId, studentName) {
+            const t = document.getElementById('studentLogsJson-' + studentId);
+            const title = document.getElementById('logsModalTitle');
+            const body = document.getElementById('logsModalBody');
+            title.textContent = studentName + ' — Recent Time Logs';
+            body.innerHTML = '';
+
+            if (!t) {
+                body.innerHTML = '<p class="text-gray-400">No logs available.</p>';
+                document.getElementById('logsModal').classList.remove('hidden');
+                return;
+            }
+
+            let logs = [];
+            try {
+                logs = JSON.parse(t.textContent || '[]');
+            } catch (e) {
+                logs = [];
+            }
+
+            if (!logs.length) {
+                body.innerHTML = '<p class="text-gray-400">No logs available.</p>';
+            } else {
+                let html = '<table class="w-full text-left"><thead><tr class="text-xs text-gray-400"><th class="py-2 pr-3">Date</th><th class="py-2 pr-3">Session</th><th class="py-2 pr-3">Time In</th><th class="py-2 pr-3">Time Out</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3">Photo</th></tr></thead><tbody>';
+                logs.forEach(l => {
+                    const statusBadge = l.status === 'approved'
+                        ? '<span class="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-300">' + (l.status || 'approved') + '</span>'
+                        : l.status === 'denied'
+                        ? '<span class="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-300">' + (l.status || 'denied') + '</span>'
+                        : '<span class="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-300">' + (l.status || 'pending') + '</span>';
+                    const photoCell = l.photo ? '<button onclick="openMediaPopup(\'' + l.photo + '\' , \'' + (studentName || 'Student Log') + '\')" class="text-blue-400 hover:underline">View</button>' : '-';
+                    html += '<tr class="border-b border-slate-700/30"><td class="py-2 pr-3 text-sm">' + (l.date || '-') + '</td><td class="py-2 pr-3 text-sm">' + (l.session || '-') + '</td><td class="py-2 pr-3 text-sm">' + (l.time_in || '-') + '</td><td class="py-2 pr-3 text-sm">' + (l.time_out || '-') + '</td><td class="py-2 pr-3 text-sm">' + statusBadge + '</td><td class="py-2 pr-3 text-sm">' + photoCell + '</td></tr>';
+                });
+                html += '</tbody></table>';
+                body.innerHTML = html;
+            }
+
+            document.getElementById('logsModal').classList.remove('hidden');
+        }
+
+        function closeLogsModal() {
+            document.getElementById('logsModal').classList.add('hidden');
+        }
+
         function viewBulkStudentLogs(studentId) {
             const card = document.querySelector(`.student-card[data-student-id="${studentId}"]`);
-            if (!card) return;
-            toggleStudentExpand(card.querySelector('.student-header-btn'));
-            card.querySelector(`[data-tab="time-records-${studentId}"]`)?.click();
+            if (card) {
+                const header = card.querySelector('.student-header-btn');
+                if (header && !card.classList.contains('expanded')) {
+                    toggleStudentExpand(header);
+                }
+                const timeTab = card.querySelector(`[data-tab="time-records-${studentId}"]`);
+                if (timeTab) timeTab.click();
+            }
+
+            const name = card ? (card.querySelector('h3')?.textContent || 'Student').trim() : 'Student';
+            showSupervisorLogsModal(studentId, name);
+            closeBulkTimeApprovalModal();
         }
 
         // Robust per-card tab switching (avoids global ID problems and freezing)

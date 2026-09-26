@@ -171,7 +171,7 @@ return [
 
     'secure' => env('SESSION_SECURE_COOKIE') !== null
         ? (bool) env('SESSION_SECURE_COOKIE')
-        : str_starts_with(strtolower((string) env('APP_URL', 'http://localhost')), 'https://'),
+        : str_starts_with(strtolower((string) config('app.url', env('APP_URL', 'http://localhost'))), 'https://'),
 
     /*
     |--------------------------------------------------------------------------

@@ -26,6 +26,9 @@ class AppServiceProvider extends ServiceProvider
             URL::forceRootUrl($appUrl);
             if (str_starts_with(strtolower($appUrl), 'https://')) {
                 URL::forceScheme('https');
+                config(['session.secure' => true]);
+            } else {
+                config(['session.secure' => false]);
             }
         }
 
