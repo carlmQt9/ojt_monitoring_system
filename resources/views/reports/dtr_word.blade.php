@@ -179,39 +179,38 @@
         <tr class="mhdr">
           <td colspan="8">{{ $monthLabel }}</td>
         </tr>
-        @foreach($records as $rec)
+        @foreach($records->groupBy(fn ($record) => $record->date->toDateString()) as $dayRecords)
           @php
-            $hrs=0; $amIn=''; $amOut=''; $pmIn=''; $pmOut='';
-            $isApproved = in_array($rec->status, ['approved', 'verified'], true);
-            if ($rec->time_out) {
-              $tIn  = \Carbon\Carbon::parse($rec->time_in);
-              $tOut = \Carbon\Carbon::parse($rec->time_out);
-              if ($tOut->lte($tIn)) $tOut->addDay(); // cross-midnight fix
-              $hrs = round($tIn->diffInMinutes($tOut)/60,2);
-              if ($isApproved) {
-                $monthHours += $hrs;
-              }
-              if ($tIn->hour < 12) {
-                $amIn = $tIn->format('h:i A');
-                if ($tOut->hour < 12) { $amOut = $tOut->format('h:i A'); }
-                else { $amOut='12:00 PM'; $pmIn='01:00 PM'; $pmOut=$tOut->format('h:i A'); }
-              } else { $pmIn=$tIn->format('h:i A'); $pmOut=$tOut->format('h:i A'); }
-            } else {
-              $tIn=\Carbon\Carbon::parse($rec->time_in);
-              if($tIn->hour<12){$amIn=$tIn->format('h:i A');}else{$pmIn=$tIn->format('h:i A');}
-            }
+            $morning = $dayRecords->firstWhere('session', 'morning');
+            $afternoon = $dayRecords->firstWhere('session', 'afternoon');
+            $morning ??= $dayRecords->first(fn ($record) => $record->time_in && \Carbon\Carbon::parse($record->time_in)->hour < 12);
+            $afternoon ??= $dayRecords->first(fn ($record) => $record->time_in && \Carbon\Carbon::parse($record->time_in)->hour >= 12);
+            $amIn = $morning?->time_in ? \Carbon\Carbon::parse($morning->time_in)->format('h:i A') : '';
+            $amOut = $morning?->time_out ? \Carbon\Carbon::parse($morning->time_out)->format('h:i A') : '';
+            $pmIn = $afternoon?->time_in ? \Carbon\Carbon::parse($afternoon->time_in)->format('h:i A') : '';
+            $pmOut = $afternoon?->time_out ? \Carbon\Carbon::parse($afternoon->time_out)->format('h:i A') : '';
+            $hrs = round($dayRecords->sum(function ($record) {
+              if (!in_array($record->status, ['approved', 'verified'], true) || !$record->time_in || !$record->time_out) return 0;
+              $timeIn = \Carbon\Carbon::parse($record->time_in);
+              $timeOut = \Carbon\Carbon::parse($record->time_out);
+              if ($timeOut->lte($timeIn)) $timeOut->addDay();
+              return $timeIn->diffInMinutes($timeOut) / 60;
+            }), 2);
+            $monthHours += $hrs;
+            $isVerified = $dayRecords->isNotEmpty() && $dayRecords->every(fn ($record) => $record->verified);
+            $date = $dayRecords->first()->date;
             $rowClass = ($rowIdx % 2 === 1) ? 'even' : '';
             $rowIdx++;
           @endphp
           <tr class="{{ $rowClass }}">
-            <td>{{ $rec->date->format('d') }}</td>
-            <td>{{ $rec->date->format('D') }}</td>
+            <td>{{ $date->format('d') }}</td>
+            <td>{{ $date->format('D') }}</td>
             <td>{{ $amIn ?: '-' }}</td>
             <td>{{ $amOut ?: '-' }}</td>
             <td>{{ $pmIn ?: '-' }}</td>
             <td>{{ $pmOut ?: '-' }}</td>
             <td>{{ $hrs > 0 ? number_format($hrs,2) : '-' }}</td>
-            <td class="{{ $rec->verified ? 'ok' : 'pnd' }}">{{ $rec->verified ? 'Verified' : 'Pending' }}</td>
+            <td class="{{ $isVerified ? 'ok' : 'pnd' }}">{{ $isVerified ? 'Verified' : 'Pending' }}</td>
           </tr>
         @endforeach
         <tr class="mtotal">

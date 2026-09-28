@@ -157,6 +157,9 @@ class AttendancePolicyTest extends TestCase
         $response->assertSeeText('Pending');
         $response->assertSeeText('5.00');
         $response->assertDontSeeText('10.00');
+        $response->assertSeeText('07:00 AM');
+        $response->assertSeeText('01:00 PM');
+        $this->assertSame(1, substr_count($response->getContent(), '>30<'));
     }
 
     public function test_dtr_excludes_weekend_days_monday_to_friday_only(): void
