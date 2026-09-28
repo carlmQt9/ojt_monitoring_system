@@ -754,6 +754,7 @@
                                             <tr class="text-xs text-gray-400 border-b border-slate-700/50">
                                                 <th class="py-2 px-3 text-left font-semibold">Date / Session</th>
                                                 <th class="py-2 px-2 text-left font-semibold hidden sm:table-cell">Time</th>
+                                                <th class="py-2 px-2 text-left font-semibold">Hours</th>
                                                 <th class="py-2 px-2 text-center font-semibold">Status</th>
                                                 <th class="py-2 px-2 text-right font-semibold">Actions</th>
                                             </tr>
@@ -774,13 +775,39 @@
                                                 @if($record->session)
                                                 <p class="text-gray-500 text-xs">{{ ucfirst($record->session) }}</p>
                                                 @endif
-                                                @if(floatval($record->ot_hours ?? 0) > 0)
-                                                <p class="text-yellow-400 text-xs">⏰ {{ number_format($record->regular_hours ?? 0,2) }}h + {{ number_format($record->ot_hours,2) }}h OT</p>
-                                                @endif
                                             </td>
                                             <td class="py-2 px-2 text-gray-400 text-xs whitespace-nowrap hidden sm:table-cell">
+                                                @php
+                                                    // Show clean label for auto-timeout (12:00) and auto-denied (23:59)
+                                                    $isAutoOut    = $record->time_out && in_array($record->time_out, ['12:00','12:00:00']);
+                                                    $isAutoDenied = $record->status === 'denied'
+                                                        && $record->time_out
+                                                        && in_array($record->time_out, ['23:59','23:59:00']);
+                                                @endphp
                                                 {{ \Carbon\Carbon::parse($record->time_in)->format('h:i A') }}
-                                                @if($record->time_out) – {{ \Carbon\Carbon::parse($record->time_out)->format('h:i A') }} @endif
+                                                @if($isAutoDenied)
+                                                    – <span class="text-red-400">Auto-denied</span>
+                                                @elseif($isAutoOut)
+                                                    – <span class="text-gray-500">12:00 PM (auto)</span>
+                                                @elseif($record->time_out)
+                                                    – {{ \Carbon\Carbon::parse($record->time_out)->format('h:i A') }}
+                                                @endif
+                                            </td>
+                                            <td class="py-2 px-2 text-xs whitespace-nowrap">
+                                                @php
+                                                    $regH = floatval($record->regular_hours ?? 0);
+                                                    $otH  = floatval($record->ot_hours ?? 0);
+                                                @endphp
+                                                @if($regH > 0 || $otH > 0)
+                                                    <span class="text-green-400 font-semibold">{{ number_format($regH, 2) }}h</span>
+                                                    @if($otH > 0)
+                                                        <span class="text-yellow-400 font-semibold"> +{{ number_format($otH, 2) }} OT</span>
+                                                    @endif
+                                                @elseif($record->time_out && !$isAutoDenied)
+                                                    <span class="text-gray-500">—</span>
+                                                @else
+                                                    <span class="text-gray-600 text-[10px]">pending</span>
+                                                @endif
                                             </td>
                                             <td class="py-2 px-2 text-center">
                                                 <span class="px-2 py-0.5 text-xs rounded-full whitespace-nowrap

@@ -815,19 +815,38 @@
                                     <?php
                                         $studentLogs = \App\Models\TimeInRecord::where('student_id', $student->id)
                                             ->orderBy('date', 'desc')
+                                            ->orderBy('session', 'asc')
                                             ->limit(12)
                                             ->get()
                                             ->map(function($r) {
-                                                $timeIn = $r->time_in ? \Carbon\Carbon::parse($r->time_in)->format('h:i A') : null;
-                                                $timeOut = $r->time_out ? \Carbon\Carbon::parse($r->time_out)->format('h:i A') : null;
+                                                $timeIn  = $r->time_in  ? \Carbon\Carbon::parse($r->time_in)->format('h:i A')  : null;
+                                                // Clean time_out display: sentinel values → readable labels
+                                                $isAutoOut    = $r->time_out && in_array($r->time_out, ['12:00','12:00:00']);
+                                                $isAutoDenied = $r->status === 'denied' && $r->time_out && in_array($r->time_out, ['23:59','23:59:00']);
+                                                if ($isAutoDenied) {
+                                                    $timeOut = 'Auto-denied';
+                                                } elseif ($isAutoOut) {
+                                                    $timeOut = '12:00 PM (auto)';
+                                                } elseif ($r->time_out) {
+                                                    $timeOut = \Carbon\Carbon::parse($r->time_out)->format('h:i A');
+                                                } else {
+                                                    $timeOut = null;
+                                                }
+                                                $regH = floatval($r->regular_hours ?? 0);
+                                                $otH  = floatval($r->ot_hours ?? 0);
+                                                $hrsLabel = $regH > 0
+                                                    ? number_format($regH, 2) . 'h' . ($otH > 0 ? ' +' . number_format($otH, 2) . ' OT' : '')
+                                                    : null;
 
                                                 return [
-                                                    'id' => $r->id,
-                                                    'date' => optional($r->date)->format('M d, Y'),
-                                                    'time_in' => $timeIn,
+                                                    'id'       => $r->id,
+                                                    'date'     => optional($r->date)->format('M d, Y'),
+                                                    'session'  => $r->session ? ucfirst($r->session) : null,
+                                                    'time_in'  => $timeIn,
                                                     'time_out' => $timeOut,
-                                                    'status' => $r->status ?? '',
-                                                    'photo' => $r->photo_path ? asset('storage/' . $r->photo_path) : null,
+                                                    'hrs'      => $hrsLabel,
+                                                    'status'   => $r->status ?? '',
+                                                    'photo'    => $r->photo_path ? asset('storage/' . $r->photo_path) : null,
                                                 ];
                                             })->toArray();
                                     ?>
@@ -1887,13 +1906,19 @@
             if (!logs.length) {
                 body.innerHTML = '<p class="text-gray-400">No logs available.</p>';
             } else {
-                let html = '<table class="w-full text-left"><thead><tr class="text-xs text-gray-400"><th class="py-2 pr-3">Date</th><th class="py-2 pr-3">Time In</th><th class="py-2 pr-3">Time Out</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3">Photo</th><th class="py-2">Action</th></tr></thead><tbody>';
+                let html = '<table class="w-full text-left"><thead><tr class="text-xs text-gray-400"><th class="py-2 pr-3">Date</th><th class="py-2 pr-2">Session</th><th class="py-2 pr-2">Time In</th><th class="py-2 pr-2">Time Out</th><th class="py-2 pr-2">Hours</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3">Photo</th><th class="py-2">Action</th></tr></thead><tbody>';
                 logs.forEach(l => {
                     const statusBadge = l.status === 'approved'
                         ? `<span class="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-300">${l.status}</span>`
                         : l.status === 'denied'
                         ? `<span class="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-300">${l.status}</span>`
                         : `<span class="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-300">${l.status || 'pending'}</span>`;
+                    const timeOutCell = l.time_out === 'Auto-denied'
+                        ? `<span class="text-red-400 text-xs">Auto-denied</span>`
+                        : (l.time_out || '-');
+                    const hrsCell = l.hrs
+                        ? `<span class="text-green-400 font-semibold text-xs">${l.hrs}</span>`
+                        : (l.time_out ? '<span class="text-gray-500">—</span>' : '<span class="text-blue-300 text-xs">⏳</span>');
                     let actions = '-';
                     if (l.status === 'pending') {
                         if (!l.time_out) {
@@ -1908,7 +1933,7 @@
                             </div>`;
                         }
                     }
-                    html += `<tr class="border-b border-slate-700/30"><td class="py-2 pr-3 text-sm">${l.date || '-'}</td><td class="py-2 pr-3 text-sm">${l.time_in || '-'}</td><td class="py-2 pr-3 text-sm">${l.time_out || '-'}</td><td class="py-2 pr-3 text-sm">${statusBadge}</td><td class="py-2 pr-3 text-sm">${l.photo ? '<button onclick="openPhotoPopup(\'' + l.photo + '\')" class="text-blue-400 hover:underline">View</button>' : '-'}</td><td class="py-2 text-sm">${actions}</td></tr>`;
+                    html += `<tr class="border-b border-slate-700/30"><td class="py-2 pr-3 text-sm">${l.date || '-'}</td><td class="py-2 pr-2 text-xs text-gray-400">${l.session || '-'}</td><td class="py-2 pr-2 text-sm">${l.time_in || '-'}</td><td class="py-2 pr-2 text-sm">${timeOutCell}</td><td class="py-2 pr-2 text-sm">${hrsCell}</td><td class="py-2 pr-3 text-sm">${statusBadge}</td><td class="py-2 pr-3 text-sm">${l.photo ? '<button onclick="openPhotoPopup(\'' + l.photo + '\')" class="text-blue-400 hover:underline">View</button>' : '-'}</td><td class="py-2 text-sm">${actions}</td></tr>`;
                 });
                 html += '</tbody></table>';
                 body.innerHTML = html;

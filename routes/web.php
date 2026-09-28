@@ -368,30 +368,55 @@ Route::post('/time-out', function () {
     $prevDayHours = round($prevDayMinutes / 60, 2);
     $totalDayHours = round($prevDayHours + $sessionHours, 2);
 
-    // Regular hours = up to 8 per day total; OT = beyond 8
-    $regularCap   = 8.0;
-    $regularToday = min($totalDayHours, $regularCap);
-    $otToday      = max(0, round($totalDayHours - $regularCap, 2));
+    // ── OT CUTOFF: only count time from OT letter submission onward as OT ──────────────────────
+    // Find the most recent non-denied OT letter submitted today.
+    $otLetter = \App\Models\StudentRequirement::where('student_id', $validated['student_id'])
+        ->whereDate('created_at', $serverTodayManila)
+        ->where('status', '!=', 'denied')
+        ->where(function($q) {
+            $q->where('title', 'like', '%OT%')
+              ->orWhere('title', 'like', '%overtime%')
+              ->orWhere('title', 'like', '%over time%');
+        })
+        ->orderByDesc('created_at')
+        ->first();
 
-    // Regular hours credited to THIS session = what this session contributes within the 8-hr cap
-    $regularThisSession = max(0, round($regularToday - $prevDayHours, 2));
-    $otThisSession      = max(0, round($sessionHours - $regularThisSession, 2));
+    $regularCap = 8.0;
+    $otThisSession      = 0.0;
+    $regularThisSession = 0.0;
+    $otStatus           = null;
 
-    // Determine OT status for this record
-    $otStatus = null;
-    if ($otThisSession > 0) {
-        // Check if student already has an approved OT letter for today
-        $otLetterApproved = \App\Models\StudentRequirement::where('student_id', $validated['student_id'])
-            ->whereDate('created_at', $serverTodayManila)
-            ->where('status', 'approved')
-            ->where(function($q) {
-                $q->where('title', 'like', '%OT%')
-                  ->orWhere('title', 'like', '%overtime%')
-                  ->orWhere('title', 'like', '%over time%');
-            })
-            ->exists();
-        $otStatus = $otLetterApproved ? 'approved' : 'pending';
+    if ($otLetter) {
+        // OT letter exists — only minutes AFTER the letter was submitted count as OT.
+        // The letter submission time in Manila timezone.
+        $otStartTime = $otLetter->created_at->setTimezone('Asia/Manila');
+        // Clamp otStartTime so it is within [inTime, outTime]
+        $otStartMins = $otStartTime->hour * 60 + $otStartTime->minute;
+        $inTimeMins  = $inTime->hour * 60 + $inTime->minute;
+        $outTimeMins = $outTime->hour * 60 + $outTime->minute;
+        // Handle midnight wrap for outTime
+        if ($outTimeMins < $inTimeMins) $outTimeMins += 1440;
+        // Clamp otStart into [inTimeMins, outTimeMins]
+        $otStartMins = max($inTimeMins, min($otStartMins, $outTimeMins));
+
+        $otMinutesThisSession      = max(0, $outTimeMins - $otStartMins);
+        $regularMinutesThisSession = max(0, $sessionMinutes - $otMinutesThisSession);
+
+        // Also apply the daily 8-hr cap on regular hours
+        $regularAvailable = max(0, $regularCap - $prevDayHours) * 60; // in minutes
+        $regularMinutesThisSession = min($regularMinutesThisSession, $regularAvailable);
+
+        $regularThisSession = round($regularMinutesThisSession / 60, 2);
+        $otThisSession      = round($otMinutesThisSession / 60, 2);
+        $otStatus           = ($otLetter->status === 'approved') ? 'approved' : 'pending';
+    } else {
+        // No OT letter — no OT at all. Regular = session contribution within 8-hr cap.
+        $regularToday       = min($totalDayHours, $regularCap);
+        $regularThisSession = max(0, round($regularToday - $prevDayHours, 2));
+        $otThisSession      = 0.0; // no letter = no OT counted
+        $otStatus           = null;
     }
+    // ── END OT CUTOFF ─────────────────────────────────────────────────────────────────────────
 
     // Update the record with computed hours
     $record->update([
@@ -410,7 +435,7 @@ Route::post('/time-out', function () {
         'status'       => 'pending',
     ]);
 
-    // If OT exists and letter already approved, create a separate OT log entry
+    // If OT exists and letter already approved, create a separate pending OT log entry
     if ($otThisSession > 0 && $otStatus === 'approved') {
         \App\Models\DailyHourLog::create([
             'student_id'   => $validated['student_id'],
@@ -422,9 +447,9 @@ Route::post('/time-out', function () {
     }
 
     $msg = $otThisSession > 0
-        ? sprintf('Time-out recorded! Regular: %.2f hrs, OT: %.2f hrs. %s',
+        ? sprintf('Time-out recorded! Regular: %.2f hrs, OT: %.2f hrs (from OT letter submission). %s',
             $regularThisSession, $otThisSession,
-            $otStatus === 'approved' ? 'OT letter approved — OT hours will be credited upon time-in approval.' : 'Submit an OT letter to have your overtime hours credited.')
+            $otStatus === 'approved' ? 'OT letter approved — OT hours will be credited upon time-in approval.' : 'OT hours pending — coordinator/supervisor must approve your OT letter.')
         : sprintf('Time-out recorded! %.2f hrs — awaiting approval.', $regularThisSession);
 
     return back()->with('success', $msg);
@@ -478,43 +503,115 @@ Route::post('/time-out-ajax', function () {
     if ($timeOutPhotoPath && \Illuminate\Support\Facades\Schema::hasColumn('time_in_records', 'time_out_photo_path')) $updateData['time_out_photo_path'] = $timeOutPhotoPath;
     $record->update($updateData);
 
-    $timeInParts = explode(':', $record->time_in);
+    // ── Same OT-cutoff logic as /time-out ─────────────────────────────────────
+    $timeInParts  = explode(':', $record->time_in);
     $timeOutParts = explode(':', $serverTimeOut);
-    $inTime = \Carbon\Carbon::createFromTime($timeInParts[0], $timeInParts[1], 0);
+    $inTime  = \Carbon\Carbon::createFromTime($timeInParts[0], $timeInParts[1], 0);
     $outTime = \Carbon\Carbon::createFromTime($timeOutParts[0], $timeOutParts[1], 0);
     if ($outTime->lessThanOrEqualTo($inTime)) {
         $outTime->addDay(); // crossed midnight
     }
-    $minutesWorked = max(0, $inTime->diffInMinutes($outTime));
-    $hoursWorked = round($minutesWorked / 60, 2);
+    $sessionMinutes = max(0, $inTime->diffInMinutes($outTime));
+    $sessionHours   = round($sessionMinutes / 60, 2);
 
-    $studentHours = \App\Models\StudentHours::where('student_id', $validated['student_id'])
-        ->firstOrCreate(['student_id' => $validated['student_id']], ['total_hours_required' => 600]);
+    // Total hours already logged today in other completed sessions
+    $prevSessionsToday = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
+        ->whereDate('date', $serverTodayManila)
+        ->whereNotNull('time_out')
+        ->where('id', '!=', $record->id)
+        ->get();
+    $prevDayMinutes = $prevSessionsToday->sum(fn($r) => (function($ti, $to) {
+        $i = \Carbon\Carbon::parse($ti); $o = \Carbon\Carbon::parse($to);
+        if ($o->lte($i)) $o->addDay();
+        return max(0, $i->diffInMinutes($o));
+    })($r->time_in, $r->time_out));
+    $prevDayHours = round($prevDayMinutes / 60, 2);
+    $totalDayHours = round($prevDayHours + $sessionHours, 2);
 
-    $newCompleted = round(max(0, $studentHours->hours_completed + $hoursWorked), 2);
-    $newRemaining = round(max(0, $studentHours->total_hours_required - $newCompleted), 2);
+    // OT cutoff: only count from OT letter submission time onward
+    $otLetter = \App\Models\StudentRequirement::where('student_id', $validated['student_id'])
+        ->whereDate('created_at', $serverTodayManila)
+        ->where('status', '!=', 'denied')
+        ->where(function($q) {
+            $q->where('title', 'like', '%OT%')
+              ->orWhere('title', 'like', '%overtime%')
+              ->orWhere('title', 'like', '%over time%');
+        })
+        ->orderByDesc('created_at')
+        ->first();
 
-    $studentHours->update([
-        'hours_completed' => $newCompleted,
-        'hours_remaining' => $newRemaining,
+    $regularCap         = 8.0;
+    $regularThisSession = 0.0;
+    $otThisSession      = 0.0;
+    $otStatus           = null;
+
+    if ($otLetter) {
+        $otStartTime = $otLetter->created_at->setTimezone('Asia/Manila');
+        $otStartMins = $otStartTime->hour * 60 + $otStartTime->minute;
+        $inTimeMins  = $inTime->hour * 60 + $inTime->minute;
+        $outTimeMins = $outTime->hour * 60 + $outTime->minute;
+        if ($outTimeMins < $inTimeMins) $outTimeMins += 1440;
+        $otStartMins = max($inTimeMins, min($otStartMins, $outTimeMins));
+
+        $otMinutesThisSession      = max(0, $outTimeMins - $otStartMins);
+        $regularMinutesThisSession = max(0, $sessionMinutes - $otMinutesThisSession);
+        $regularAvailable          = max(0, $regularCap - $prevDayHours) * 60;
+        $regularMinutesThisSession = min($regularMinutesThisSession, $regularAvailable);
+
+        $regularThisSession = round($regularMinutesThisSession / 60, 2);
+        $otThisSession      = round($otMinutesThisSession / 60, 2);
+        $otStatus           = ($otLetter->status === 'approved') ? 'approved' : 'pending';
+    } else {
+        $regularToday       = min($totalDayHours, $regularCap);
+        $regularThisSession = max(0, round($regularToday - $prevDayHours, 2));
+    }
+
+    // Persist computed hours onto the record (same as /time-out)
+    $record->update([
+        'regular_hours' => $regularThisSession,
+        'ot_hours'      => $otThisSession,
+        'ot_status'     => $otStatus,
     ]);
 
+    // Create pending DailyHourLog — hours credited only after supervisor approval
     \App\Models\DailyHourLog::create([
         'student_id'   => $validated['student_id'],
         'log_date'     => $serverTodayManila,
-        'hours_logged' => max(0, $hoursWorked),
-        'status'       => 'approved',
+        'hours_logged' => $regularThisSession,
+        'is_overtime'  => false,
+        'status'       => 'pending',
     ]);
+    if ($otThisSession > 0 && $otStatus === 'approved') {
+        \App\Models\DailyHourLog::create([
+            'student_id'   => $validated['student_id'],
+            'log_date'     => $serverTodayManila,
+            'hours_logged' => $otThisSession,
+            'is_overtime'  => true,
+            'status'       => 'pending',
+        ]);
+    }
+
+    // Read current (not yet updated) StudentHours for the response — hours are pending approval
+    $studentHours = \App\Models\StudentHours::where('student_id', $validated['student_id'])
+        ->firstOrCreate(['student_id' => $validated['student_id']], ['total_hours_required' => 600]);
+    // ── END OT-cutoff logic ───────────────────────────────────────────────────
 
     return response()->json([
-        'success' => true,
-        'hours_worked' => $hoursWorked,
-        'student_hours' => [
-            'hours_completed' => $studentHours->hours_completed,
-            'hours_remaining' => $studentHours->hours_remaining,
+        'success'        => true,
+        'regular_hours'  => $regularThisSession,
+        'ot_hours'       => $otThisSession,
+        'ot_status'      => $otStatus,
+        'student_hours'  => [
+            'hours_completed'      => $studentHours->hours_completed,
+            'hours_remaining'      => $studentHours->hours_remaining,
             'total_hours_required' => $studentHours->total_hours_required,
-            'progress_percentage' => $studentHours->total_hours_required > 0 ? round(($studentHours->hours_completed / $studentHours->total_hours_required) * 100, 2) : 0,
+            'progress_percentage'  => $studentHours->total_hours_required > 0
+                ? round(($studentHours->hours_completed / $studentHours->total_hours_required) * 100, 2)
+                : 0,
         ],
+        'message' => $otThisSession > 0
+            ? sprintf('Time-out recorded! %.2f reg hrs + %.2f OT hrs — awaiting approval.', $regularThisSession, $otThisSession)
+            : sprintf('Time-out recorded! %.2f hrs — awaiting approval.', $regularThisSession),
     ]);
 })->name('time-out-ajax')->middleware(['auth.custom', 'role:student']);
 

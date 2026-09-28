@@ -793,13 +793,15 @@
                                 $_totalDayMinsNow = $_prevMins + $_activeElapsed;
                                 // Has student hit 8 hours (480 mins) based on actual time data?
                                 $_hit8Hours = $_totalDayMinsNow >= 480;
-                                // Has student already submitted an OT letter today?
+                                // Has student already submitted a non-denied OT letter today?
                                 $_otLetterToday = \App\Models\StudentRequirement::where('student_id', $user->id)
                                     ->whereDate('created_at', $today)
                                     ->where(function($q){ $q->where('title','like','%OT%')->orWhere('title','like','%overtime%')->orWhere('title','like','%over time%'); })
                                     ->orderByDesc('created_at')->first();
-                                // For JS live check: pass prevMins and timeIn so JS can compute elapsed
-                                $_prevHours = round($_prevMins / 60, 4);
+                                // OT letter submission time as HH:MM in Manila — passed to JS for live OT preview
+                                $_otLetterSubmittedAt = ($_otLetterToday && $_otLetterToday->status !== 'denied')
+                                    ? $_otLetterToday->created_at->setTimezone('Asia/Manila')->format('H:i')
+                                    : '';
                             @endphp
                             <form method="POST" action="{{ route('time-out') }}" id="timeOutForm">
                                 @csrf
@@ -813,7 +815,7 @@
                             {{-- OT Gate wrapper: JS will swap between timeout btn and OT prompt --}}
                             <div id="otGateWrapper">
 
-                                {{-- Normal Time Out button (shown when < 8 hrs) --}}
+                                {{-- Normal Time Out button (shown when < 8 hrs OR letter already submitted) --}}
                                 <div id="normalTimeoutBtn">
                                     <button type="button" id="timeOutBtn" onclick="openTimeoutOptionsModal(); return false;"
                                         class="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold transition-colors">
@@ -821,53 +823,48 @@
                                     </button>
                                 </div>
 
-                                {{-- OT Gate: shown when 8 hrs reached --}}
+                                {{-- OT Gate: shown when 8 hrs reached and no letter yet --}}
                                 <div id="otGatePrompt" class="hidden">
                                     <div class="bg-yellow-500/10 border border-yellow-500 rounded-xl p-4">
                                         <p class="text-yellow-300 font-bold text-sm mb-1">⏰ You have reached 8 hours today!</p>
-                                        <p class="text-yellow-200 text-xs mb-3">Your regular hours are complete. Do you want to continue working overtime? Submit an OT Letter to proceed, or time out now with only 8 hours recorded.</p>
+                                        <p class="text-yellow-200 text-xs mb-3">
+                                            Your regular hours are complete.
+                                            To continue working overtime, submit an OT Letter first —
+                                            <strong>only time worked after submitting the letter counts as OT.</strong>
+                                            Or time out now to record only your 8 regular hours.
+                                        </p>
+                                        {{-- Live OT preview (only shown after letter submitted) --}}
+                                        <p id="otLivePreview" class="text-yellow-300 text-xs font-semibold mb-2 hidden"></p>
                                         <div class="flex flex-col gap-2">
-                                            @if(!$_otLetterToday)
-                                            {{-- No OT letter yet: show upload form --}}
+                                            @if(!$_otLetterToday || $_otLetterToday->status === 'denied')
+                                            {{-- No active OT letter: show upload form trigger + hard-block time-out --}}
                                             <button type="button" onclick="openOtLetterForm()" id="showOtLetterBtn"
                                                 class="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm">
                                                 📄 Submit OT Letter to Continue OT
                                             </button>
+                                            {{-- Escape hatch: time out with exactly 8 regular hrs --}}
+                                            <button type="button" onclick="timeOutEightHrsOnly()"
+                                                class="w-full px-4 py-2.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold text-sm">
+                                                🕐 Time Out Now (8 hrs only — no OT)
+                                            </button>
                                             @elseif($_otLetterToday->status === 'pending')
-                                            {{-- OT letter submitted, waiting --}}
+                                            {{-- OT letter submitted, waiting for approval --}}
                                             <div class="bg-blue-500/10 border border-blue-400 rounded-lg p-3">
                                                 <p class="text-blue-300 text-xs font-semibold">📋 OT Letter submitted — waiting for supervisor/coordinator approval.</p>
-                                                <p class="text-blue-200 text-xs mt-1">You may continue working. Your OT time is being tracked. Time out when done.</p>
+                                                <p class="text-blue-200 text-xs mt-1">OT time is being tracked from your submission time. Time out when done.</p>
                                             </div>
-                                            <button type="button" id="timeOutBtn" onclick="openTimeoutOptionsModal(); return false;"
+                                            <button type="button" onclick="openTimeoutOptionsModal(); return false;"
                                                 class="w-full px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold text-sm">
                                                 🕐 Time Out (OT in progress)
                                             </button>
                                             @elseif($_otLetterToday->status === 'approved')
                                             {{-- OT letter approved --}}
                                             <div class="bg-green-500/10 border border-green-500 rounded-lg p-3">
-                                                <p class="text-green-300 text-xs font-semibold">✅ OT Letter approved! Your overtime hours will be credited.</p>
+                                                <p class="text-green-300 text-xs font-semibold">✅ OT Letter approved! Overtime is counting from your submission time.</p>
                                             </div>
-                                            <button type="button" id="timeOutBtn" onclick="openTimeoutOptionsModal(); return false;"
+                                            <button type="button" onclick="openTimeoutOptionsModal(); return false;"
                                                 class="w-full px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold text-sm">
                                                 🕐 Time Out (OT approved)
-                                            </button>
-                                            @elseif($_otLetterToday->status === 'denied')
-                                            {{-- OT letter denied --}}
-                                            <div class="bg-red-500/10 border border-red-500 rounded-lg p-3">
-                                                <p class="text-red-300 text-xs font-semibold">❌ OT Letter denied. Only your 8 regular hours will be recorded.</p>
-                                            </div>
-                                            <button type="button" id="timeOutBtn" onclick="openTimeoutOptionsModal(); return false;"
-                                                class="w-full px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-semibold text-sm">
-                                                🕐 Time Out (8 hrs only)
-                                            </button>
-                                            @endif
-
-                                            {{-- Always show: time out with 8 hrs only --}}
-                                            @if(!$_otLetterToday || $_otLetterToday->status === 'denied')
-                                            <button type="button" onclick="openTimeoutOptionsModal(); return false;"
-                                                class="w-full px-4 py-2.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg font-semibold text-sm">
-                                                🕐 Time Out Now (8 hrs only)
                                             </button>
                                             @endif
                                         </div>
@@ -927,11 +924,21 @@
                                     if (msg) msg.innerHTML = 'Complete <strong>8 hours</strong> today to unlock OT letter submission.';
                                 }
                             }
+
+                            // "Time Out Now (8 hrs only)" — submits the form but caps at the moment
+                            // the student hit 8 hours so no OT is computed server-side.
+                            function timeOutEightHrsOnly() {
+                                if (!confirm('Time out now with 8 regular hours only? No OT will be recorded.')) return;
+                                openTimeoutOptionsModal();
+                            }
+
                             (function() {
                                 // prevMins = total minutes already logged in completed sessions today
-                                var prevMins       = {{ $_prevMins }};
-                                var timeInStr      = '{{ $activeRecord->time_in }}';
-                                var otLetterStatus = '{{ $_otLetterToday ? $_otLetterToday->status : "none" }}';
+                                var prevMins         = {{ $_prevMins }};
+                                var timeInStr        = '{{ $activeRecord->time_in }}';
+                                // otLetterSubmittedAt: 'HH:MM' in Manila time, or '' if no active OT letter
+                                var otLetterSubmittedAt = '{{ $_otLetterSubmittedAt }}';
+                                var otLetterStatus   = '{{ $_otLetterToday ? $_otLetterToday->status : "none" }}';
 
                                 function parseHHMM(str) {
                                     var p = str.split(':');
@@ -939,12 +946,12 @@
                                 }
 
                                 function checkOtGate() {
-                                    var now = new Date();
-                                    var nowTotalMins = now.getHours() * 60 + now.getMinutes();
+                                    var now          = new Date();
+                                    var nowMins      = now.getHours() * 60 + now.getMinutes();
                                     var timeInMins   = parseHHMM(timeInStr);
-                                    // elapsed minutes in this active session
-                                    var elapsed = nowTotalMins - timeInMins;
-                                    if (elapsed < 0) elapsed += 1440; // handle midnight wrap
+                                    // elapsed minutes in this active session (handle midnight wrap)
+                                    var elapsed = nowMins - timeInMins;
+                                    if (elapsed < 0) elapsed += 1440;
                                     // total day minutes = previous completed sessions + current elapsed
                                     var totalDayMins = prevMins + elapsed;
 
@@ -952,12 +959,33 @@
                                     var otPrompt  = document.getElementById('otGatePrompt');
                                     if (!normalBtn || !otPrompt) return;
 
-                                    // Show OT gate only when student has actually accumulated 8 hrs (480 mins)
-                                    // and OT letter is not already approved or pending
-                                    if (totalDayMins >= 480 && otLetterStatus !== 'approved' && otLetterStatus !== 'pending') {
+                                    // Show OT gate when student reaches 8 hrs AND has no active OT letter yet.
+                                    // Once a letter is submitted (pending/approved), the gate stays but
+                                    // the time-out button is re-enabled inside the gate UI (see blade above).
+                                    var letterActive = (otLetterStatus === 'pending' || otLetterStatus === 'approved');
+                                    if (totalDayMins >= 480 && !letterActive) {
+                                        // Hard-block: hide normal button, show OT gate
                                         normalBtn.classList.add('hidden');
                                         otPrompt.classList.remove('hidden');
+                                    } else if (totalDayMins >= 480 && letterActive) {
+                                        // Letter submitted — keep gate visible (shows status + time-out button)
+                                        normalBtn.classList.add('hidden');
+                                        otPrompt.classList.remove('hidden');
+                                        // Show live OT preview: minutes from letter submission to now
+                                        if (otLetterSubmittedAt) {
+                                            var letterMins = parseHHMM(otLetterSubmittedAt);
+                                            var otElapsed  = nowMins - letterMins;
+                                            if (otElapsed < 0) otElapsed += 1440; // midnight wrap
+                                            var otH = Math.floor(otElapsed / 60);
+                                            var otM = otElapsed % 60;
+                                            var preview = document.getElementById('otLivePreview');
+                                            if (preview) {
+                                                preview.textContent = '⏱ Current OT: ' + otH + 'h ' + otM + 'm (from ' + otLetterSubmittedAt + ')';
+                                                preview.classList.remove('hidden');
+                                            }
+                                        }
                                     } else {
+                                        // Under 8 hrs — show normal time-out button
                                         normalBtn.classList.remove('hidden');
                                         otPrompt.classList.add('hidden');
                                     }
@@ -1175,20 +1203,36 @@
                 @php
                     $morning   = $sessions->firstWhere('session', 'morning');
                     $afternoon = $sessions->firstWhere('session', 'afternoon');
-                    $anyVerified = $sessions->contains('verified', true);
-                    $anyPending  = $sessions->contains(fn($r) => !$r->verified);
                     $displayDate = \Carbon\Carbon::parse($date)->format('M d, Y');
+                    // Per-day status summary
+                    $allApproved = $sessions->every(fn($r) => $r->status === 'approved');
+                    $anyDenied   = $sessions->contains(fn($r) => $r->status === 'denied');
+                    $anyPending  = $sessions->contains(fn($r) => $r->status === 'pending');
+                    // Day-level hours from stored columns (correct even for auto-timed-out records)
+                    $dayRegular  = round($sessions->sum(fn($r) => floatval($r->regular_hours ?? 0)), 2);
+                    $dayOt       = round($sessions->sum(fn($r) => floatval($r->ot_hours ?? 0)), 2);
                 @endphp
                 <div class="bg-slate-700/30 rounded-xl p-4 hover:bg-slate-700/50 transition-colors">
-                    {{-- Date header + status --}}
+                    {{-- Date header + status + day total --}}
                     <div class="flex items-center justify-between mb-3">
-                        <p class="text-gray-200 font-semibold text-sm">{{ $displayDate }}</p>
-                        <div class="flex gap-1.5">
-                            @if($anyVerified)
-                            <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full font-semibold">Verified</span>
+                        <div>
+                            <p class="text-gray-200 font-semibold text-sm">{{ $displayDate }}</p>
+                            @if($dayRegular > 0 || $dayOt > 0)
+                            <p class="text-xs text-gray-400 mt-0.5">
+                                <span class="text-green-400 font-semibold">{{ number_format($dayRegular, 2) }} reg hrs</span>
+                                @if($dayOt > 0)
+                                <span class="text-yellow-400 font-semibold ml-1">+ {{ number_format($dayOt, 2) }} OT</span>
+                                @endif
+                            </p>
                             @endif
-                            @if($anyPending)
-                            <span class="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full font-semibold">Pending</span>
+                        </div>
+                        <div class="flex gap-1.5">
+                            @if($allApproved)
+                            <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full font-semibold">✓ Approved</span>
+                            @elseif($anyDenied && !$anyPending)
+                            <span class="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs rounded-full font-semibold">Denied</span>
+                            @elseif($anyPending)
+                            <span class="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full font-semibold">⏳ Pending</span>
                             @endif
                         </div>
                     </div>
@@ -1199,11 +1243,41 @@
                         <div class="bg-slate-800/50 rounded-lg p-3">
                             <p class="text-xs font-semibold text-blue-400 mb-2">🌅 Morning</p>
                             @if($morning)
-                            <p class="text-gray-400 text-xs mb-2">
+                            @php
+                                // Time-out display: '12:00' = auto-timeout at noon
+                                $mOutDisplay = null;
+                                $mIsAutoOut  = false;
+                                if ($morning->time_out) {
+                                    $mIsAutoOut  = ($morning->time_out === '12:00' || $morning->time_out === '12:00:00');
+                                    $mOutDisplay = $mIsAutoOut
+                                        ? '12:00 PM (auto)'
+                                        : \Carbon\Carbon::parse($morning->time_out)->format('h:i A');
+                                }
+                                $mHours = floatval($morning->regular_hours ?? 0);
+                                $mOt    = floatval($morning->ot_hours ?? 0);
+                            @endphp
+                            <p class="text-gray-400 text-xs">
                                 {{ \Carbon\Carbon::parse($morning->time_in)->format('h:i A') }}
-                                @if($morning->time_out) → {{ \Carbon\Carbon::parse($morning->time_out)->format('h:i A') }} @endif
+                                @if($mOutDisplay)
+                                    → <span class="{{ $mIsAutoOut ? 'text-gray-500' : '' }}">{{ $mOutDisplay }}</span>
+                                @else
+                                    <span class="text-yellow-400">⏳ Active</span>
+                                @endif
                             </p>
-                            <div class="flex gap-2">
+                            @if($mHours > 0 || $mOt > 0)
+                            <p class="text-blue-300 text-xs font-semibold mt-1">
+                                {{ number_format($mHours, 2) }} hrs
+                                @if($mOt > 0)<span class="text-yellow-400"> +{{ number_format($mOt, 2) }} OT</span>@endif
+                            </p>
+                            @endif
+                            {{-- Status badge --}}
+                            <span class="inline-block mt-1 px-1.5 py-0.5 text-[10px] rounded font-semibold
+                                @if($morning->status === 'approved') bg-green-500/20 text-green-400
+                                @elseif($morning->status === 'denied') bg-red-500/20 text-red-400
+                                @else bg-yellow-500/20 text-yellow-400 @endif">
+                                {{ ucfirst($morning->status) }}
+                            </span>
+                            <div class="flex gap-2 mt-2">
                                 {{-- Morning time-in photo --}}
                                 <div class="flex flex-col items-center gap-1 flex-1">
                                     @if($morning->photo_path)
@@ -1226,7 +1300,9 @@
                                         onclick="openFileViewer('{{ url('storage/' . $morning->time_out_photo_path) }}','{{ $displayDate }} Morning — Time-out')">
                                     <div class="w-full h-16 bg-slate-600 rounded-lg items-center justify-center hidden"><span class="text-gray-400 text-xs">📸</span></div>
                                     @elseif($morning->time_out)
-                                    <div class="w-full h-16 bg-slate-600/30 rounded-lg flex items-center justify-center border border-dashed border-slate-500"><span class="text-gray-500 text-xs">—</span></div>
+                                    <div class="w-full h-16 bg-slate-600/30 rounded-lg flex items-center justify-center border border-dashed border-slate-500">
+                                        <span class="text-gray-500 text-xs">{{ $mIsAutoOut ? '🤖' : '—' }}</span>
+                                    </div>
                                     @else
                                     <div class="w-full h-16 bg-slate-600/20 rounded-lg flex items-center justify-center border border-dashed border-slate-600"><span class="text-gray-500 text-xs">⏳</span></div>
                                     @endif
@@ -1242,11 +1318,41 @@
                         <div class="bg-slate-800/50 rounded-lg p-3">
                             <p class="text-xs font-semibold text-orange-400 mb-2">🌇 Afternoon</p>
                             @if($afternoon)
-                            <p class="text-gray-400 text-xs mb-2">
+                            @php
+                                // Auto-denied afternoons have time_out = '23:59' — show label instead of the raw time
+                                $aIsAutoDenied = ($afternoon->status === 'denied'
+                                    && ($afternoon->time_out === '23:59' || $afternoon->time_out === '23:59:00'));
+                                $aOutDisplay = null;
+                                if ($afternoon->time_out && !$aIsAutoDenied) {
+                                    $aOutDisplay = \Carbon\Carbon::parse($afternoon->time_out)->format('h:i A');
+                                }
+                                $aHours = floatval($afternoon->regular_hours ?? 0);
+                                $aOt    = floatval($afternoon->ot_hours ?? 0);
+                            @endphp
+                            <p class="text-gray-400 text-xs">
                                 {{ \Carbon\Carbon::parse($afternoon->time_in)->format('h:i A') }}
-                                @if($afternoon->time_out) → {{ \Carbon\Carbon::parse($afternoon->time_out)->format('h:i A') }} @endif
+                                @if($aIsAutoDenied)
+                                    → <span class="text-red-400 text-[10px]">Auto-denied (no time-out)</span>
+                                @elseif($aOutDisplay)
+                                    → {{ $aOutDisplay }}
+                                @else
+                                    <span class="text-yellow-400">⏳ Active</span>
+                                @endif
                             </p>
-                            <div class="flex gap-2">
+                            @if(!$aIsAutoDenied && ($aHours > 0 || $aOt > 0))
+                            <p class="text-blue-300 text-xs font-semibold mt-1">
+                                {{ number_format($aHours, 2) }} hrs
+                                @if($aOt > 0)<span class="text-yellow-400"> +{{ number_format($aOt, 2) }} OT</span>@endif
+                            </p>
+                            @endif
+                            {{-- Status badge --}}
+                            <span class="inline-block mt-1 px-1.5 py-0.5 text-[10px] rounded font-semibold
+                                @if($afternoon->status === 'approved') bg-green-500/20 text-green-400
+                                @elseif($afternoon->status === 'denied') bg-red-500/20 text-red-400
+                                @else bg-yellow-500/20 text-yellow-400 @endif">
+                                {{ ucfirst($afternoon->status) }}
+                            </span>
+                            <div class="flex gap-2 mt-2">
                                 {{-- Afternoon time-in photo --}}
                                 <div class="flex flex-col items-center gap-1 flex-1">
                                     @if($afternoon->photo_path)
@@ -1268,6 +1374,8 @@
                                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
                                         onclick="openFileViewer('{{ url('storage/' . $afternoon->time_out_photo_path) }}','{{ $displayDate }} Afternoon — Time-out')">
                                     <div class="w-full h-16 bg-slate-600 rounded-lg items-center justify-center hidden"><span class="text-gray-400 text-xs">📸</span></div>
+                                    @elseif($aIsAutoDenied)
+                                    <div class="w-full h-16 bg-red-900/20 rounded-lg flex items-center justify-center border border-dashed border-red-800/50"><span class="text-red-500 text-xs">✕</span></div>
                                     @elseif($afternoon->time_out)
                                     <div class="w-full h-16 bg-slate-600/30 rounded-lg flex items-center justify-center border border-dashed border-slate-500"><span class="text-gray-500 text-xs">—</span></div>
                                     @else

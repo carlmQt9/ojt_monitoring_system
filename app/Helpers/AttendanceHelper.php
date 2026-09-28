@@ -3,7 +3,6 @@
 namespace App\Helpers;
 
 use App\Models\TimeInRecord;
-use App\Models\StudentHours;
 use App\Models\DailyHourLog;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -113,7 +112,7 @@ class AttendanceHelper
             }
 
             $deniedCount = $pastAfternoonQuery->update([
-                'time_out'      => '00:00',
+                'time_out'      => '23:59',   // use end-of-day sentinel; '00:00' would display as 12:00 AM (confusing)
                 'regular_hours' => 0,
                 'ot_hours'      => 0,
                 'ot_status'     => null,
@@ -159,18 +158,13 @@ class AttendanceHelper
 
                 $recDate = $openMorning->date ? $openMorning->date->toDateString() : $today;
 
-                $sh = StudentHours::where('student_id', $openMorning->student_id)
-                    ->firstOrCreate(['student_id' => $openMorning->student_id], ['total_hours_required' => 600]);
-                $newCompleted = round(max(0, ($sh->hours_completed ?? 0) + $regularHours), 2);
-                $sh->update([
-                    'hours_completed' => $newCompleted,
-                    'hours_remaining' => round(max(0, ($sh->total_hours_required ?? 600) - $newCompleted), 2),
-                ]);
-
-                // Create or update daily hour log for that day
+                // Do NOT credit hours to StudentHours here — the record is pending and must
+                // be approved by the supervisor/coordinator first, exactly like a manual time-out.
+                // Create a pending DailyHourLog entry to match the manual time-out flow.
                 $existingLog = DailyHourLog::where('student_id', $openMorning->student_id)
                     ->whereDate('log_date', $recDate)
                     ->where('is_overtime', false)
+                    ->where('status', 'pending')
                     ->first();
 
                 if (!$existingLog) {
@@ -179,11 +173,7 @@ class AttendanceHelper
                         'log_date'     => $recDate,
                         'hours_logged' => $regularHours,
                         'is_overtime'  => false,
-                        'status'       => 'approved',
-                    ]);
-                } else {
-                    $existingLog->update([
-                        'hours_logged' => round($existingLog->hours_logged + $regularHours, 2),
+                        'status'       => 'pending',
                     ]);
                 }
 
