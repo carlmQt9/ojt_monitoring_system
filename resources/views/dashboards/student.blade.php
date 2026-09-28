@@ -4198,5 +4198,6 @@
         <p id="pageLoaderMsg" style="color:#86efac;font-size:16px;font-weight:600;font-family:sans-serif;letter-spacing:.05em;">Please wait…</p>
     </div>
 
+@include('partials.dashboard-action-state')
 </body>
 </html>

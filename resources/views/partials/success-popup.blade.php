@@ -2,7 +2,7 @@
 {{-- Usage: include this at the top of the <body> on any view that may show a success message. --}}
 
 <!-- markup (kept hidden by default) -->
-<div id="successPopup" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 popup-container px-4">
+<div id="successPopup" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[200] popup-container px-4">
     <div class="popup-content bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-green-500/50 rounded-2xl p-8 w-full max-w-md mx-auto shadow-2xl">
         <div class="flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500/20 to-green-600/20 rounded-full mx-auto mb-5 ring-4 ring-green-500/30">
             <svg class="w-10 h-10 checkmark-svg" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">

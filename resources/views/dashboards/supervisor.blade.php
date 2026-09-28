@@ -623,19 +623,19 @@
                             <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
                                 <div class="bg-slate-700/30 rounded-lg p-2.5">
                                     <p class="text-gray-400 text-xs mb-1">✅ Completed</p>
-                                    <p class="text-base font-bold text-green-400">{{ $displayCompleted }}</p>
+                                    <p class="text-base font-bold text-green-400" data-completed-hours>{{ $displayCompleted }}</p>
                                 </div>
                                 <div class="bg-slate-700/30 rounded-lg p-2.5">
                                     <p class="text-gray-400 text-xs mb-1">⏳ Remaining</p>
-                                    <p class="text-base font-bold text-blue-400">{{ $displayRemaining }}</p>
+                                    <p class="text-base font-bold text-blue-400" data-remaining-hours>{{ $displayRemaining }}</p>
                                 </div>
                                 <div class="bg-slate-700/30 rounded-lg p-2.5">
                                     <p class="text-gray-400 text-xs mb-1">📈 Progress</p>
-                                    <p class="text-base font-bold text-purple-400">{{ $displayPercentSigned }}%</p>
+                                    <p class="text-base font-bold text-purple-400" data-progress-percent>{{ $displayPercentSigned }}%</p>
                                 </div>
                                 <div class="bg-slate-700/30 rounded-lg p-2.5">
                                     <p class="text-gray-400 text-xs mb-1">🔔 Pending</p>
-                                    <p class="text-base font-bold text-yellow-400">{{ $pendingTimeEdits + $pendingRequirements }}</p>
+                                    <p class="text-base font-bold text-yellow-400" data-pending-count>{{ $pendingTimeEdits + $pendingRequirements }}</p>
                                 </div>
                                 <div class="bg-slate-700/30 rounded-lg p-2.5 col-span-2 sm:col-span-1">
                                     <p class="text-gray-400 text-xs mb-1">📋 Evaluation</p>
@@ -652,7 +652,7 @@
                             <!-- Progress Bar -->
                             <div class="mt-4">
                                 <div class="w-full bg-slate-700/50 rounded-full h-3 overflow-hidden border border-slate-600">
-                                    <div class="progress-bar h-full rounded-full transition-all duration-1000 bg-gradient-to-r from-purple-500 to-blue-500" 
+                                    <div class="progress-bar h-full rounded-full transition-all duration-1000 bg-gradient-to-r from-purple-500 to-blue-500" data-progress-bar
                                          style="--progress-width: {{ $progressWidth }}%; width: {{ $progressWidth }}%">
                                     </div>
                                 </div>
@@ -769,7 +769,7 @@
                                                 ->where('id', '!=', $record->id)
                                                 ->exists();
                                         @endphp
-                                        <tr class="hover:bg-slate-700/20 transition-colors time-edit-row" data-date="{{ strtolower($record->date->format('M d, Y')) }}">
+                                        <tr class="hover:bg-slate-700/20 transition-colors time-edit-row" data-time-record-id="{{ $record->id }}" data-date="{{ strtolower($record->date->format('M d, Y')) }}">
                                             <td class="py-2 px-3">
                                                 <p class="text-gray-200 text-xs font-medium whitespace-nowrap">{{ $record->date->format('M d, Y') }}</p>
                                                 @if($record->session)
@@ -826,17 +826,17 @@
                                                     <span class="text-blue-300 text-xs">⏳</span>
                                                     @elseif($record->denial_reason === 'undone')
                                                     {{-- Was undone — show Redo only --}}
-                                                    <form method="POST" action="{{ route('approve-time-in', $record->id) }}" style="display:inline;">
+                                                    <form method="POST" action="{{ route('approve-time-in', $record->id) }}" data-inline-time-approval style="display:inline;">
                                                         @csrf
-                                                        <button type="submit" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded font-semibold">↻ Redo</button>
+                                                        <button type="submit" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg font-semibold shadow-lg shadow-blue-900/30 transition-colors">↻ Redo</button>
                                                     </form>
                                                     @else
-                                                    <div class="flex items-center justify-end gap-1">
-                                                        <form method="POST" action="{{ route('approve-time-in', $record->id) }}" style="display:inline;">
+                                                    <div class="flex items-center justify-end gap-2">
+                                                        <form method="POST" action="{{ route('approve-time-in', $record->id) }}" data-inline-time-approval style="display:inline;">
                                                             @csrf
-                                                            <button type="submit" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">✓</button>
+                                                            <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg font-semibold shadow-lg shadow-green-900/30 transition-colors" title="Approve this time log">✓ Approve</button>
                                                         </form>
-                                                        <button onclick="showDenyTimeEditModal({{ $record->id }})" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">✕</button>
+                                                        <button onclick="showDenyTimeEditModal({{ $record->id }})" class="inline-flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded-lg font-semibold shadow-lg shadow-red-900/30 transition-colors" title="Deny this time log">✕ Deny</button>
                                                     </div>
                                                     @endif
                                                 @elseif($record->status === 'approved')
@@ -1900,6 +1900,8 @@
 
         function showSupervisorLogsModal(studentId, studentName) {
             const t = document.getElementById('studentLogsJson-' + studentId);
+            document.querySelectorAll('script[id^="studentLogsJson-"]').forEach(script => script.removeAttribute('data-active'));
+            if (t) t.dataset.active = 'true';
             const title = document.getElementById('logsModalTitle');
             const body = document.getElementById('logsModalBody');
             title.textContent = studentName + ' — Recent Time Logs';
@@ -1956,26 +1958,78 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json'
                 }
             })
-            .then(r => {
-                if (r.ok || r.redirected) {
-                    showToast('Time log approved', 'success');
-                    closeLogsModal();
-                    setTimeout(() => location.reload(), 500);
-                } else {
-                    hideLoadingModal();
-                    return r.json().then(data => {
-                        showToast(data.message || 'Failed to approve', 'error');
-                    });
-                }
+            .then(async r => {
+                const data = await r.json();
+                if (!r.ok || !data.success) throw new Error(data.message || 'Failed to approve');
+                updateSupervisorTimeLog(logId, 'approved');
+                refreshSupervisorStudent(data.dashboard);
+                refreshInlineTimeEditRow(logId, 'approved');
+                showSupervisorLogsModalFromCurrentTitle();
+                hideLoadingModal();
+                if (typeof showSuccess === 'function') showSuccess(data.message || 'The time log was approved.');
+                else showToast('Time log approved', data.message || 'The time log was updated.', 'green');
             })
             .catch((err) => {
                 hideLoadingModal();
                 console.error('Approve error:', err);
-                showToast('Failed to approve', 'error');
+                showToast('Error', err.message || 'Failed to approve', 'red');
             });
+        }
+
+        function updateSupervisorTimeLog(logId, status) {
+            document.querySelectorAll('script[id^="studentLogsJson-"]').forEach(script => {
+                try {
+                    const logs = JSON.parse(script.textContent || '[]');
+                    const log = logs.find(item => Number(item.id) === Number(logId));
+                    if (log) {
+                        log.status = status;
+                        script.textContent = JSON.stringify(logs);
+                    }
+                } catch (_) {}
+            });
+        }
+
+        function refreshInlineTimeEditRow(recordId, status) {
+            const row = document.querySelector(`.time-edit-row[data-time-record-id="${recordId}"]`);
+            if (!row) return;
+
+            const statusCell = row.children[3];
+            const actionCell = row.lastElementChild;
+            const color = status === 'approved' ? 'green' : 'red';
+            statusCell.innerHTML = `<span class="px-2 py-0.5 text-xs rounded-full whitespace-nowrap bg-${color}-500/20 text-${color}-300">${status}</span>`;
+
+            if (status === 'approved') {
+                const date = row.querySelector('td:first-child p')?.textContent.trim() || '';
+                const session = row.querySelector('td:first-child p:nth-child(2)')?.textContent.trim() || '';
+                actionCell.innerHTML = `<button onclick="confirmUndoApproval(${recordId}, '${date}', '${session}')" class="px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded transition-colors" title="Undo approval">↩ Undo</button>`;
+            } else {
+                actionCell.innerHTML = '<span class="text-gray-500 text-xs">—</span>';
+            }
+        }
+
+        function refreshSupervisorStudent(dashboard) {
+            if (!dashboard?.student_id) return;
+            const card = document.querySelector(`.student-card[data-student-id="${dashboard.student_id}"]`);
+            if (card) {
+                card.querySelector('[data-completed-hours]').textContent = dashboard.hours_completed.toFixed(2);
+                card.querySelector('[data-remaining-hours]').textContent = dashboard.hours_remaining.toFixed(2);
+                card.querySelector('[data-progress-percent]').textContent = `${dashboard.progress_percentage.toFixed(2)}%`;
+                const progressBar = card.querySelector('[data-progress-bar]');
+                progressBar.style.width = `${Math.min(dashboard.progress_percentage, 100)}%`;
+                progressBar.style.setProperty('--progress-width', `${Math.min(dashboard.progress_percentage, 100)}%`);
+                const pending = card.querySelector('[data-pending-count]');
+                if (pending) pending.textContent = dashboard.pending_items;
+            }
+            if (typeof updateSupervisorLiveCounts === 'function') updateSupervisorLiveCounts();
+        }
+
+        function showSupervisorLogsModalFromCurrentTitle() {
+            const match = document.querySelector('script[id^="studentLogsJson-"][data-active="true"]');
+            if (match) showSupervisorLogsModal(match.id.replace('studentLogsJson-', ''), document.getElementById('logsModalTitle').textContent.split(' — ')[0]);
         }
 
         function denyTimeLog(logId, studentName) {
@@ -1996,9 +2050,46 @@
             document.getElementById('loadingModal').classList.add('hidden');
         }
 
-        // Handle deny form submission with loading animation
-        document.getElementById('supervisorDenyTimeForm').addEventListener('submit', function(e) {
+        // Keep the filtered intern list in place when an inline Time Edits action is used.
+        document.addEventListener('submit', function(e) {
+            const form = e.target.closest('form[data-inline-time-approval]');
+            if (!form) return;
+            e.preventDefault();
+            const recordId = form.action.split('/').pop();
+            const button = form.querySelector('button[type="submit"]');
+            button.disabled = true;
+            approveTimeLog(recordId);
+        });
+
+        // Handle denial in place so the open log view is retained.
+        document.getElementById('supervisorDenyTimeForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const form = this;
+            const submitButton = form.querySelector('button[type="submit"]');
+            const logId = form.action.split('/').pop();
+            submitButton.disabled = true;
             showLoadingModal('DENYING');
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    headers: { 'Accept': 'application/json' },
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.message || 'Failed to deny');
+                updateSupervisorTimeLog(logId, 'denied');
+                refreshSupervisorStudent(data.dashboard);
+                refreshInlineTimeEditRow(logId, 'denied');
+                closeSupervisorDenyTimeModal();
+                showSupervisorLogsModalFromCurrentTitle();
+                if (typeof showSuccess === 'function') showSuccess(data.message || 'The time log was denied.');
+                else showToast('Time log denied', data.message || 'The time log was updated.', 'green');
+            } catch (error) {
+                showToast('Error', error.message || 'Failed to deny', 'red');
+                submitButton.disabled = false;
+            } finally {
+                hideLoadingModal();
+            }
         });
 
         function viewBulkStudentLogs(studentId) {
@@ -2605,5 +2696,6 @@
         <p id="pageLoaderMsg" style="color:#c4b5fd;font-size:16px;font-weight:600;font-family:sans-serif;letter-spacing:.05em;">Please wait…</p>
     </div>
 
+@include('partials.dashboard-action-state')
 </body>
 </html>

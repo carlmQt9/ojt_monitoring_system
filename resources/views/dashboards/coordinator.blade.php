@@ -723,12 +723,12 @@
                                         <td class="py-2 px-3">{{ $student->name }}<div class="text-xs text-gray-400">{{ $student->email }}</div></td>
                                         <td class="py-2 px-3 text-gray-400 text-sm">{{ $student->company ? $student->company->name : '-' }}</td>
                                         <td class="py-2 px-3">
-                                            <div class="text-sm text-gray-300">{{ $progressPct }}%</div>
+                                            <div class="text-sm text-gray-300" data-progress-percent>{{ $progressPct }}%</div>
                                             <div class="w-full bg-slate-700/30 h-2 rounded mt-2 overflow-hidden">
-                                                <div class="h-2 bg-gradient-to-r from-green-500 to-blue-500" style="width: {{ max(0, min($progressPct, 100)) }}%"></div>
+                                                <div class="h-2 bg-gradient-to-r from-green-500 to-blue-500" data-progress-bar style="width: {{ max(0, min($progressPct, 100)) }}%"></div>
                                             </div>
                                         </td>
-                                        <td class="py-2 px-3 text-yellow-400 font-semibold">{{ $pendingLogs + $pendingTimeIns + $pendingReq }}</td>
+                                        <td class="py-2 px-3 text-yellow-400 font-semibold" data-pending-count>{{ $pendingLogs + $pendingTimeIns + $pendingReq }}</td>
                                         <td class="py-2 px-3 text-right">
                                             <button onclick="toggleStudentDetails({{ $student->id }})"
                                                     class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">
@@ -1975,15 +1975,79 @@
             document.getElementById('loadingModal').classList.add('hidden');
         }
 
-        // Handle deny form submission with loading animation
-        document.getElementById('coordDenyTimeForm').addEventListener('submit', function(e) {
-            showLoadingModal('DENYING');
-        });
+        function updateCachedTimeLog(recordId, status) {
+            document.querySelectorAll('script[id^="studentLogsJson-"]').forEach(script => {
+                try {
+                    const logs = JSON.parse(script.textContent || '[]');
+                    const log = logs.find(item => Number(item.id) === Number(recordId));
+                    if (log) {
+                        log.status = status;
+                        script.textContent = JSON.stringify(logs);
+                    }
+                } catch (_) {}
+            });
+        }
 
-        // Intercept approve form submissions in logs modal to show loading animation
+        function updateTimeLogRow(recordId, status) {
+            const actionButton = document.querySelector(`#logsModalBody button[onclick*="${recordId}"]`);
+            const row = actionButton?.closest('tr');
+            if (!row) return;
+            const statusCell = row.children[5];
+            const actionCell = row.lastElementChild;
+            const color = status === 'approved' ? 'green' : 'red';
+            statusCell.innerHTML = `<span class="px-2 py-0.5 text-xs rounded-full bg-${color}-500/20 text-${color}-300">${status}</span>`;
+            actionCell.textContent = '—';
+        }
+
+        function refreshCoordinatorStudent(dashboard) {
+            if (!dashboard?.student_id) return;
+            const row = document.querySelector(`tr.compact-row[data-student-id="${dashboard.student_id}"]`);
+            if (row) {
+                row.querySelector('[data-progress-percent]').textContent = `${dashboard.progress_percentage.toFixed(2)}%`;
+                row.querySelector('[data-progress-bar]').style.width = `${Math.min(dashboard.progress_percentage, 100)}%`;
+                const pending = row.querySelector('[data-pending-count]');
+                if (pending) pending.textContent = dashboard.pending_items;
+            }
+            if (typeof updateCoordinatorLiveCounts === 'function') updateCoordinatorLiveCounts();
+        }
+
+        async function submitTimeLogAction(form, status) {
+            const submitButton = form.querySelector('button[type="submit"]');
+            const recordId = form.action.split('/').pop();
+            submitButton.disabled = true;
+            showLoadingModal(status === 'approved' ? 'APPROVING' : 'DENYING');
+
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: new FormData(form),
+                    headers: { 'Accept': 'application/json' },
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.message || 'Unable to update the time log.');
+
+                updateCachedTimeLog(recordId, status);
+                updateTimeLogRow(recordId, status);
+                refreshCoordinatorStudent(data.dashboard);
+                closeCoordDenyTimeModal();
+                if (typeof showSuccess === 'function') showSuccess(data.message);
+            } catch (error) {
+                alert(error.message || 'Unable to update the time log.');
+                submitButton.disabled = false;
+            } finally {
+                hideLoadingModal();
+            }
+        }
+
+        // Submit time-log approvals and denials in place, keeping the log modal open.
         document.addEventListener('submit', function(e) {
             if (e.target.action && e.target.action.includes('/approve-time-in/')) {
-                showLoadingModal('APPROVING');
+                e.preventDefault();
+                submitTimeLogAction(e.target, 'approved');
+            }
+            if (e.target.id === 'coordDenyTimeForm') {
+                e.preventDefault();
+                submitTimeLogAction(e.target, 'denied');
             }
         });
 
@@ -2552,5 +2616,6 @@
         <p id="pageLoaderMsg" style="color:#fdba74;font-size:16px;font-weight:600;font-family:sans-serif;letter-spacing:.05em;">Please wait…</p>
     </div>
 
+@include('partials.dashboard-action-state')
 </body>
 </html>

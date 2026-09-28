@@ -826,7 +826,29 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
         });
     }
 
-    return back()->with('success', $msg ?: 'Record processed.');
+    $message = $msg ?: 'Record processed.';
+
+    if (request()->expectsJson()) {
+        $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)->first();
+        $requiredHours = $studentHours->total_hours_required ?? 600;
+        $completedHours = (float) ($studentHours->hours_completed ?? 0);
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'dashboard' => [
+                'student_id' => $record->student_id,
+                'hours_completed' => round($completedHours, 2),
+                'hours_remaining' => round(max(0, $requiredHours - $completedHours), 2),
+                'progress_percentage' => $requiredHours > 0 ? round(($completedHours / $requiredHours) * 100, 2) : 0,
+                'pending_time_records' => \App\Models\TimeInRecord::where('student_id', $record->student_id)->whereNotNull('time_out')->where('status', 'pending')->count(),
+                'pending_items' => \App\Models\DailyHourLog::where('student_id', $record->student_id)->where('status', 'pending')->count()
+                    + \App\Models\TimeInRecord::where('student_id', $record->student_id)->whereNotNull('time_out')->where('status', 'pending')->count()
+                    + \App\Models\StudentRequirement::where('student_id', $record->student_id)->where('status', 'pending')->count(),
+            ],
+        ]);
+    }
+
+    return back()->with('success', $message);
 })->name('approve-time-in')->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
 // Undo approval — revert approved record back to pending and deduct hours
@@ -949,7 +971,29 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
         });
     }
 
-    return back()->with('success', 'Time record denied. Only previously approved hours remain credited.');
+    $message = 'Time record denied. Only previously approved hours remain credited.';
+
+    if (request()->expectsJson()) {
+        $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)->first();
+        $requiredHours = $studentHours->total_hours_required ?? 600;
+        $completedHours = (float) ($studentHours->hours_completed ?? 0);
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'dashboard' => [
+                'student_id' => $record->student_id,
+                'hours_completed' => round($completedHours, 2),
+                'hours_remaining' => round(max(0, $requiredHours - $completedHours), 2),
+                'progress_percentage' => $requiredHours > 0 ? round(($completedHours / $requiredHours) * 100, 2) : 0,
+                'pending_time_records' => \App\Models\TimeInRecord::where('student_id', $record->student_id)->whereNotNull('time_out')->where('status', 'pending')->count(),
+                'pending_items' => \App\Models\DailyHourLog::where('student_id', $record->student_id)->where('status', 'pending')->count()
+                    + \App\Models\TimeInRecord::where('student_id', $record->student_id)->whereNotNull('time_out')->where('status', 'pending')->count()
+                    + \App\Models\StudentRequirement::where('student_id', $record->student_id)->where('status', 'pending')->count(),
+            ],
+        ]);
+    }
+
+    return back()->with('success', $message);
 })->name('deny-time-in')->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
 // Bulk approve all pending time-in records for a student

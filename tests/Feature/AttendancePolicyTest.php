@@ -336,8 +336,12 @@ class AttendancePolicyTest extends TestCase
 
         $this->withSession(['user_id' => $coordinator->id, 'user' => $coordinator])
             ->from('/dashboard')
+            ->withHeader('Accept', 'application/json')
             ->post('/deny-time-in/' . $afternoon->id, ['reason' => 'Incorrect time-in'])
-            ->assertRedirect();
+            ->assertOk()
+            ->assertJson(['success' => true])
+            ->assertJsonPath('dashboard.student_id', $student->id)
+            ->assertJsonPath('dashboard.pending_time_records', 1);
 
         $morning->refresh();
         $afternoon->refresh();
