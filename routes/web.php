@@ -206,9 +206,20 @@ Route::post('/time-in', function () {
 
     $student = User::findOrFail($validated['student_id']);
 
+    // Block time-in on weekends (Saturday = 6, Sunday = 0) using Manila time.
+    $nowManila = \Carbon\Carbon::now('Asia/Manila');
+    $dayOfWeek = (int) $nowManila->format('N'); // 1=Mon … 7=Sun
+    if ($dayOfWeek >= 6) { // 6=Saturday, 7=Sunday
+        $dayName = $nowManila->format('l');
+        $msg = "Time-in is not allowed on weekends. Today is {$dayName} — please come back on Monday.";
+        if (request()->wantsJson() || request()->ajax()) {
+            return response()->json(['success' => false, 'message' => $msg], 403);
+        }
+        return back()->withErrors(['error' => $msg]);
+    }
+
     // Determine session: afternoon only allowed after 12:50
     // Use Manila timezone so InfinityFree UTC server does not detect wrong session
-    $nowManila = \Carbon\Carbon::now('Asia/Manila');
     $nowHour = (int) $nowManila->format('H');
     $nowMin  = (int) $nowManila->format('i');
     $session = $validated['session'] ?? 'morning';
@@ -434,12 +445,16 @@ Route::post('/time-out-ajax', function () {
 
     // Always use server Manila date to find the record — never trust client date
     $serverTodayManila = \Carbon\Carbon::now('Asia/Manila')->toDateString();
+    // Find the open session (no time_out yet) so we never accidentally overwrite
+    // the already-completed session when two sessions exist on the same day.
     $record = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
         ->whereDate('date', $serverTodayManila)
+        ->whereNull('time_out')
+        ->orderBy('session') // morning before afternoon — pick the earliest open one
         ->first();
 
     if (!$record) {
-        return response()->json(['error' => 'No time-in record found for this date.'], 422);
+        return response()->json(['error' => 'No active time-in record found for this date.'], 422);
     }
 
     $timeOutPhotoPath = null;
@@ -620,9 +635,10 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
     $totalToCredit = 0;
 
     if ($record->status !== 'approved' && $record->time_in && $record->time_out) {
-        // Get ALL sessions for this student on this date
-        $allDaySessions = \App\Models\TimeInRecord::where('student_id', $record->student_id)
+        // Only approve the selected session, not every pending session on the same date.
+        $sessionRecords = \App\Models\TimeInRecord::where('student_id', $record->student_id)
             ->whereDate('date', $record->date)
+            ->where('session', $record->session)
             ->whereNotNull('time_out')
             ->where('status', 'pending')
             ->get();
@@ -637,7 +653,7 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
                   ->orWhere('title', 'like', '%over time%');
             })->exists();
 
-        foreach ($allDaySessions as $session) {
+        foreach ($sessionRecords as $session) {
             $regularHours = floatval($session->regular_hours ?? 0);
             $otHours = floatval($session->ot_hours ?? 0);
             $totalToCredit += $regularHours;
@@ -660,10 +676,23 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
             ]);
         }
 
-        \App\Models\DailyHourLog::where('student_id', $record->student_id)
-            ->whereDate('log_date', $record->date)
+        // A session is still "in progress" if it has no time_out and hasn't been denied yet.
+        // We must not mark the day's logs as done while any session is still open or pending.
+        $hasAnyUnfinishedSameDate = \App\Models\TimeInRecord::where('student_id', $record->student_id)
+            ->whereDate('date', $record->date)
             ->where('status', 'pending')
-            ->update(['status' => 'approved']);
+            ->exists(); // covers both timed-out-pending AND still-open (no time_out) sessions
+
+        $hasApprovedSameDate = \App\Models\TimeInRecord::where('student_id', $record->student_id)
+            ->whereDate('date', $record->date)
+            ->where('status', 'approved')
+            ->exists();
+
+        if (!$hasAnyUnfinishedSameDate) {
+            \App\Models\DailyHourLog::where('student_id', $record->student_id)
+                ->whereDate('log_date', $record->date)
+                ->update(['status' => $hasApprovedSameDate ? 'approved' : 'denied']);
+        }
     }
 
     $msg = ($record->ot_hours > 0 && !\App\Models\StudentRequirement::where('student_id', $record->student_id)
@@ -734,14 +763,15 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
     $record = \App\Models\TimeInRecord::findOrFail($recordId);
     $reviewer = User::findOrFail(session('user_id'));
 
-    // Deny ALL sessions for this day
-    $allDaySessions = \App\Models\TimeInRecord::where('student_id', $record->student_id)
+    // Only deny the selected student/session for that date, never every session on the same day.
+    $sessionRecords = \App\Models\TimeInRecord::where('student_id', $record->student_id)
         ->whereDate('date', $record->date)
+        ->where('session', $record->session)
         ->whereNotNull('time_out')
         ->get();
 
-    // If any were previously approved, deduct hours back
-    foreach ($allDaySessions as $session) {
+    // If any targeted session was previously approved, deduct hours back.
+    foreach ($sessionRecords as $session) {
         if ($session->status === 'approved') {
             $credited = floatval($session->regular_hours ?? 0);
             if (floatval($session->ot_hours ?? 0) > 0 && $session->ot_status === 'approved') {
@@ -758,8 +788,8 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
                 }
             }
         }
-        // Bug #3 fix: only re-credit regular hours for sessions that were PENDING (not already approved).
-        // Approved sessions were already deducted above — re-adding them here would double-credit.
+
+        // Re-credit regular hours only for pending targeted session records.
         if ($session->status === 'pending') {
             $regularOnly = floatval($session->regular_hours ?? 0);
             if ($regularOnly > 0) {
@@ -772,6 +802,7 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
                 ]);
             }
         }
+
         $session->update([
             'status'        => 'denied',
             'verified'      => false,
@@ -782,10 +813,22 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
         ]);
     }
 
-    \App\Models\DailyHourLog::where('student_id', $record->student_id)
-        ->whereDate('log_date', $record->date)
-        ->whereIn('status', ['pending', 'approved'])
-        ->update(['status' => 'denied']);
+    $hasPendingSameDate = \App\Models\TimeInRecord::where('student_id', $record->student_id)
+        ->whereDate('date', $record->date)
+        ->where('status', 'pending')
+        ->whereNotNull('time_out')
+        ->exists();
+
+    $hasApprovedSameDate = \App\Models\TimeInRecord::where('student_id', $record->student_id)
+        ->whereDate('date', $record->date)
+        ->where('status', 'approved')
+        ->exists();
+
+    if (!$hasPendingSameDate) {
+        \App\Models\DailyHourLog::where('student_id', $record->student_id)
+            ->whereDate('log_date', $record->date)
+            ->update(['status' => $hasApprovedSameDate ? 'approved' : 'denied']);
+    }
 
     // Send email notification to student
     $studentUser = User::find($record->student_id);
@@ -850,7 +893,26 @@ Route::post('/approve-all-time-in/{studentId}', function ($studentId) {
             'hours_remaining' => round(max(0, $sh->total_hours_required - $newCompleted), 2),
         ]);
     }
-    \App\Models\DailyHourLog::where('student_id', $studentId)->where('status', 'pending')->update(['status' => 'approved']);
+    $pendingDateKeys = \App\Models\TimeInRecord::where('student_id', $studentId)
+        ->where('status', 'pending')
+        ->whereNotNull('time_out')
+        ->pluck('date')
+        ->map(fn($date) => $date->toDateString())
+        ->unique();
+
+    foreach ($pendingDateKeys as $dateKey) {
+        $hasPendingSameDate = \App\Models\TimeInRecord::where('student_id', $studentId)
+            ->whereDate('date', $dateKey)
+            ->where('status', 'pending')
+            ->whereNotNull('time_out')
+            ->exists();
+
+        if (!$hasPendingSameDate) {
+            \App\Models\DailyHourLog::where('student_id', $studentId)
+                ->whereDate('log_date', $dateKey)
+                ->update(['status' => 'approved']);
+        }
+    }
     // Send email notification
     $student = User::findOrFail($studentId);
     $dateStr = now()->format('M d, Y');
@@ -934,10 +996,18 @@ Route::post('/approve-all-pending-time-in', function () {
         }
 
         foreach ($studentRecords->pluck('date') as $date) {
-            \App\Models\DailyHourLog::where('student_id', $studentId)
-                ->whereDate('log_date', $date)
+            $dateKey = $date->toDateString();
+            $hasPendingSameDate = \App\Models\TimeInRecord::where('student_id', $studentId)
+                ->whereDate('date', $dateKey)
                 ->where('status', 'pending')
-                ->update(['status' => 'approved']);
+                ->whereNotNull('time_out')
+                ->exists();
+
+            if (!$hasPendingSameDate) {
+                \App\Models\DailyHourLog::where('student_id', $studentId)
+                    ->whereDate('log_date', $dateKey)
+                    ->update(['status' => 'approved']);
+            }
         }
 
         $student = User::find($studentId);
@@ -985,7 +1055,26 @@ Route::post('/deny-all-time-in/{studentId}', function ($studentId) {
             'hours_remaining' => round(max(0, $sh->total_hours_required - $newCompleted), 2),
         ]);
     }
-    \App\Models\DailyHourLog::where('student_id', $studentId)->where('status', 'pending')->update(['status' => 'denied']);
+    $pendingDateKeys = \App\Models\TimeInRecord::where('student_id', $studentId)
+        ->where('status', 'pending')
+        ->whereNotNull('time_out')
+        ->pluck('date')
+        ->map(fn($date) => $date->toDateString())
+        ->unique();
+
+    foreach ($pendingDateKeys as $dateKey) {
+        $hasPendingSameDate = \App\Models\TimeInRecord::where('student_id', $studentId)
+            ->whereDate('date', $dateKey)
+            ->where('status', 'pending')
+            ->whereNotNull('time_out')
+            ->exists();
+
+        if (!$hasPendingSameDate) {
+            \App\Models\DailyHourLog::where('student_id', $studentId)
+                ->whereDate('log_date', $dateKey)
+                ->update(['status' => 'denied']);
+        }
+    }
     // Send email notification
     $student = User::findOrFail($studentId);
     $reason = $validated['reason'];
@@ -1116,18 +1205,42 @@ Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
 
     if ($isOtLetter) {
         $otDate = $requirement->created_at->toDateString();
-        // Find all approved time-in records for this student on that date with pending OT
-        $otRecords = \App\Models\TimeInRecord::where('student_id', $requirement->student_id)
+        // Approve the entire day's relevant sessions when the OT letter is approved,
+        // so regular and OT totals on the DTR are counted together for that date.
+        $dayRecords = \App\Models\TimeInRecord::where('student_id', $requirement->student_id)
             ->whereDate('date', $otDate)
-            ->where('status', 'approved')
-            ->where('ot_status', 'pending')
-            ->where('ot_hours', '>', 0)
+            ->where(function ($query) {
+                $query->where('status', 'pending')
+                    ->orWhere('status', 'approved')
+                    ->orWhere('status', 'verified');
+            })
             ->get();
 
         $totalOtToCredit = 0;
-        foreach ($otRecords as $otRec) {
-            $totalOtToCredit += floatval($otRec->ot_hours);
-            $otRec->update(['ot_status' => 'approved']);
+        foreach ($dayRecords as $dayRec) {
+            $dayRec->update([
+                'status'   => 'approved',
+                'verified' => true,
+            ]);
+
+            $otValue = floatval($dayRec->ot_hours ?? 0);
+            if ($otValue <= 0 && $dayRec->time_in && $dayRec->time_out) {
+                $inTime = \Carbon\Carbon::parse($dayRec->time_in);
+                $outTime = \Carbon\Carbon::parse($dayRec->time_out);
+                if ($outTime->lte($inTime)) {
+                    $outTime->addDay();
+                }
+                $workedHours = max(0, $inTime->diffInMinutes($outTime) / 60);
+                $otValue = max(0, round($workedHours - (float) ($dayRec->regular_hours ?? 0), 2));
+            }
+
+            if ($otValue > 0) {
+                $dayRec->update([
+                    'ot_status' => 'approved',
+                    'ot_hours'  => $otValue,
+                ]);
+                $totalOtToCredit += $otValue;
+            }
         }
 
         if ($totalOtToCredit > 0) {
@@ -1138,7 +1251,6 @@ Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
                 'hours_completed' => $newCompleted,
                 'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
             ]);
-            // Log the OT hours as approved
             \App\Models\DailyHourLog::create([
                 'student_id'   => $requirement->student_id,
                 'log_date'     => $otDate,
@@ -1285,14 +1397,26 @@ Route::post('/reject-requirement/{requirementId}', function ($requirementId) {
 Route::get('/generate-dtr-word/{studentId}', function ($studentId) {
     $student = User::findOrFail($studentId);
     $sh = \App\Models\StudentHours::where('student_id', $studentId)->first();
-    $timeInRecords = \App\Models\TimeInRecord::where('student_id', $studentId)->orderBy('date','asc')->get();
-    $required   = $sh->total_hours_required ?? 600;
-    $totalHours = round($sh->hours_completed ?? 0, 2);
-    $remaining  = round(max(0, $required - $totalHours), 2);
-    $pct        = $required > 0 ? round(($totalHours / $required) * 100, 2) : 0;
-    $company    = $student->company->name ?? 'N/A';
-    $byMonth    = $timeInRecords->groupBy(fn($r) => $r->date->format('Y-m'));
-    $content    = view('reports.dtr_word', compact('student','company','byMonth','totalHours','required','remaining','pct'))->render();
+    $timeInRecords = \App\Models\TimeInRecord::where('student_id', $studentId)
+        ->orderBy('date','asc')
+        ->get()
+        ->filter(function ($record) {
+            $date = $record->date instanceof \Carbon\CarbonInterface ? $record->date : \Carbon\Carbon::parse($record->date);
+            return in_array($date->dayOfWeekIso, [1, 2, 3, 4, 5], true);
+        });
+    $required = $sh->total_hours_required ?? 600;
+    $totalHours = 0.0;
+
+    foreach ($timeInRecords->groupBy(fn ($r) => $r->date->toDateString()) as $date => $records) {
+        $dailyTotals = \App\Helpers\AttendanceHelper::computeDailyTotalsForStudent($studentId, $date);
+        $totalHours += $dailyTotals['total_hours'];
+    }
+
+    $remaining = round(max(0, $required - $totalHours), 2);
+    $pct = $required > 0 ? round(($totalHours / $required) * 100, 2) : 0;
+    $company = $student->company->name ?? 'N/A';
+    $byMonth = $timeInRecords->groupBy(fn($r) => $r->date->format('Y-m'));
+    $content = view('reports.dtr_word', compact('student','company','byMonth','totalHours','required','remaining','pct'))->render();
     return response($content)
         ->header('Content-Type', 'application/msword')
         ->header('Content-Disposition', 'attachment; filename="DTR_' . preg_replace('/[^A-Za-z0-9_]/','',$student->name) . '_' . now()->format('Y-m-d') . '.doc"');
@@ -1301,13 +1425,25 @@ Route::get('/generate-dtr-word/{studentId}', function ($studentId) {
 Route::get('/generate-dtr/{studentId}', function ($studentId) {
     $student = User::findOrFail($studentId);
     $sh = \App\Models\StudentHours::where('student_id', $studentId)->first();
-    $timeInRecords = \App\Models\TimeInRecord::where('student_id', $studentId)->orderBy('date','asc')->get();
-    $required   = $sh->total_hours_required ?? 600;
-    $totalHours = round($sh->hours_completed ?? 0, 2);
-    $remaining  = round(max(0, $required - $totalHours), 2);
-    $pct        = $required > 0 ? round(($totalHours / $required) * 100, 2) : 0;
-    $company    = $student->company->name ?? 'N/A';
-    $byMonth    = $timeInRecords->groupBy(fn($r) => $r->date->format('Y-m'));
+    $timeInRecords = \App\Models\TimeInRecord::where('student_id', $studentId)
+        ->orderBy('date','asc')
+        ->get()
+        ->filter(function ($record) {
+            $date = $record->date instanceof \Carbon\CarbonInterface ? $record->date : \Carbon\Carbon::parse($record->date);
+            return in_array($date->dayOfWeekIso, [1, 2, 3, 4, 5], true);
+        });
+    $required = $sh->total_hours_required ?? 600;
+    $totalHours = 0.0;
+
+    foreach ($timeInRecords->groupBy(fn ($r) => $r->date->toDateString()) as $date => $records) {
+        $dailyTotals = \App\Helpers\AttendanceHelper::computeDailyTotalsForStudent($studentId, $date);
+        $totalHours += $dailyTotals['total_hours'];
+    }
+
+    $remaining = round(max(0, $required - $totalHours), 2);
+    $pct = $required > 0 ? round(($totalHours / $required) * 100, 2) : 0;
+    $company = $student->company->name ?? 'N/A';
+    $byMonth = $timeInRecords->groupBy(fn($r) => $r->date->format('Y-m'));
     return view('reports.dtr', compact('student','company','byMonth','totalHours','required','remaining','pct'));
 })->name('generate-dtr')->middleware(['auth.custom', 'role:coordinator,ccit_head,supervisor']);
 // Company Routes

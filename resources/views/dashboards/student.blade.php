@@ -667,7 +667,9 @@
                     
                     <?php 
                     $today   = \Carbon\Carbon::now('Asia/Manila')->toDateString();
-                    $nowHour = (int) \Carbon\Carbon::now('Asia/Manila')->format('H');
+                    $nowManila = \Carbon\Carbon::now('Asia/Manila');
+                    $nowHour = (int) $nowManila->format('H');
+                    $isWeekend = $nowManila->isWeekend(); // true on Saturday & Sunday
 
                     // Get all today's records
                     $todayRecords = \App\Models\TimeInRecord::where('student_id', $user->id)
@@ -703,7 +705,14 @@
                     ?>
                     <span id="todayTimeIn" data-time="{{ optional($activeRecord)->time_in ?? '' }}" class="hidden"></span>
 
-                    @if($todayRecords->isNotEmpty())
+                    @if($isWeekend)
+                    <!-- Weekend notice — time-in is disabled on Saturday & Sunday -->
+                    <div class="flex flex-col items-center justify-center py-10 text-center">
+                        <div class="text-5xl mb-4">🏖️</div>
+                        <h3 class="text-xl font-bold text-yellow-300 mb-2">It's {{ $nowManila->format('l') }}!</h3>
+                        <p class="text-gray-400 text-sm max-w-xs">Time-in is only available on weekdays (Monday – Friday). Enjoy your weekend and see you on Monday!</p>
+                    </div>
+                    @elseif($todayRecords->isNotEmpty())
                         <!-- Sessions Summary -->
                         <div class="space-y-4">
 

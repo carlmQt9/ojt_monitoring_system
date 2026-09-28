@@ -1051,11 +1051,14 @@
                             ->limit(12)
                             ->get()
                             ->map(function($r) {
+                                $timeIn = $r->time_in ? \Carbon\Carbon::parse($r->time_in)->format('h:i A') : null;
+                                $timeOut = $r->time_out ? \Carbon\Carbon::parse($r->time_out)->format('h:i A') : null;
+
                                 return [
                                     'id' => $r->id,
                                     'date' => optional($r->date)->format('M d, Y'),
-                                    'time_in' => $r->time_in,
-                                    'time_out' => $r->time_out,
+                                    'time_in' => $timeIn,
+                                    'time_out' => $timeOut,
                                     'status' => $r->status ?? '',
                                     'photo' => $r->photo_path ? asset('storage/' . $r->photo_path) : null,
                                     'session' => $r->session ?? null,

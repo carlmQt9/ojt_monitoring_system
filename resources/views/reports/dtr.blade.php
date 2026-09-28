@@ -143,7 +143,8 @@ table.dtr-table tbody tr:nth-child(even) { background: #f9f9f9; }
           @php
             $hrs = 0;
             $amIn = ''; $amOut = ''; $pmIn = ''; $pmOut = '';
-            if ($rec->time_out) {
+            $isApproved = in_array($rec->status, ['approved', 'verified'], true);
+            if ($isApproved && $rec->time_out) {
               $tIn  = \Carbon\Carbon::parse($rec->time_in);
               $tOut = \Carbon\Carbon::parse($rec->time_out);
               if ($tOut->lte($tIn)) $tOut->addDay(); // cross-midnight fix
@@ -162,7 +163,7 @@ table.dtr-table tbody tr:nth-child(even) { background: #f9f9f9; }
                 $pmIn  = $tIn->format('h:i A');
                 $pmOut = $tOut->format('h:i A');
               }
-            } else {
+            } elseif ($rec->time_in) {
               $tIn = \Carbon\Carbon::parse($rec->time_in);
               if ($tIn->hour < 12) { $amIn = $tIn->format('h:i A'); }
               else { $pmIn = $tIn->format('h:i A'); }

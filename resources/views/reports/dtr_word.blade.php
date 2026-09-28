@@ -182,12 +182,15 @@
         @foreach($records as $rec)
           @php
             $hrs=0; $amIn=''; $amOut=''; $pmIn=''; $pmOut='';
+            $isApproved = in_array($rec->status, ['approved', 'verified'], true);
             if ($rec->time_out) {
               $tIn  = \Carbon\Carbon::parse($rec->time_in);
               $tOut = \Carbon\Carbon::parse($rec->time_out);
               if ($tOut->lte($tIn)) $tOut->addDay(); // cross-midnight fix
               $hrs = round($tIn->diffInMinutes($tOut)/60,2);
-              $monthHours += $hrs;
+              if ($isApproved) {
+                $monthHours += $hrs;
+              }
               if ($tIn->hour < 12) {
                 $amIn = $tIn->format('h:i A');
                 if ($tOut->hour < 12) { $amOut = $tOut->format('h:i A'); }
