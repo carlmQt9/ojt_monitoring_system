@@ -390,13 +390,14 @@ Route::post('/time-out', function () {
         // OT letter exists — only minutes AFTER the letter was submitted count as OT.
         // The letter submission time in Manila timezone.
         $otStartTime = $otLetter->created_at->setTimezone('Asia/Manila');
-        // Clamp otStartTime so it is within [inTime, outTime]
-        $otStartMins = $otStartTime->hour * 60 + $otStartTime->minute;
+        // Express all times as minutes-from-midnight, with midnight-wrap applied uniformly
         $inTimeMins  = $inTime->hour * 60 + $inTime->minute;
         $outTimeMins = $outTime->hour * 60 + $outTime->minute;
-        // Handle midnight wrap for outTime
+        $otStartMins = $otStartTime->hour * 60 + $otStartTime->minute;
+        // Handle midnight wrap: if outTime or otStart appears to be before inTime, it crossed midnight
         if ($outTimeMins < $inTimeMins) $outTimeMins += 1440;
-        // Clamp otStart into [inTimeMins, outTimeMins]
+        if ($otStartMins < $inTimeMins) $otStartMins += 1440;
+        // Clamp otStart into [inTimeMins, outTimeMins] so it stays within this session
         $otStartMins = max($inTimeMins, min($otStartMins, $outTimeMins));
 
         $otMinutesThisSession      = max(0, $outTimeMins - $otStartMins);
@@ -547,10 +548,11 @@ Route::post('/time-out-ajax', function () {
 
     if ($otLetter) {
         $otStartTime = $otLetter->created_at->setTimezone('Asia/Manila');
-        $otStartMins = $otStartTime->hour * 60 + $otStartTime->minute;
         $inTimeMins  = $inTime->hour * 60 + $inTime->minute;
         $outTimeMins = $outTime->hour * 60 + $outTime->minute;
+        $otStartMins = $otStartTime->hour * 60 + $otStartTime->minute;
         if ($outTimeMins < $inTimeMins) $outTimeMins += 1440;
+        if ($otStartMins < $inTimeMins) $otStartMins += 1440;
         $otStartMins = max($inTimeMins, min($otStartMins, $outTimeMins));
 
         $otMinutesThisSession      = max(0, $outTimeMins - $otStartMins);
