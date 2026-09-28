@@ -1507,6 +1507,39 @@
         </div>
     </div>
 
+    <!-- Supervisor Deny Time-In Modal -->
+    <div id="supervisorDenyTimeModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-[100]">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
+            <h3 class="text-xl font-bold text-white mb-6">Deny Time-In Record</h3>
+            <form id="supervisorDenyTimeForm" method="POST" class="space-y-4">
+                @csrf
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Reason for Denial <span class="text-red-400">*</span></label>
+                    <textarea name="reason" required rows="3"
+                        class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-red-500 focus:outline-none"
+                        placeholder="Explain why..."></textarea>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeSupervisorDenyTimeModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold">Deny</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[110]">
+        <div class="bg-slate-900/95 border border-slate-700/40 rounded-xl p-8 w-44 text-center">
+            <div class="inline-block mb-4">
+                <svg class="animate-spin h-12 w-12 text-blue-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-15" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                    <path class="opacity-100" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+            <p id="loadingModalText" class="text-white text-xs font-bold tracking-wider">APPROVING</p>
+        </div>
+    </div>
+
     <!-- Task Logs Modal -->
     <div id="taskLogsModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop overflow-y-auto">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-2xl w-full mx-4 my-8">
@@ -1888,7 +1921,7 @@
             if (!logs.length) {
                 body.innerHTML = '<p class="text-gray-400">No logs available.</p>';
             } else {
-                let html = '<table class="w-full text-left"><thead><tr class="text-xs text-gray-400"><th class="py-2 pr-3">Date</th><th class="py-2 pr-3">Session</th><th class="py-2 pr-3">Time In</th><th class="py-2 pr-3">Time Out</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3">Photo</th></tr></thead><tbody>';
+                let html = '<table class="w-full text-left"><thead><tr class="text-xs text-gray-400"><th class="py-2 pr-3">Date</th><th class="py-2 pr-3">Session</th><th class="py-2 pr-3">Time In</th><th class="py-2 pr-3">Time Out</th><th class="py-2 pr-3">Status</th><th class="py-2 pr-3">Photo</th><th class="py-2 pr-3">Action</th></tr></thead><tbody>';
                 logs.forEach(l => {
                     const statusBadge = l.status === 'approved'
                         ? '<span class="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-300">' + (l.status || 'approved') + '</span>'
@@ -1896,7 +1929,14 @@
                         ? '<span class="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-300">' + (l.status || 'denied') + '</span>'
                         : '<span class="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-300">' + (l.status || 'pending') + '</span>';
                     const photoCell = l.photo ? '<button onclick="openMediaPopup(\'' + l.photo + '\' , \'' + (studentName || 'Student Log') + '\')" class="text-blue-400 hover:underline">View</button>' : '-';
-                    html += '<tr class="border-b border-slate-700/30"><td class="py-2 pr-3 text-sm">' + (l.date || '-') + '</td><td class="py-2 pr-3 text-sm">' + (l.session || '-') + '</td><td class="py-2 pr-3 text-sm">' + (l.time_in || '-') + '</td><td class="py-2 pr-3 text-sm">' + (l.time_out || '-') + '</td><td class="py-2 pr-3 text-sm">' + statusBadge + '</td><td class="py-2 pr-3 text-sm">' + photoCell + '</td></tr>';
+                    
+                    // Action buttons for pending records
+                    let actionCell = '-';
+                    if (l.status === 'pending' && l.id) {
+                        actionCell = '<div class="flex gap-1"><button onclick="approveTimeLog(' + l.id + ', \'' + studentName + '\')" class="px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded">Approve</button><button onclick="denyTimeLog(' + l.id + ', \'' + studentName + '\')" class="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded">Deny</button></div>';
+                    }
+                    
+                    html += '<tr class="border-b border-slate-700/30"><td class="py-2 pr-3 text-sm">' + (l.date || '-') + '</td><td class="py-2 pr-3 text-sm">' + (l.session || '-') + '</td><td class="py-2 pr-3 text-sm">' + (l.time_in || '-') + '</td><td class="py-2 pr-3 text-sm">' + (l.time_out || '-') + '</td><td class="py-2 pr-3 text-sm">' + statusBadge + '</td><td class="py-2 pr-3 text-sm">' + photoCell + '</td><td class="py-2 pr-3 text-sm">' + actionCell + '</td></tr>';
                 });
                 html += '</tbody></table>';
                 body.innerHTML = html;
@@ -1908,6 +1948,58 @@
         function closeLogsModal() {
             document.getElementById('logsModal').classList.add('hidden');
         }
+
+        function approveTimeLog(logId, studentName) {
+            showLoadingModal('APPROVING');
+            
+            fetch('/approve-time-in/' + logId, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                }
+            })
+            .then(r => {
+                if (r.ok || r.redirected) {
+                    showToast('Time log approved', 'success');
+                    closeLogsModal();
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    hideLoadingModal();
+                    return r.json().then(data => {
+                        showToast(data.message || 'Failed to approve', 'error');
+                    });
+                }
+            })
+            .catch((err) => {
+                hideLoadingModal();
+                console.error('Approve error:', err);
+                showToast('Failed to approve', 'error');
+            });
+        }
+
+        function denyTimeLog(logId, studentName) {
+            document.getElementById('supervisorDenyTimeForm').action = '/deny-time-in/' + logId;
+            document.getElementById('supervisorDenyTimeModal').classList.remove('hidden');
+        }
+
+        function closeSupervisorDenyTimeModal() {
+            document.getElementById('supervisorDenyTimeModal').classList.add('hidden');
+        }
+
+        function showLoadingModal(text) {
+            document.getElementById('loadingModalText').textContent = text;
+            document.getElementById('loadingModal').classList.remove('hidden');
+        }
+
+        function hideLoadingModal() {
+            document.getElementById('loadingModal').classList.add('hidden');
+        }
+
+        // Handle deny form submission with loading animation
+        document.getElementById('supervisorDenyTimeForm').addEventListener('submit', function(e) {
+            showLoadingModal('DENYING');
+        });
 
         function viewBulkStudentLogs(studentId) {
             const card = document.querySelector(`.student-card[data-student-id="${studentId}"]`);

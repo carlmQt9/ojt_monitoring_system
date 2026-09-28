@@ -54,6 +54,7 @@ Route::post('/login', function () {
     }
 
     // Store user in session
+    session()->regenerate(); // Prevent session fixation attacks
     session([
         'user_id' => $user->id,
         'user' => $user,
@@ -717,8 +718,8 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
     if (!$record) {
         return response()->json([
             'success' => false,
-            'message' => 'Access Denied: You can only approve time-in records for students in your company.',
-        ], 403);
+            'message' => 'Record not found.',
+        ], 404);
     }
 
     if ($reviewer->role === 'supervisor') {
@@ -732,14 +733,29 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
     }
 
     $totalToCredit = 0;
+    $msg           = '';
 
-    if ($record->status !== 'approved' && $record->time_in && $record->time_out) {
+    // ── Wrap everything in a DB transaction to prevent partial updates ──────────
+    // ── lockForUpdate() prevents race condition where two approvers hit at once ─
+    \Illuminate\Support\Facades\DB::transaction(function () use ($record, $reviewer, &$totalToCredit, &$msg) {
+
+        // Re-fetch with a row lock so concurrent requests queue up instead of double-crediting
+        $record = \App\Models\TimeInRecord::where('id', $record->id)
+            ->lockForUpdate()
+            ->first();
+
+        // Guard: if already approved by another request that got here first, bail out cleanly
+        if (!$record || $record->status === 'approved' || !$record->time_in || !$record->time_out) {
+            return;
+        }
+
         // Only approve the selected session, not every pending session on the same date.
         $sessionRecords = \App\Models\TimeInRecord::where('student_id', $record->student_id)
             ->whereDate('date', $record->date)
             ->where('session', $record->session)
             ->whereNotNull('time_out')
             ->where('status', 'pending')
+            ->lockForUpdate()
             ->get();
 
         // Check if OT letter is approved for this date
@@ -754,7 +770,7 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
 
         foreach ($sessionRecords as $session) {
             $regularHours = floatval($session->regular_hours ?? 0);
-            $otHours = floatval($session->ot_hours ?? 0);
+            $otHours      = floatval($session->ot_hours ?? 0);
             $totalToCredit += $regularHours;
             if ($otHours > 0 && $otLetterApproved) {
                 $totalToCredit += $otHours;
@@ -766,7 +782,9 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
         }
 
         if ($totalToCredit > 0) {
+            // Use atomic increment to prevent concurrent approvals losing each other's updates
             $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)
+                ->lockForUpdate()
                 ->firstOrCreate(['student_id' => $record->student_id], ['total_hours_required' => 600]);
             $newCompleted = round(max(0, $studentHours->hours_completed + $totalToCredit), 2);
             $studentHours->update([
@@ -775,12 +793,10 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
             ]);
         }
 
-        // A session is still "in progress" if it has no time_out and hasn't been denied yet.
-        // We must not mark the day's logs as done while any session is still open or pending.
         $hasAnyUnfinishedSameDate = \App\Models\TimeInRecord::where('student_id', $record->student_id)
             ->whereDate('date', $record->date)
             ->where('status', 'pending')
-            ->exists(); // covers both timed-out-pending AND still-open (no time_out) sessions
+            ->exists();
 
         $hasApprovedSameDate = \App\Models\TimeInRecord::where('student_id', $record->student_id)
             ->whereDate('date', $record->date)
@@ -792,17 +808,17 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
                 ->whereDate('log_date', $record->date)
                 ->update(['status' => $hasApprovedSameDate ? 'approved' : 'denied']);
         }
-    }
 
-    $msg = ($record->ot_hours > 0 && !\App\Models\StudentRequirement::where('student_id', $record->student_id)
-        ->whereDate('created_at', $record->date)->where('status','approved')
-        ->where(function($q){ $q->where('title','like','%OT%')->orWhere('title','like','%overtime%')->orWhere('title','like','%over time%'); })->exists())
-        ? 'All sessions approved! Regular hours credited. OT hours pending — student must get OT letter approved.'
-        : 'All sessions for this day approved and hours credited!';
+        $msg = ($record->ot_hours > 0 && !\App\Models\StudentRequirement::where('student_id', $record->student_id)
+            ->whereDate('created_at', $record->date)->where('status','approved')
+            ->where(function($q){ $q->where('title','like','%OT%')->orWhere('title','like','%overtime%')->orWhere('title','like','%over time%'); })->exists())
+            ? 'All sessions approved! Regular hours credited. OT hours pending — student must get OT letter approved.'
+            : 'All sessions for this day approved and hours credited!';
+    });
 
-    // Send email notification to student
+    // Send email notification AFTER transaction commits (outside transaction to avoid holding lock)
     $studentUser = User::find($record->student_id);
-    if ($studentUser) {
+    if ($studentUser && $totalToCredit > 0) {
         $dateStr = $record->date->format('M d, Y');
         $credited = $totalToCredit;
         register_shutdown_function(function() use ($studentUser, $dateStr, $credited) {
@@ -810,7 +826,7 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
         });
     }
 
-    return back()->with('success', $msg);
+    return back()->with('success', $msg ?: 'Record processed.');
 })->name('approve-time-in')->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
 // Undo approval — revert approved record back to pending and deduct hours
@@ -862,74 +878,68 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
     $record = \App\Models\TimeInRecord::findOrFail($recordId);
     $reviewer = User::findOrFail(session('user_id'));
 
-    // Only deny the selected student/session for that date, never every session on the same day.
-    $sessionRecords = \App\Models\TimeInRecord::where('student_id', $record->student_id)
-        ->whereDate('date', $record->date)
-        ->where('session', $record->session)
-        ->whereNotNull('time_out')
-        ->get();
+    \Illuminate\Support\Facades\DB::transaction(function () use ($record, $reviewer, $validated) {
 
-    // If any targeted session was previously approved, deduct hours back.
-    foreach ($sessionRecords as $session) {
-        if ($session->status === 'approved') {
-            $credited = floatval($session->regular_hours ?? 0);
-            if (floatval($session->ot_hours ?? 0) > 0 && $session->ot_status === 'approved') {
-                $credited += floatval($session->ot_hours);
-            }
-            if ($credited > 0) {
-                $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)->first();
-                if ($studentHours) {
-                    $newCompleted = round(max(0, $studentHours->hours_completed - $credited), 2);
-                    $studentHours->update([
-                        'hours_completed' => $newCompleted,
-                        'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
-                    ]);
+        // Only deny the selected student/session for that date, never every session on the same day.
+        $sessionRecords = \App\Models\TimeInRecord::where('student_id', $record->student_id)
+            ->whereDate('date', $record->date)
+            ->where('session', $record->session)
+            ->whereNotNull('time_out')
+            ->lockForUpdate()
+            ->get();
+
+        // If any targeted session was previously APPROVED, deduct those hours back.
+        // If pending — do NOT re-credit anything (pending means hours were never credited yet).
+        foreach ($sessionRecords as $session) {
+            if ($session->status === 'approved') {
+                $credited = floatval($session->regular_hours ?? 0);
+                if (floatval($session->ot_hours ?? 0) > 0 && $session->ot_status === 'approved') {
+                    $credited += floatval($session->ot_hours);
+                }
+                if ($credited > 0) {
+                    $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($studentHours) {
+                        $newCompleted = round(max(0, $studentHours->hours_completed - $credited), 2);
+                        $studentHours->update([
+                            'hours_completed' => $newCompleted,
+                            'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
+                        ]);
+                    }
                 }
             }
+            // NOTE: No re-credit for pending records — pending hours were never credited to begin with.
+
+            $session->update([
+                'status'        => 'denied',
+                'verified'      => false,
+                'ot_status'     => $session->ot_hours > 0 ? 'denied' : $session->ot_status,
+                'denial_reason' => $validated['reason'],
+                'approved_by'   => $reviewer->id,
+                'approved_at'   => now(),
+            ]);
         }
 
-        // Re-credit regular hours only for pending targeted session records.
-        if ($session->status === 'pending') {
-            $regularOnly = floatval($session->regular_hours ?? 0);
-            if ($regularOnly > 0) {
-                $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)
-                    ->firstOrCreate(['student_id' => $record->student_id], ['total_hours_required' => 600]);
-                $newCompleted = round(max(0, $studentHours->hours_completed + $regularOnly), 2);
-                $studentHours->update([
-                    'hours_completed' => $newCompleted,
-                    'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
-                ]);
-            }
+        $hasPendingSameDate = \App\Models\TimeInRecord::where('student_id', $record->student_id)
+            ->whereDate('date', $record->date)
+            ->where('status', 'pending')
+            ->whereNotNull('time_out')
+            ->exists();
+
+        $hasApprovedSameDate = \App\Models\TimeInRecord::where('student_id', $record->student_id)
+            ->whereDate('date', $record->date)
+            ->where('status', 'approved')
+            ->exists();
+
+        if (!$hasPendingSameDate) {
+            \App\Models\DailyHourLog::where('student_id', $record->student_id)
+                ->whereDate('log_date', $record->date)
+                ->update(['status' => $hasApprovedSameDate ? 'approved' : 'denied']);
         }
+    });
 
-        $session->update([
-            'status'        => 'denied',
-            'verified'      => false,
-            'ot_status'     => $session->ot_hours > 0 ? 'denied' : $session->ot_status,
-            'denial_reason' => $validated['reason'],
-            'approved_by'   => $reviewer->id,
-            'approved_at'   => now(),
-        ]);
-    }
-
-    $hasPendingSameDate = \App\Models\TimeInRecord::where('student_id', $record->student_id)
-        ->whereDate('date', $record->date)
-        ->where('status', 'pending')
-        ->whereNotNull('time_out')
-        ->exists();
-
-    $hasApprovedSameDate = \App\Models\TimeInRecord::where('student_id', $record->student_id)
-        ->whereDate('date', $record->date)
-        ->where('status', 'approved')
-        ->exists();
-
-    if (!$hasPendingSameDate) {
-        \App\Models\DailyHourLog::where('student_id', $record->student_id)
-            ->whereDate('log_date', $record->date)
-            ->update(['status' => $hasApprovedSameDate ? 'approved' : 'denied']);
-    }
-
-    // Send email notification to student
+    // Send email AFTER transaction commits
     $studentUser = User::find($record->student_id);
     if ($studentUser) {
         $dateStr = $record->date->format('M d, Y');
@@ -939,7 +949,7 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
         });
     }
 
-    return back()->with('success', 'OT denied. Only regular hours (up to 8 hrs) have been recorded.');
+    return back()->with('success', 'Time record denied. Only previously approved hours remain credited.');
 })->name('deny-time-in')->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
 // Bulk approve all pending time-in records for a student
@@ -2341,7 +2351,7 @@ Route::delete('/api/users/{id}', function ($id) {
     }
     $user->delete(); // soft delete — records stay, just hidden
     return response()->json(['success' => true, 'message' => 'User archived successfully']);
-});
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::post('/api/users/{id}/restore', function ($id) {
     $user = User::withTrashed()->findOrFail($id);
@@ -2352,7 +2362,7 @@ Route::post('/api/users/{id}/restore', function ($id) {
             ->update(['is_used' => true]);
     }
     return response()->json(['success' => true, 'message' => 'User restored successfully']);
-});
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::delete('/api/users/{id}/force', function ($id) {
     $user = User::withTrashed()->findOrFail($id);
@@ -2369,21 +2379,21 @@ Route::delete('/api/users/{id}/force', function ($id) {
     }
     $user->forceDelete();
     return response()->json(['success' => true, 'message' => 'User permanently deleted']);
-});
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::post('/api/users/{id}/approve', function ($id) {
     $user = User::findOrFail($id);
     $user->update(['is_approved' => true]);
     try { MailHelper::sendApproved($user->email, $user->name); } catch (\Throwable) {}
     return response()->json(['success' => true]);
-});
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::delete('/api/users/{id}/deny', function ($id) {
     $user = User::findOrFail($id);
     try { MailHelper::sendDenied($user->email, $user->name); } catch (\Throwable) {}
     $user->delete(); // soft delete
     return response()->json(['success' => true]);
-});
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::get('/api/reports/system', function () {
     $required          = \App\Models\StudentHours::query()->value('total_hours_required') ?? 600;
