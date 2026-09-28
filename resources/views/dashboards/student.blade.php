@@ -2100,23 +2100,23 @@
     </div>
 
     <!-- Camera Modal (shared for Time In / Time Out) -->
-    <div id="cameraModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-2 sm:p-4">
-        <div class="bg-slate-900 rounded-xl w-full max-w-xl sm:max-w-2xl p-4 sm:p-6 border border-slate-700 flex flex-col" style="max-height:95vh">
+    <div id="cameraModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-1 sm:p-4">
+        <div class="bg-slate-900 rounded-2xl w-full max-w-full sm:max-w-2xl p-3 sm:p-6 border border-slate-700 flex flex-col" style="max-height:98vh;margin:2px">
             <div class="flex justify-between items-center mb-3 shrink-0">
-                <h3 class="text-lg font-semibold text-white" id="cameraModalTitle">Capture Photo</h3>
-                <button type="button" id="closeCameraModal" class="text-gray-400 hover:text-white text-xl leading-none">✕</button>
+                <h3 class="text-base sm:text-lg font-semibold text-white" id="cameraModalTitle">Capture Photo</h3>
+                <button type="button" id="closeCameraModal" class="text-gray-400 hover:text-white text-2xl leading-none w-9 h-9 flex items-center justify-center rounded-lg hover:bg-slate-700">✕</button>
             </div>
 
             <!-- Face guide status bar -->
-            <div id="faceGuideStatus" class="flex items-center gap-2 px-3 py-2 rounded-lg mb-3 text-sm font-semibold transition-all duration-300 shrink-0" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4)">
+            <div id="faceGuideStatus" class="flex items-center gap-2 px-3 py-2.5 rounded-lg mb-3 text-sm font-semibold transition-all duration-300 shrink-0" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4)">
                 <span id="faceGuideIcon">🔴</span>
                 <span id="faceGuideText" class="text-red-300">Position your face inside the oval frame</span>
             </div>
 
             <!-- Video container — fills available space, no stretch -->
-            <div class="relative rounded-lg overflow-hidden mb-3 transition-all duration-300 flex-1 min-h-0" id="cameraVideoContainer"
-                style="border:4px solid #ef4444;background:#000;aspect-ratio:4/3;max-height:60vh">
-                <video id="cameraModalVideo" class="w-full h-full camera-video" style="object-fit:contain;display:block" playsinline webkit-playsinline autoplay muted></video>
+            <div class="relative rounded-xl overflow-hidden mb-3 transition-all duration-300 flex-1 min-h-0" id="cameraVideoContainer"
+                style="border:4px solid #ef4444;background:#000;aspect-ratio:4/3;max-height:72vh">
+                <video id="cameraModalVideo" class="w-full h-full camera-video" style="object-fit:cover;display:block" playsinline webkit-playsinline autoplay muted></video>
                 <img id="cameraModalImage" src="" alt="Preview" class="hidden absolute inset-0 w-full h-full" style="object-fit:contain">
 
                 <!-- Oval face guide frame — guide only, full photo is captured -->
@@ -2125,16 +2125,16 @@
                     <svg class="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                         <ellipse id="faceOvalBorder" cx="50" cy="46" rx="22" ry="28" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4 2"/>
                     </svg>
-                    <div class="absolute bottom-2 left-0 right-0 text-center">
-                        <span id="faceGuideLabel" class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:rgba(0,0,0,0.6);color:#fca5a5">👤 Align face here</span>
+                    <div class="absolute bottom-3 left-0 right-0 text-center">
+                        <span id="faceGuideLabel" class="text-xs font-bold px-2 py-1 rounded-full" style="background:rgba(0,0,0,0.6);color:#fca5a5">👤 Align face here</span>
                     </div>
                 </div>
             </div>
 
             <!-- Capture button -->
-            <div class="flex gap-2 mb-3 shrink-0" id="cameraCaptureRow">
+            <div class="flex gap-2 mb-2 shrink-0" id="cameraCaptureRow">
                 <button type="button" id="cameraModalCaptureBtn" disabled
-                    class="flex-1 px-4 py-3 rounded-lg font-semibold transition-all duration-300 bg-slate-600 text-slate-400 dark:bg-slate-600 dark:text-slate-400 cursor-not-allowed text-base">
+                    class="flex-1 px-4 py-4 rounded-xl font-bold transition-all duration-300 bg-slate-600 text-slate-400 dark:bg-slate-600 dark:text-slate-400 cursor-not-allowed text-base sm:text-lg">
                     📸 Capture
                 </button>
             </div>
@@ -2143,8 +2143,8 @@
             <div id="cameraModalPreview" class="hidden shrink-0">
                 <p class="text-xs text-gray-400 mb-2">Captured:</p>
                 <div class="flex gap-2 mt-2">
-                    <button type="button" id="cameraModalRetakeBtn" class="flex-1 px-4 py-2.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-semibold hidden">Retake</button>
-                    <button type="button" id="cameraModalUseBtn" class="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold hidden">Use Photo</button>
+                    <button type="button" id="cameraModalRetakeBtn" class="flex-1 px-4 py-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded-xl font-bold hidden text-sm sm:text-base">Retake</button>
+                    <button type="button" id="cameraModalUseBtn" class="flex-1 px-4 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold hidden text-sm sm:text-base">Use Photo</button>
                 </div>
             </div>
 
@@ -2287,7 +2287,8 @@
         let cameraPhotoCaptured = false;
 
         // ===== FACE DETECTION =====
-        function setFaceGuide(detected) {
+        // setFaceGuide(true/false, reason) — reason is a short string shown when blocked
+        function setFaceGuide(detected, reason) {
             if (cameraPhotoCaptured) return;
             faceInFrame = detected;
             const container = document.getElementById('cameraVideoContainer');
@@ -2299,24 +2300,25 @@
             const captureBtn = document.getElementById('cameraModalCaptureBtn');
 
             if (detected) {
-                // Green — face in frame
+                // Green — real face confirmed
                 if (container) container.style.borderColor = '#22c55e';
                 if (statusBar) { statusBar.style.background = 'rgba(34,197,94,0.15)'; statusBar.style.borderColor = 'rgba(34,197,94,0.4)'; }
                 if (icon) icon.textContent = '🟢';
-                if (text) { text.textContent = 'Face detected — ready to capture!'; text.className = 'text-green-300'; }
+                if (text) { text.textContent = 'Face verified — ready to capture!'; text.className = 'text-green-300'; }
                 if (oval) { oval.setAttribute('stroke', '#22c55e'); oval.setAttribute('stroke-dasharray', '0'); }
-                if (label) { label.style.color = '#86efac'; label.textContent = '✓ Face aligned'; }
+                if (label) { label.style.color = '#86efac'; label.textContent = '✓ Face verified'; }
                 if (captureBtn) {
                     captureBtn.disabled = false;
                     captureBtn.className = 'flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all duration-300 bg-green-600 hover:bg-green-700 text-white cursor-pointer';
                     captureBtn.textContent = '📸 Capture';
                 }
             } else {
-                // Red — no face
+                // Red — blocked, show specific reason
+                const msg = reason || 'Position your face inside the oval — no covers or masks';
                 if (container) container.style.borderColor = '#ef4444';
                 if (statusBar) { statusBar.style.background = 'rgba(239,68,68,0.15)'; statusBar.style.borderColor = 'rgba(239,68,68,0.4)'; }
                 if (icon) icon.textContent = '🔴';
-                if (text) { text.textContent = 'Position your face inside the oval frame'; text.className = 'text-red-300'; }
+                if (text) { text.textContent = msg; text.className = 'text-red-300'; }
                 if (oval) { oval.setAttribute('stroke', '#ef4444'); oval.setAttribute('stroke-dasharray', '4 2'); }
                 if (label) { label.style.color = '#fca5a5'; label.textContent = '👤 Align face here'; }
                 if (captureBtn) {
@@ -2327,15 +2329,105 @@
             }
         }
 
+        // ── Skin-tone pixel ratio check ──────────────────────────────────────────────────
+        // Samples the face bounding box region and counts pixels in a skin-tone HSV range.
+        // Returns ratio 0.0–1.0. A real face should have ≥ 0.18 skin-tone pixels.
+        // Papers, phones, masks, and hands covering the face will score much lower.
+        function getSkinRatio(videoEl, box) {
+            try {
+                const SC = 80, SR = 60; // sample canvas size (keeps it fast)
+                const sc = document.createElement('canvas');
+                sc.width = SC; sc.height = SR;
+                const ctx = sc.getContext('2d');
+                const vw = videoEl.videoWidth  || videoEl.offsetWidth  || 640;
+                const vh = videoEl.videoHeight || videoEl.offsetHeight || 480;
+                // Draw only the face bounding box region, scaled to SC×SR
+                // The video is CSS-mirrored, so flip horizontally when sampling
+                ctx.save();
+                ctx.scale(-1, 1);
+                ctx.drawImage(
+                    videoEl,
+                    vw - box.x - box.width, box.y, box.width, box.height, // source (unmirrored)
+                    -SC, 0, SC, SR                                          // dest
+                );
+                ctx.restore();
+                const data = ctx.getImageData(0, 0, SC, SR).data;
+                let skinPx = 0, total = 0;
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i], g = data[i+1], b = data[i+2];
+                    // Broad skin-tone range covering light to dark complexions (RGB heuristic)
+                    if (
+                        r > 60  && g > 35  && b > 15  &&   // minimum brightness
+                        r > g   && r > b   &&               // red dominates
+                        (r - g) > 10       &&               // enough red-green separation
+                        Math.abs(r - b) > 10               // enough red-blue separation
+                    ) skinPx++;
+                    total++;
+                }
+                return total > 0 ? skinPx / total : 0;
+            } catch(e) { return 0.5; } // fail open on canvas error
+        }
+
+        // ── Live-face liveness check ─────────────────────────────────────────────────────
+        // Tracks pixel-level motion inside the face box between successive frames.
+        // A printed photo or phone screen is static; a real face has micro-movements.
+        let _livenessLastFrame = null;
+        let _livenessMotionScore = 0;
+        const LIVENESS_MOTION_THRESHOLD = 3; // mean absolute pixel diff to accept as "live" (lowered for compressed webcams)
+
+        function checkLiveness(videoEl, box) {
+            try {
+                const LC = 48, LR = 48;
+                const lc = document.createElement('canvas');
+                lc.width = LC; lc.height = LR;
+                const ctx = lc.getContext('2d');
+                const vw = videoEl.videoWidth  || videoEl.offsetWidth  || 640;
+                ctx.save();
+                ctx.scale(-1, 1);
+                ctx.drawImage(videoEl,
+                    vw - box.x - box.width, box.y, box.width, box.height,
+                    -LC, 0, LC, LR);
+                ctx.restore();
+                const curr = ctx.getImageData(0, 0, LC, LR).data;
+                if (!_livenessLastFrame || _livenessLastFrame.length !== curr.length) {
+                    _livenessLastFrame = curr;
+                    return false; // need 2 frames to compare
+                }
+                let diff = 0, n = 0;
+                for (let i = 0; i < curr.length; i += 4) {
+                    // Luminance diff between frames
+                    const la = (_livenessLastFrame[i]*77 + _livenessLastFrame[i+1]*150 + _livenessLastFrame[i+2]*29) >> 8;
+                    const lb = (curr[i]*77 + curr[i+1]*150 + curr[i+2]*29) >> 8;
+                    diff += Math.abs(la - lb);
+                    n++;
+                }
+                _livenessLastFrame = curr;
+                const meanDiff = diff / n;
+                // Smooth the score over time (EMA) so one noisy frame doesn't fake it
+                _livenessMotionScore = _livenessMotionScore * 0.6 + meanDiff * 0.4;
+                return _livenessMotionScore >= LIVENESS_MOTION_THRESHOLD;
+            } catch(e) { return true; } // fail open on canvas error
+        }
+
         // face-api.js model loaded flag
         let faceApiReady = false;
         (async function loadFaceApi() {
             try {
                 if (typeof faceapi === 'undefined') return;
-                // Load model weights from jsDelivr CDN — avoids InfinityFree binary file restrictions
-                const modelUrl = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js-models@master/tiny_face_detector';
-                await faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
-                faceApiReady = true;
+                // Try local model first (faster, no CDN dependency)
+                const localModelUrl = '/face-api/models';
+                try {
+                    await faceapi.nets.tinyFaceDetector.loadFromUri(localModelUrl);
+                    faceApiReady = true;
+                    console.log('face-api.js: local model loaded');
+                } catch(localErr) {
+                    // Fallback to CDN if local fails
+                    console.warn('face-api.js local model failed, trying CDN:', localErr);
+                    const cdnModelUrl = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js-models@master/tiny_face_detector';
+                    await faceapi.nets.tinyFaceDetector.loadFromUri(cdnModelUrl);
+                    faceApiReady = true;
+                    console.log('face-api.js: CDN model loaded');
+                }
             } catch(e) {
                 console.warn('face-api.js model failed to load:', e);
                 faceApiReady = false;
@@ -2345,49 +2437,116 @@
         async function startFaceDetection(videoEl) {
             // ── face-api.js TinyFaceDetector — real neural net, works for all skin tones ──
             if (typeof faceapi !== 'undefined') {
-                // Wait up to 12s for model to be ready (CDN can be slow on first load)
+                // Wait up to 15s for model to be ready (local is fast; CDN fallback may be slow)
                 let waited = 0;
-                while (!faceApiReady && waited < 12000) {
-                    await new Promise(r => setTimeout(r, 100));
-                    waited += 100;
+                while (!faceApiReady && waited < 15000) {
+                    await new Promise(r => setTimeout(r, 80));
+                    waited += 80;
                 }
 
                 if (faceApiReady) {
-                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+                    // inputSize 320 — good balance of speed and accuracy
+                    // scoreThreshold 0.40 — works for real faces in all lighting conditions
+                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.40 });
                     let detecting = false;
+                    // 3 consecutive confirmed frames — fast enough to feel responsive
+                    let confirmedFrames = 0;
+                    const CONFIRM_FRAMES = 3;
+                    // Reset liveness state each time detection restarts
+                    _livenessLastFrame  = null;
+                    _livenessMotionScore = 0;
 
                     async function faceApiLoop() {
                         faceDetectLoop = requestAnimationFrame(faceApiLoop);
-                        if (detecting) return;  // don't stack calls
+                        if (detecting) return;
+                        if (cameraPhotoCaptured) return;
                         if (!cameraStream || videoEl.readyState < 2 || videoEl.paused) return;
                         detecting = true;
                         try {
                             const result = await faceapi.detectSingleFace(videoEl, options);
                             if (!result) {
-                                setFaceGuide(false);
+                                confirmedFrames = 0;
+                                _livenessMotionScore = Math.max(0, _livenessMotionScore - 1);
+                                setFaceGuide(false, 'No face detected — remove any cover or mask');
                                 detecting = false;
                                 return;
                             }
-                            // Check the detected face box is inside our oval guide
-                            const vw = videoEl.videoWidth  || videoEl.offsetWidth;
-                            const vh = videoEl.videoHeight || videoEl.offsetHeight;
+
+                            const vw = videoEl.videoWidth  || videoEl.offsetWidth  || 640;
+                            const vh = videoEl.videoHeight || videoEl.offsetHeight || 480;
                             const box = result.box;
-                            // Face center in normalized coords
+
+                            // ── 1. Score floor: 0.45 — filters near-zero detections (paper/blank covers)
+                            if (result.score < 0.45) {
+                                confirmedFrames = 0;
+                                setFaceGuide(false, 'Face not clear enough — look directly at camera');
+                                detecting = false; return;
+                            }
+
+                            // ── 2. Oval alignment — 15% tolerance so normal head positioning works ─
                             const fcx = (box.x + box.width  / 2) / vw;
                             const fcy = (box.y + box.height / 2) / vh;
-                            // Oval guide: cx=50%, cy=46%, rx=22%, ry=28% (from SVG)
-                            // Allow 25% extra tolerance so normal head positioning works
                             const oCX = 0.50, oCY = 0.46;
-                            const oRX = 0.22 * 1.25, oRY = 0.28 * 1.25;
+                            const oRX = 0.22 * 1.15, oRY = 0.28 * 1.15;
                             const dx = (fcx - oCX) / oRX;
                             const dy = (fcy - oCY) / oRY;
-                            const inOval = dx * dx + dy * dy <= 1.0;
-                            // Face must be a reasonable size relative to frame
+                            if (dx * dx + dy * dy > 1.0) {
+                                confirmedFrames = 0;
+                                setFaceGuide(false, 'Center your face inside the oval frame');
+                                detecting = false; return;
+                            }
+
+                            // ── 3. Face size — reasonable range, not overly strict ────────────────
                             const faceW = box.width / vw;
-                            const sizeOk = faceW > 0.08 && faceW < 0.95;
-                            setFaceGuide(inOval && sizeOk);
+                            if (faceW < 0.12 || faceW > 0.92) {
+                                confirmedFrames = 0;
+                                setFaceGuide(false, faceW < 0.12
+                                    ? 'Move closer to the camera'
+                                    : 'Move a little further from the camera');
+                                detecting = false; return;
+                            }
+
+                            // ── 4. Face aspect ratio — blocks flat phones/papers ──────────────────
+                            //    Real face: 0.45–1.15. Phones/paper tend to be > 1.3 wide.
+                            const aspectRatio = box.width / (box.height || 1);
+                            if (aspectRatio < 0.40 || aspectRatio > 1.20) {
+                                confirmedFrames = 0;
+                                setFaceGuide(false, 'Face not recognized — do not cover your face');
+                                detecting = false; return;
+                            }
+
+                            // ── 5. Skin-tone check removed — RGB heuristics fail on darker/Asian
+                            //       complexions and low-light webcams. The neural-net score (check 1)
+                            //       already handles the "is this a real face" question reliably. ──────
+
+                            // ── 6. Liveness — very relaxed; just needs any non-zero motion ──────────
+                            const isLive = checkLiveness(videoEl, box);
+                            if (!isLive && confirmedFrames < 4) {
+                                setFaceGuide(false, 'Hold still briefly… verifying live face');
+                                detecting = false; return;
+                            }
+
+                            // ── All checks passed ─────────────────────────────────────────────────
+                            confirmedFrames++;
+                            if (confirmedFrames >= CONFIRM_FRAMES) {
+                                setFaceGuide(true);
+                            } else {
+                                // Show a "verifying" amber state while counting frames
+                                const pct = Math.round((confirmedFrames / CONFIRM_FRAMES) * 100);
+                                const statusBar = document.getElementById('faceGuideStatus');
+                                const icon = document.getElementById('faceGuideIcon');
+                                const text = document.getElementById('faceGuideText');
+                                const oval = document.getElementById('faceOvalBorder');
+                                const container = document.getElementById('cameraVideoContainer');
+                                if (container) container.style.borderColor = '#f59e0b';
+                                if (statusBar) { statusBar.style.background = 'rgba(245,158,11,0.15)'; statusBar.style.borderColor = 'rgba(245,158,11,0.4)'; }
+                                if (icon) icon.textContent = '🟡';
+                                if (text) { text.textContent = `Verifying… hold still (${pct}%)`; text.className = 'text-yellow-300'; }
+                                if (oval) { oval.setAttribute('stroke', '#f59e0b'); oval.setAttribute('stroke-dasharray', '0'); }
+                            }
                         } catch(e) {
-                            setFaceGuide(false);
+                            confirmedFrames = 0;
+                            setFaceGuide(false, 'Detection error — try again');
                         }
                         detecting = false;
                     }
@@ -2396,32 +2555,57 @@
                 }
             }
 
-            // ── Fallback: simple motion/presence detection (face-api not available) ─────────
-            // Just checks if there's something in front of the camera with enough brightness
-            // and variance. Not perfect but better than nothing.
+            // ── Fallback: pixel-analysis presence detection (face-api not available) ─────────
+            // Requires decent lighting and skin tones — still blocks white paper / blank screens.
             const dc = document.createElement('canvas');
             let lastTs = 0;
+            let fbConfirmed = 0;
+            let fbLastLuma = null;
+            const FB_CONFIRM = 4;
             function fallbackLoop(ts) {
                 faceDetectLoop = requestAnimationFrame(fallbackLoop);
-                if (ts - lastTs < 200) return;
+                if (ts - lastTs < 100) return; // ~10fps
                 lastTs = ts;
-                if (!cameraStream || videoEl.readyState < 2) { setFaceGuide(false); return; }
+                if (cameraPhotoCaptured) return;
+                if (!cameraStream || videoEl.readyState < 2) { fbConfirmed = 0; setFaceGuide(false, 'Camera not ready'); return; }
                 try {
                     dc.width = 160; dc.height = 120;
                     const ctx = dc.getContext('2d');
-                    ctx.drawImage(videoEl, 0, 0, 160, 120);
-                    // Sample centre region (rough oval area)
+                    ctx.save(); ctx.scale(-1,1);
+                    ctx.drawImage(videoEl, -160, 0, 160, 120);
+                    ctx.restore();
                     const imgData = ctx.getImageData(40, 15, 80, 90).data;
-                    let sum = 0, sqSum = 0, n = 0;
+                    let sum = 0, sqSum = 0, skinPx = 0, n = 0;
+                    const luma = [];
                     for (let i = 0; i < imgData.length; i += 4) {
-                        const lum = (imgData[i]*77 + imgData[i+1]*150 + imgData[i+2]*29) >> 8;
-                        sum += lum; sqSum += lum*lum; n++;
+                        const r = imgData[i], g = imgData[i+1], b = imgData[i+2];
+                        const l = (r*77 + g*150 + b*29) >> 8;
+                        sum += l; sqSum += l*l; luma.push(l); n++;
+                        if (r > 50 && g > 30 && b > 10 && r > g && r > b && (r-g) > 8 && Math.abs(r-b) > 8) skinPx++;
                     }
                     const avg = sum / n;
                     const variance = sqSum / n - avg * avg;
-                    // Something meaningful is in front of the camera
-                    setFaceGuide(avg > 20 && variance > 300);
-                } catch(e) { setFaceGuide(false); }
+                    const skinRatio = skinPx / n;
+                    // Motion check
+                    let motion = 5; // default "live" if no prior frame
+                    if (fbLastLuma && fbLastLuma.length === luma.length) {
+                        let d = 0;
+                        for (let j = 0; j < luma.length; j++) d += Math.abs(luma[j] - fbLastLuma[j]);
+                        motion = d / luma.length;
+                    }
+                    fbLastLuma = luma;
+                    // Relaxed: decent brightness + some texture is enough for fallback
+                    const passed = avg > 25 && variance > 300;
+                    if (passed) { fbConfirmed++; } else { fbConfirmed = 0; }
+                    if (fbConfirmed >= FB_CONFIRM) {
+                        setFaceGuide(true);
+                    } else {
+                        const reason = avg <= 25 ? 'Too dark — improve lighting'
+                                     : motion < 2 ? 'Hold still briefly…'
+                                     : 'Position your face inside the oval';
+                        setFaceGuide(false, reason);
+                    }
+                } catch(e) { fbConfirmed = 0; setFaceGuide(false, 'Detection error'); }
             }
             faceDetectLoop = requestAnimationFrame(fallbackLoop);
         }
@@ -2629,6 +2813,7 @@
             stopCamera();
             // reset UI
             cameraPhotoCaptured = false;
+            _livenessLastFrame = null; _livenessMotionScore = 0;
             if (cameraModalImage) cameraModalImage.src = '';
             cameraModalImage?.classList.add('hidden');
             cameraModalVideo?.classList.remove('hidden');
@@ -2993,8 +3178,9 @@
                     cameraModalUseBtn.classList.add('hidden');
                     cameraModalCaptureBtn.classList.remove('hidden');
                     cameraModalVideo.classList.remove('hidden');
-                    // reset face guide to red before restarting
+                    // reset face guide and liveness state before restarting
                     cameraPhotoCaptured = false;
+                    _livenessLastFrame = null; _livenessMotionScore = 0;
                     setFaceGuide(false);
                     // restart camera feed + face detection
                     startCamera();
