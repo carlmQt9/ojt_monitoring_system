@@ -693,12 +693,14 @@
                     $otHours       = max(0, round($totalDayHours - 8, 2));
 
                     // Can time in afternoon? Morning must be timed out and now >= 12:50
-                    $nowMin = (int) date('i');
+                    $nowMin = (int) $nowManila->format('i');
                     $canTimeInAfternoon = false;
                     if ($morningRecord && $morningRecord->time_out && !$afternoonRecord
                         && ($nowHour > 12 || ($nowHour === 12 && $nowMin >= 50))) {
                         $canTimeInAfternoon = true;
                     }
+                    $awaitingAfternoon = $morningRecord && $morningRecord->time_out && !$afternoonRecord;
+                    $afternoonOpensIn = max(0, $nowManila->diffInSeconds($nowManila->copy()->setTime(12, 50), false));
 
                     // Determine what to show
                     $todayRecord = $activeRecord ?? $todayRecords->last();
@@ -1028,25 +1030,30 @@
                             </script>
                             @endif
 
-                            {{-- Afternoon Time-In Button (lunch break flow) --}}
-                            @if($canTimeInAfternoon)
+                            {{-- Keep the next session visible while camera access is locked for lunch. --}}
+                            @if($awaitingAfternoon)
                             <div class="bg-blue-500/10 border border-blue-400 rounded-lg p-4">
-                                <p class="text-blue-300 text-sm mb-3">🍽️ Lunch break done! You can now time in for your afternoon session.</p>
+                                @if($canTimeInAfternoon)
+                                <p class="text-blue-300 text-sm mb-3">🌇 Your afternoon session is next. Time in when you are ready.</p>
+                                @else
+                                <p class="text-orange-300 text-sm font-semibold mb-1">🍽️ Afternoon session is next — camera locked for lunch</p>
+                                <p class="text-gray-400 text-xs mb-3">Camera time-in opens at 12:50 PM. Resuming in <strong id="afternoonCountdown" class="text-orange-300">--:--</strong>.</p>
+                                @endif
                                 <form method="POST" action="{{ route('time-in') }}" enctype="multipart/form-data" id="afternoonTimeInForm">
                                     @csrf
                                     <input type="hidden" name="student_id" value="{{ $user->id }}">
                                     <input type="hidden" name="date" value="{{ $today }}">
                                     <input type="hidden" name="session" value="afternoon">
                                     <input type="hidden" name="photo_base64" id="afternoonPhotoBase64">
-                                    <button type="button" onclick="openCameraModal('afternoon')" class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold">
-                                        📷 Time In — Afternoon Session
+                                    <button type="button" onclick="openCameraModal('afternoon')" {{ $canTimeInAfternoon ? '' : 'disabled' }} class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-60 text-white rounded-lg font-semibold">
+                                        {{ $canTimeInAfternoon ? '📷 Time In — Afternoon Session' : '🔒 Camera locked until 12:50 PM' }}
                                     </button>
                                 </form>
                             </div>
                             @endif
 
-                            {{-- All sessions done --}}
-                            @if(!$activeRecord && !$canTimeInAfternoon)
+                            {{-- Only show completion after both sessions have been recorded. --}}
+                            @if(!$activeRecord && $morningRecord && $afternoonRecord)
                             <div class="bg-green-500/5 rounded-lg p-4">
                                 <p class="text-gray-300 text-center text-sm">✓ All sessions completed for today.</p>
                             </div>
@@ -1982,7 +1989,11 @@
                 <button type="button" onclick="closeNarrativeModal()"
                     class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">Cancel</button>
                 <button type="button" id="narrativeSubmitBtn" onclick="submitNarrative()"
-                    class="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-semibold transition-all">
+                    class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-70 disabled:cursor-wait text-white rounded-xl font-semibold transition-all">
+                    <svg id="narrativeSubmitSpinner" class="hidden w-4 h-4 animate-spin" role="status" aria-label="Saving" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
                     <span id="narrativeSubmitLabel">Submit Report</span>
                 </button>
             </div>
@@ -2253,6 +2264,23 @@
 
             checkLunchLock();
             setInterval(checkLunchLock, 1000);
+        })();
+
+        // Keep the afternoon reminder visible and count down while its camera button is locked.
+        (function() {
+            const counter = document.getElementById('afternoonCountdown');
+            if (!counter) return;
+
+            let remaining = @json($afternoonOpensIn);
+            function updateAfternoonCountdown() {
+                const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
+                const seconds = String(remaining % 60).padStart(2, '0');
+                counter.textContent = minutes + ':' + seconds;
+                if (remaining > 0) remaining--;
+            }
+
+            updateAfternoonCountdown();
+            setInterval(updateAfternoonCountdown, 1000);
         })();
 
         // ============ AUTO SET TIME IN ============
@@ -3653,6 +3681,9 @@
             const descErr  = document.getElementById('narrativeDescError');
             const btn      = document.getElementById('narrativeSubmitBtn');
             const label    = document.getElementById('narrativeSubmitLabel');
+            const spinner  = document.getElementById('narrativeSubmitSpinner');
+
+            if (btn.disabled) return;
 
             errEl.classList.add('hidden');
             descErr.classList.add('hidden');
@@ -3672,6 +3703,15 @@
             btn.disabled = true;
             const origLabel = label.textContent;
             label.textContent = 'Saving…';
+            spinner.classList.remove('hidden');
+            btn.setAttribute('aria-busy', 'true');
+
+            const restoreSubmitButton = () => {
+                btn.disabled = false;
+                btn.removeAttribute('aria-busy');
+                label.textContent = origLabel;
+                spinner.classList.add('hidden');
+            };
 
             const formData = new FormData();
             formData.append('_token', document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}');
@@ -3691,7 +3731,7 @@
                 if (!dateVal) {
                     errEl.textContent = 'Please select a date.';
                     errEl.classList.remove('hidden');
-                    btn.disabled = false; label.textContent = origLabel;
+                    restoreSubmitButton();
                     return;
                 }
                 formData.append('report_date', dateVal);
@@ -3720,12 +3760,12 @@
                 } else {
                     errEl.textContent = data.message || 'Something went wrong. Please try again.';
                     errEl.classList.remove('hidden');
-                    btn.disabled = false; label.textContent = origLabel;
+                    restoreSubmitButton();
                 }
             } catch (e) {
                 errEl.textContent = 'Network error. Please try again.';
                 errEl.classList.remove('hidden');
-                btn.disabled = false; label.textContent = origLabel;
+                restoreSubmitButton();
             }
         }
 
