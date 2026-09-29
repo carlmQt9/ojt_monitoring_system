@@ -56,7 +56,7 @@ class AttendanceHelper
 
             $inTime = Carbon::parse($record->time_in);
             $outTime = Carbon::parse($record->time_out);
-            if ($outTime->lte($inTime)) {
+            if ($outTime->lt($inTime)) {
                 $outTime->addDay();
             }
 

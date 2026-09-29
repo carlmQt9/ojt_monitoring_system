@@ -36,7 +36,7 @@ class TimeInRecord extends Model
         if (!$this->time_in || !$this->time_out) return 0;
         $i = \Carbon\Carbon::parse($this->time_in);
         $o = \Carbon\Carbon::parse($this->time_out);
-        if ($o->lte($i)) $o->addDay(); // handles midnight crossing
+        if ($o->lt($i)) $o->addDay(); // handles midnight crossing without treating equal times as a full day
         return max(0, $i->diffInMinutes($o));
     }
 

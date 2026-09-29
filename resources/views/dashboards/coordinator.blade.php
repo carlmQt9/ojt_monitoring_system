@@ -1624,10 +1624,20 @@
                     });
                 });
                 await Promise.all(requests);
-                window.location.reload();
+                if (typeof setQueuedSuccessMessage === 'function') {
+                    setQueuedSuccessMessage('All pending time logs were approved successfully!');
+                } else if (typeof showSuccess === 'function') {
+                    showSuccess('All pending time logs were approved successfully!');
+                }
+                setTimeout(() => window.location.reload(), 1800);
             } catch (err) {
                 console.error('Bulk approve error:', err);
-                window.location.reload();
+                if (typeof setQueuedSuccessMessage === 'function') {
+                    setQueuedSuccessMessage('Bulk approval completed.');
+                } else if (typeof showSuccess === 'function') {
+                    showSuccess('Bulk approval completed.');
+                }
+                setTimeout(() => window.location.reload(), 1200);
             }
         };
             const tickColor = '#94a3b8';
@@ -1940,6 +1950,7 @@
                             actions = `<div class="flex gap-1">
                                 <form method="POST" action="{{ url('/approve-time-in') }}/${l.id}" style="display:inline">
                                     <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                    <input type="hidden" name="_method" value="POST">
                                     <button type="submit" class="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded">Approve</button>
                                 </form>
                                 <button onclick="showCoordDenyTimeModal(${l.id})" class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Deny</button>
@@ -2014,25 +2025,60 @@
         async function submitTimeLogAction(form, status) {
             const submitButton = form.querySelector('button[type="submit"]');
             const recordId = form.action.split('/').pop();
+            const token = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
+            const fd = new FormData(form);
+            fd.set('_token', token);
             submitButton.disabled = true;
             showLoadingModal(status === 'approved' ? 'APPROVING' : 'DENYING');
 
             try {
                 const response = await fetch(form.action, {
                     method: 'POST',
-                    body: new FormData(form),
-                    headers: { 'Accept': 'application/json' },
+                    body: fd,
+                    headers: {
+                        'X-CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'same-origin'
                 });
-                const data = await response.json();
+                const text = await response.text();
+                let data = {};
+
+                if (text) {
+                    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+                    if (contentType.includes('application/json')) {
+                        try { data = JSON.parse(text); } catch (e) { throw new Error('The server returned an invalid approval response. Please refresh and try again.'); }
+                    } else if (/<html|<!doctype html/i.test(text)) {
+                        if (response.status === 401 || /login/i.test(text)) {
+                            window.location.reload();
+                            throw new Error('Your session has expired. Please sign in again.');
+                        }
+                        throw new Error('This action is no longer available. Please refresh the page and try again.');
+                    } else {
+                        try { data = JSON.parse(text); } catch (e) { throw new Error(text.trim() || 'Unable to process the approval response. Please refresh and try again.'); }
+                    }
+                }
+
                 if (!response.ok || !data.success) throw new Error(data.message || 'Unable to update the time log.');
 
                 updateCachedTimeLog(recordId, status);
                 updateTimeLogRow(recordId, status);
                 refreshCoordinatorStudent(data.dashboard);
                 closeCoordDenyTimeModal();
+                hideLoadingModal();
                 if (typeof showSuccess === 'function') showSuccess(data.message);
             } catch (error) {
-                alert(error.message || 'Unable to update the time log.');
+                const message = error?.message || 'Unable to update the time log.';
+                if (/session|login|expired|unauth/i.test(message)) {
+                    window.location.reload();
+                    return;
+                }
+                if (typeof showToast === 'function') {
+                    showToast('Error', message, 'red');
+                } else {
+                    alert(message);
+                }
                 submitButton.disabled = false;
             } finally {
                 hideLoadingModal();

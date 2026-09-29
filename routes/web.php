@@ -349,7 +349,7 @@ Route::post('/time-out', function () {
     $timeOutParts = explode(':', $serverTimeOut);
     $inTime  = \Carbon\Carbon::createFromTime($timeInParts[0], $timeInParts[1], 0);
     $outTime = \Carbon\Carbon::createFromTime($timeOutParts[0], $timeOutParts[1], 0);
-    if ($outTime->lessThanOrEqualTo($inTime)) {
+    if ($outTime->lessThan($inTime)) {
         $outTime->addDay(); // crossed midnight
     }
     $sessionMinutes = max(0, $inTime->diffInMinutes($outTime));
@@ -363,7 +363,7 @@ Route::post('/time-out', function () {
         ->get();
     $prevDayMinutes = $prevSessionsToday->sum(fn($r) => (function($ti, $to) {
         $i = \Carbon\Carbon::parse($ti); $o = \Carbon\Carbon::parse($to);
-        if ($o->lte($i)) $o->addDay();
+        if ($o->lt($i)) $o->addDay();
         return max(0, $i->diffInMinutes($o));
     })($r->time_in, $r->time_out));
     $prevDayHours = round($prevDayMinutes / 60, 2);
@@ -510,7 +510,7 @@ Route::post('/time-out-ajax', function () {
     $timeOutParts = explode(':', $serverTimeOut);
     $inTime  = \Carbon\Carbon::createFromTime($timeInParts[0], $timeInParts[1], 0);
     $outTime = \Carbon\Carbon::createFromTime($timeOutParts[0], $timeOutParts[1], 0);
-    if ($outTime->lessThanOrEqualTo($inTime)) {
+    if ($outTime->lessThan($inTime)) {
         $outTime->addDay(); // crossed midnight
     }
     $sessionMinutes = max(0, $inTime->diffInMinutes($outTime));
@@ -524,7 +524,7 @@ Route::post('/time-out-ajax', function () {
         ->get();
     $prevDayMinutes = $prevSessionsToday->sum(fn($r) => (function($ti, $to) {
         $i = \Carbon\Carbon::parse($ti); $o = \Carbon\Carbon::parse($to);
-        if ($o->lte($i)) $o->addDay();
+        if ($o->lt($i)) $o->addDay();
         return max(0, $i->diffInMinutes($o));
     })($r->time_in, $r->time_out));
     $prevDayHours = round($prevDayMinutes / 60, 2);
@@ -828,7 +828,7 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
 
     $message = $msg ?: 'Record processed.';
 
-    if (request()->expectsJson()) {
+    if (request()->expectsJson() || request()->ajax() || request()->wantsJson() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
         $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)->first();
         $requiredHours = $studentHours->total_hours_required ?? 600;
         $completedHours = (float) ($studentHours->hours_completed ?? 0);
@@ -973,7 +973,7 @@ Route::post('/deny-time-in/{recordId}', function ($recordId) {
 
     $message = 'Time record denied. Only previously approved hours remain credited.';
 
-    if (request()->expectsJson()) {
+    if (request()->expectsJson() || request()->ajax() || request()->wantsJson() || request()->header('X-Requested-With') === 'XMLHttpRequest') {
         $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)->first();
         $requiredHours = $studentHours->total_hours_required ?? 600;
         $completedHours = (float) ($studentHours->hours_completed ?? 0);
@@ -1380,7 +1380,7 @@ Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
             if ($otValue <= 0 && $dayRec->time_in && $dayRec->time_out) {
                 $inTime = \Carbon\Carbon::parse($dayRec->time_in);
                 $outTime = \Carbon\Carbon::parse($dayRec->time_out);
-                if ($outTime->lte($inTime)) {
+                if ($outTime->lt($inTime)) {
                     $outTime->addDay();
                 }
                 $workedHours = max(0, $inTime->diffInMinutes($outTime) / 60);
@@ -2047,11 +2047,12 @@ Route::post('/api/settings', function () {
 })->middleware(['auth.custom', 'role:ccit_head']);
 
 // retrieve current settings
+// Shared by all authenticated users so student dashboards can poll required hours safely.
 Route::get('/api/settings', function () {
     $required = \App\Models\StudentHours::query()->value('total_hours_required') ?? 600;
     $email = cache('settings.email_notifications', true);
     return response()->json(['required_hours' => $required, 'email_notifications' => $email]);
-})->middleware(['auth.custom', 'role:ccit_head']);
+})->middleware(['auth.custom']);
 
 Route::get('/api/dashboard-stats', function () {
     $sy = request('school_year');
@@ -2495,7 +2496,7 @@ Route::get('/api/reports/attendance-data', function () {
         ->get() as $rec) {
         if (!$rec->student) continue;
         if (!$rec->time_in || !$rec->time_out || $rec->time_out === '00:00:00') continue;
-        $hrs = $rec->time_out ? round((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lte($i))$o->addDay();return $i->diffInMinutes($o);})(  $rec->time_in,$rec->time_out)/60, 2) : 0;
+        $hrs = $rec->time_out ? round((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lt($i))$o->addDay();return $i->diffInMinutes($o);})(  $rec->time_in,$rec->time_out)/60, 2) : 0;
         $rows[] = [
             'student_name' => $rec->student->name,
             'date'         => $rec->date->format('Y-m-d'),
@@ -2520,7 +2521,7 @@ Route::get('/api/reports/attendance', function () {
         ->get() as $rec) {
         if (!$rec->student) continue;
         if (!$rec->time_in || !$rec->time_out || $rec->time_out === '00:00:00') continue;
-        $hrs = $rec->time_out ? round((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lte($i))$o->addDay();return $i->diffInMinutes($o);})(  $rec->time_in,$rec->time_out)/60,4) : 0;
+        $hrs = $rec->time_out ? round((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lt($i))$o->addDay();return $i->diffInMinutes($o);})(  $rec->time_in,$rec->time_out)/60,4) : 0;
         $rows[] = ['date'=>$rec->date->format('Y-m-d'),'name'=>$rec->student->name,'company'=>$rec->student->company->name??'N/A','time_in'=>$rec->time_in,'time_out'=>$rec->time_out??'-','hours'=>$hrs,'status'=>$rec->status,'verified'=>$rec->verified];
     }
     $records = $rows;

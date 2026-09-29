@@ -1606,9 +1606,20 @@
         
         function openSettingsModal() {
             // load current settings before showing
-            fetch('/api/settings')
-                .then(resp => resp.json())
+            fetch('/api/settings', { headers: { Accept: 'application/json' } })
+                .then(async (resp) => {
+                    const contentType = resp.headers.get('content-type') || '';
+                    if (!resp.ok) {
+                        throw new Error(`Settings request failed (${resp.status})`);
+                    }
+                    if (!contentType.includes('application/json')) {
+                        console.warn('Settings endpoint returned non-JSON content.');
+                        return null;
+                    }
+                    return resp.json();
+                })
                 .then(json => {
+                    if (!json) return;
                     const form = document.getElementById('settingsForm');
                     if (form) {
                         form.required_hours.value = json.required_hours || '';
@@ -2756,13 +2767,24 @@
                         else if (name === 'schoolyears' && typeof loadSchoolYearList === 'function') loadSchoolYearList();
                         else if (name === 'schoolids' && typeof loadSchoolIdList === 'function') loadSchoolIdList();
                         else if (name === 'settings') {
-                            fetch('/api/settings').then(r => r.json()).then(json => {
-                                const form = document.getElementById('settingsForm');
-                                if (form) {
-                                    if (form.required_hours) form.required_hours.value = json.required_hours || '';
-                                    if (form.email_notifications) form.email_notifications.checked = !!json.email_notifications;
-                                }
-                            }).catch(() => {});
+                            fetch('/api/settings', { headers: { Accept: 'application/json' } })
+                                .then(async (r) => {
+                                    const contentType = r.headers.get('content-type') || '';
+                                    if (!r.ok) throw new Error(`Settings request failed (${r.status})`);
+                                    if (!contentType.includes('application/json')) {
+                                        console.warn('Settings endpoint returned non-JSON content during section load.');
+                                        return null;
+                                    }
+                                    return r.json();
+                                })
+                                .then(json => {
+                                    if (!json) return;
+                                    const form = document.getElementById('settingsForm');
+                                    if (form) {
+                                        if (form.required_hours) form.required_hours.value = json.required_hours || '';
+                                        if (form.email_notifications) form.email_notifications.checked = !!json.email_notifications;
+                                    }
+                                }).catch(() => {});
                         }
                     } catch (e) { console.error('Section data load error:', e); }
                 }, 100);

@@ -106,11 +106,50 @@
 <script>
     let _successReload = false;
 
+    function setQueuedSuccessMessage(message) {
+        if (typeof window === 'undefined' || !window.sessionStorage) return;
+        window.sessionStorage.setItem('ojtSuccessPopupMessage', String(message));
+    }
+
+    function setQueuedToastNotification(title, message, color = 'green') {
+        if (typeof window === 'undefined' || !window.sessionStorage) return false;
+        window.sessionStorage.setItem('ojtQueuedToastNotification', JSON.stringify({ title, message, color }));
+        window.sessionStorage.removeItem('ojtSuccessPopupMessage');
+        return true;
+    }
+
+    function consumeQueuedSuccessMessage() {
+        if (typeof window === 'undefined' || !window.sessionStorage) return null;
+        const message = window.sessionStorage.getItem('ojtSuccessPopupMessage');
+        if (message) {
+            window.sessionStorage.removeItem('ojtSuccessPopupMessage');
+        }
+        return message;
+    }
+
+    function consumeQueuedToastNotification() {
+        if (typeof window === 'undefined' || !window.sessionStorage) return null;
+        const notification = window.sessionStorage.getItem('ojtQueuedToastNotification');
+        if (notification) window.sessionStorage.removeItem('ojtQueuedToastNotification');
+        try {
+            return notification ? JSON.parse(notification) : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
     function showSuccess(message, redirectUrl = null, reloadOnClose = false) {
         const popup = document.getElementById('successPopup');
-        if (!popup) return;
+        if (!popup) {
+            if (typeof showToast === 'function') showToast('Success', message, 'green');
+            return;
+        }
         popup.querySelector('.success-message').textContent = message;
         popup.classList.remove('hidden');
+        popup.style.display = 'flex';
+        popup.style.position = 'fixed';
+        popup.style.inset = '0';
+        popup.style.zIndex = '2147483647';
         popup.style.animation = 'backgroundFadeIn 0.3s ease-in-out';
         _successReload = reloadOnClose;
 
@@ -128,6 +167,7 @@
         popup.style.animation = 'backgroundFadeIn 0.3s ease-in-out reverse';
         setTimeout(() => {
             popup.classList.add('hidden');
+            popup.style.display = 'none';
             if (_successReload) {
                 _successReload = false;
                 if (typeof _allowLeave !== 'undefined') _allowLeave = true;
@@ -146,6 +186,18 @@
 
     // show server-side message if present
     document.addEventListener('DOMContentLoaded', function() {
+        const queuedToast = consumeQueuedToastNotification();
+        if (queuedToast && typeof showToast === 'function') {
+            showToast(queuedToast.title, queuedToast.message, queuedToast.color);
+            return;
+        }
+
+        const queuedMessage = consumeQueuedSuccessMessage();
+        if (queuedMessage) {
+            showSuccess(queuedMessage);
+            return;
+        }
+
         @if(session('success'))
             showSuccess("{{ addslashes(session('success')) }}");
         @endif

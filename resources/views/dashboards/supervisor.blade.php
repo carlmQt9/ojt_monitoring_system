@@ -1817,10 +1817,20 @@
                     });
                 });
                 await Promise.all(requests);
-                window.location.reload();
+                if (typeof setQueuedSuccessMessage === 'function') {
+                    setQueuedSuccessMessage('All pending time logs were approved successfully!');
+                } else if (typeof showSuccess === 'function') {
+                    showSuccess('All pending time logs were approved successfully!');
+                }
+                setTimeout(() => window.location.reload(), 1800);
             } catch (err) {
                 console.error('Bulk approve error:', err);
-                window.location.reload();
+                if (typeof setQueuedSuccessMessage === 'function') {
+                    setQueuedSuccessMessage('Bulk approval completed.');
+                } else if (typeof showSuccess === 'function') {
+                    showSuccess('Bulk approval completed.');
+                }
+                setTimeout(() => window.location.reload(), 1200);
             }
         }
 
@@ -1873,7 +1883,9 @@
                 const data = await res.json();
                 btn.closest('.fixed').remove();
                 if (data.success) {
-                    showToast('Approval Undone', 'Hours deducted and record set back to Pending.', 'orange');
+                    if (!setQueuedToastNotification('Approval Undone', 'Hours deducted and record set back to Pending.', 'orange')) {
+                        showToast('Approval Undone', 'Hours deducted and record set back to Pending.', 'orange');
+                    }
                     setTimeout(() => location.reload(), 1200);
                 } else {
                     showToast('Error', data.message || 'Failed to undo approval.', 'red');
@@ -1953,17 +1965,39 @@
 
         function approveTimeLog(logId, studentName) {
             showLoadingModal('APPROVING');
+            const token = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
+            const fd = new FormData();
+            fd.append('_token', token);
             
             fetch('/approve-time-in/' + logId, {
                 method: 'POST',
+                body: fd,
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'X-CSRF-TOKEN': token,
+                    'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json'
-                }
+                },
+                credentials: 'same-origin'
             })
             .then(async r => {
-                const data = await r.json();
+                const text = await r.text();
+                let data = {};
+
+                if (text) {
+                    const contentType = (r.headers.get('content-type') || '').toLowerCase();
+                    if (contentType.includes('application/json')) {
+                        try { data = JSON.parse(text); } catch (e) { throw new Error('The server returned an invalid approval response. Please refresh and try again.'); }
+                    } else if (/<html|<!doctype html/i.test(text)) {
+                        if (r.status === 401 || /login/i.test(text)) {
+                            window.location.reload();
+                            throw new Error('Your session has expired. Please sign in again.');
+                        }
+                        throw new Error('This action is no longer available. Please refresh the page and try again.');
+                    } else {
+                        try { data = JSON.parse(text); } catch (e) { throw new Error(text.trim() || 'Unable to process the approval response. Please refresh and try again.'); }
+                    }
+                }
+
                 if (!r.ok || !data.success) throw new Error(data.message || 'Failed to approve');
                 updateSupervisorTimeLog(logId, 'approved');
                 refreshSupervisorStudent(data.dashboard);
@@ -1975,8 +2009,13 @@
             })
             .catch((err) => {
                 hideLoadingModal();
+                const message = err?.message || 'Failed to approve';
+                if (/session|login|expired|unauth/i.test(message)) {
+                    window.location.reload();
+                    return;
+                }
                 console.error('Approve error:', err);
-                showToast('Error', err.message || 'Failed to approve', 'red');
+                showToast('Error', message, 'red');
             });
         }
 
@@ -2067,25 +2106,56 @@
             const form = this;
             const submitButton = form.querySelector('button[type="submit"]');
             const logId = form.action.split('/').pop();
+            const token = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
+            const fd = new FormData(form);
+            fd.set('_token', token);
             submitButton.disabled = true;
             showLoadingModal('DENYING');
             try {
                 const response = await fetch(form.action, {
                     method: 'POST',
-                    body: new FormData(form),
-                    headers: { 'Accept': 'application/json' },
+                    body: fd,
+                    headers: {
+                        'X-CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'same-origin'
                 });
-                const data = await response.json();
+                const text = await response.text();
+                let data = {};
+
+                if (text) {
+                    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+                    if (contentType.includes('application/json')) {
+                        try { data = JSON.parse(text); } catch (e) { throw new Error('The server returned an invalid denial response. Please refresh and try again.'); }
+                    } else if (/<html|<!doctype html/i.test(text)) {
+                        if (response.status === 401 || /login/i.test(text)) {
+                            window.location.reload();
+                            throw new Error('Your session has expired. Please sign in again.');
+                        }
+                        throw new Error('This action is no longer available. Please refresh the page and try again.');
+                    } else {
+                        try { data = JSON.parse(text); } catch (e) { throw new Error(text.trim() || 'Unable to process the denial response. Please refresh and try again.'); }
+                    }
+                }
+
                 if (!response.ok || !data.success) throw new Error(data.message || 'Failed to deny');
                 updateSupervisorTimeLog(logId, 'denied');
                 refreshSupervisorStudent(data.dashboard);
                 refreshInlineTimeEditRow(logId, 'denied');
                 closeSupervisorDenyTimeModal();
                 showSupervisorLogsModalFromCurrentTitle();
+                hideLoadingModal();
                 if (typeof showSuccess === 'function') showSuccess(data.message || 'The time log was denied.');
                 else showToast('Time log denied', data.message || 'The time log was updated.', 'green');
             } catch (error) {
-                showToast('Error', error.message || 'Failed to deny', 'red');
+                const message = error?.message || 'Failed to deny';
+                if (/session|login|expired|unauth/i.test(message)) {
+                    window.location.reload();
+                    return;
+                }
+                showToast('Error', message, 'red');
                 submitButton.disabled = false;
             } finally {
                 hideLoadingModal();
@@ -2364,8 +2434,8 @@
                 if (typeof hidePixelLoader === 'function') hidePixelLoader();
                 if (data.success) {
                     closeEvaluationModal();
-                    if (typeof showSuccess === 'function') showSuccess('Evaluation submitted successfully!');
-                    setTimeout(() => { _allowLeave = true; window.location.reload(); }, 3500);
+                    setQueuedSuccessMessage('Evaluation submitted successfully!');
+                    setTimeout(() => { _allowLeave = true; window.location.reload(); }, 500);
                 } else {
                     alert('Failed to submit. Please try again.');
                     submitBtn.disabled = false; submitBtn.textContent = 'Submit Evaluation';
@@ -2467,7 +2537,10 @@
             .then(data => {
                 closeCertConfirm();
                 if (data.success) {
-                    showToast('🏅 Certificate Awarded!', data.message || 'Certificate successfully issued.', 'green');
+                    const message = data.message || 'Certificate successfully issued.';
+                    if (!setQueuedToastNotification('🏅 Certificate Awarded!', message, 'green')) {
+                        showToast('🏅 Certificate Awarded!', message, 'green');
+                    }
                     setTimeout(() => location.reload(), 1500);
                 } else {
                     btn.disabled = false;
@@ -2583,7 +2656,9 @@
             .then(data => {
                 hideUploadingOverlay();
                 if (data.success) {
-                    showToast('✅ Certificate Uploaded!', 'The certificate is now visible to the student.', 'green');
+                    if (!setQueuedToastNotification('✅ Certificate Uploaded!', 'The certificate is now visible to the student.', 'green')) {
+                        showToast('✅ Certificate Uploaded!', 'The certificate is now visible to the student.', 'green');
+                    }
                     setTimeout(() => location.reload(), 1500);
                 } else {
                     if (progress) progress.classList.add('hidden');
