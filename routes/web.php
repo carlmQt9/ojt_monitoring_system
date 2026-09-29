@@ -288,10 +288,20 @@ Route::post('/time-in', function () {
 })->name('time-in')->middleware(['auth.custom', 'role:student', 'throttle:20,1']);
 
 Route::post('/time-out', function () {
+    $student = User::findOrFail(session('user_id'));
+    if ($student->role !== 'student') {
+        abort(403, 'Access denied: only students can record time-out.');
+    }
+
+    if (request()->filled('student_id') && (int) request()->input('student_id') !== (int) $student->id) {
+        abort(403, 'Access denied: you can only record your own time-out.');
+    }
+
     $rules = [
         'student_id' => 'required|exists:users,id',
         'date'       => 'required|date',
         'session'    => 'nullable|in:morning,afternoon',
+        'regular_only' => 'nullable|boolean',
     ];
 
     if (request()->filled('photo_base64')) {
@@ -299,11 +309,12 @@ Route::post('/time-out', function () {
     }
 
     $validated = request()->validate($rules);
+    $regularOnly = (bool) ($validated['regular_only'] ?? false);
 
     // Find the open (no time_out) record for today matching session
     // Always use server Manila date — never trust the client-sent date
     $serverTodayManila = \Carbon\Carbon::now('Asia/Manila')->toDateString();
-    $record = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
+    $record = \App\Models\TimeInRecord::where('student_id', $student->id)
         ->whereDate('date', $serverTodayManila)
         ->whereNull('time_out')
         ->when(isset($validated['session']), fn($q) => $q->where('session', $validated['session']))
@@ -344,81 +355,29 @@ Route::post('/time-out', function () {
     }
     $record->update($updateData);
 
-    // Calculate hours for THIS session (handle cross-midnight: if time_out < time_in, add 1 day)
-    $timeInParts  = explode(':', $record->time_in);
-    $timeOutParts = explode(':', $serverTimeOut);
-    $inTime  = \Carbon\Carbon::createFromTime($timeInParts[0], $timeInParts[1], 0);
-    $outTime = \Carbon\Carbon::createFromTime($timeOutParts[0], $timeOutParts[1], 0);
-    if ($outTime->lessThan($inTime)) {
-        $outTime->addDay(); // crossed midnight
+    $calculatedHours = \App\Helpers\AttendanceHelper::calculateRecordHours($record);
+    $regularThisSession = $calculatedHours['regular_hours'];
+    $otThisSession = $regularOnly ? 0.0 : $calculatedHours['ot_hours'];
+    $otStatus = $regularOnly ? 'denied' : $calculatedHours['ot_status'];
+
+    if ($regularOnly) {
+        $otLetter = \App\Models\StudentRequirement::where('student_id', $student->id)
+            ->whereDate('created_at', $serverTodayManila)
+            ->where('status', 'pending')
+            ->where(function ($query) {
+                $query->where('title', 'like', '%OT%')
+                    ->orWhere('title', 'like', '%overtime%')
+                    ->orWhere('title', 'like', '%over time%');
+            })
+            ->latest('created_at')
+            ->first();
+        $otLetter?->update([
+            'status' => 'denied',
+            'feedback' => 'OT was not claimed because the student chose regular-hours-only time-out.',
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
     }
-    $sessionMinutes = max(0, $inTime->diffInMinutes($outTime));
-    $sessionHours   = round($sessionMinutes / 60, 2);
-
-    // Calculate total hours already logged today (previous sessions, already timed out)
-    $prevSessionsToday = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
-        ->whereDate('date', $serverTodayManila)
-        ->whereNotNull('time_out')
-        ->where('id', '!=', $record->id)
-        ->get();
-    $prevDayMinutes = $prevSessionsToday->sum(fn($r) => (function($ti, $to) {
-        $i = \Carbon\Carbon::parse($ti); $o = \Carbon\Carbon::parse($to);
-        if ($o->lt($i)) $o->addDay();
-        return max(0, $i->diffInMinutes($o));
-    })($r->time_in, $r->time_out));
-    $prevDayHours = round($prevDayMinutes / 60, 2);
-    $totalDayHours = round($prevDayHours + $sessionHours, 2);
-
-    // ── OT CUTOFF: only count time from OT letter submission onward as OT ──────────────────────
-    // Find the most recent non-denied OT letter submitted today.
-    $otLetter = \App\Models\StudentRequirement::where('student_id', $validated['student_id'])
-        ->whereDate('created_at', $serverTodayManila)
-        ->where('status', '!=', 'denied')
-        ->where(function($q) {
-            $q->where('title', 'like', '%OT%')
-              ->orWhere('title', 'like', '%overtime%')
-              ->orWhere('title', 'like', '%over time%');
-        })
-        ->orderByDesc('created_at')
-        ->first();
-
-    $regularCap = 8.0;
-    $otThisSession      = 0.0;
-    $regularThisSession = 0.0;
-    $otStatus           = null;
-
-    if ($otLetter) {
-        // OT letter exists — only minutes AFTER the letter was submitted count as OT.
-        // The letter submission time in Manila timezone.
-        $otStartTime = $otLetter->created_at->setTimezone('Asia/Manila');
-        // Express all times as minutes-from-midnight, with midnight-wrap applied uniformly
-        $inTimeMins  = $inTime->hour * 60 + $inTime->minute;
-        $outTimeMins = $outTime->hour * 60 + $outTime->minute;
-        $otStartMins = $otStartTime->hour * 60 + $otStartTime->minute;
-        // Handle midnight wrap: if outTime or otStart appears to be before inTime, it crossed midnight
-        if ($outTimeMins < $inTimeMins) $outTimeMins += 1440;
-        if ($otStartMins < $inTimeMins) $otStartMins += 1440;
-        // Clamp otStart into [inTimeMins, outTimeMins] so it stays within this session
-        $otStartMins = max($inTimeMins, min($otStartMins, $outTimeMins));
-
-        $otMinutesThisSession      = max(0, $outTimeMins - $otStartMins);
-        $regularMinutesThisSession = max(0, $sessionMinutes - $otMinutesThisSession);
-
-        // Also apply the daily 8-hr cap on regular hours
-        $regularAvailable = max(0, $regularCap - $prevDayHours) * 60; // in minutes
-        $regularMinutesThisSession = min($regularMinutesThisSession, $regularAvailable);
-
-        $regularThisSession = round($regularMinutesThisSession / 60, 2);
-        $otThisSession      = round($otMinutesThisSession / 60, 2);
-        $otStatus           = ($otLetter->status === 'approved') ? 'approved' : 'pending';
-    } else {
-        // No OT letter — no OT at all. Regular = session contribution within 8-hr cap.
-        $regularToday       = min($totalDayHours, $regularCap);
-        $regularThisSession = max(0, round($regularToday - $prevDayHours, 2));
-        $otThisSession      = 0.0; // no letter = no OT counted
-        $otStatus           = null;
-    }
-    // ── END OT CUTOFF ─────────────────────────────────────────────────────────────────────────
 
     // Update the record with computed hours
     $record->update([
@@ -427,8 +386,7 @@ Route::post('/time-out', function () {
         'ot_status'     => $otStatus,
     ]);
 
-    // DO NOT add hours yet — wait for supervisor/coordinator approval of the time-in record
-    // Create daily log entry as pending (only regular hours tracked here; OT handled separately)
+    // Regular hours remain pending until time-log approval; OT is credited separately only by an approved OT letter.
     \App\Models\DailyHourLog::create([
         'student_id'   => $validated['student_id'],
         'log_date'     => $serverTodayManila,
@@ -437,21 +395,28 @@ Route::post('/time-out', function () {
         'status'       => 'pending',
     ]);
 
-    // If OT exists and letter already approved, create a separate pending OT log entry
+    // OT is credited independently from regular hours when the OT letter is approved.
     if ($otThisSession > 0 && $otStatus === 'approved') {
+        $studentHours = \App\Models\StudentHours::where('student_id', $validated['student_id'])
+            ->firstOrCreate(['student_id' => $validated['student_id']], ['total_hours_required' => 600]);
+        $newCompleted = round(max(0, $studentHours->hours_completed + $otThisSession), 2);
+        $studentHours->update([
+            'hours_completed' => $newCompleted,
+            'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
+        ]);
         \App\Models\DailyHourLog::create([
             'student_id'   => $validated['student_id'],
             'log_date'     => $serverTodayManila,
             'hours_logged' => $otThisSession,
             'is_overtime'  => true,
-            'status'       => 'pending',
+            'status'       => 'approved',
         ]);
     }
 
     $msg = $otThisSession > 0
         ? sprintf('Time-out recorded! Regular: %.2f hrs, OT: %.2f hrs (from OT letter submission). %s',
             $regularThisSession, $otThisSession,
-            $otStatus === 'approved' ? 'OT letter approved — OT hours will be credited upon time-in approval.' : 'OT hours pending — coordinator/supervisor must approve your OT letter.')
+            $otStatus === 'approved' ? 'OT letter approved — OT hours credited automatically.' : 'OT hours pending — coordinator/supervisor must approve your OT letter.')
         : sprintf('Time-out recorded! %.2f hrs — awaiting approval.', $regularThisSession);
 
     return back()->with('success', $msg);
@@ -459,9 +424,19 @@ Route::post('/time-out', function () {
 
 // AJAX time-out endpoint: returns JSON with updated student hours
 Route::post('/time-out-ajax', function () {
+    $student = User::findOrFail(session('user_id'));
+    if ($student->role !== 'student') {
+        return response()->json(['success' => false, 'message' => 'Only students can record time-out.'], 403);
+    }
+
+    if (request()->filled('student_id') && (int) request()->input('student_id') !== (int) $student->id) {
+        return response()->json(['success' => false, 'message' => 'You can only record your own time-out.'], 403);
+    }
+
     $rules = [
         'student_id' => 'required|exists:users,id',
         'date' => 'required|date',
+        'regular_only' => 'nullable|boolean',
     ];
 
     if (request()->filled('photo_base64')) {
@@ -469,12 +444,13 @@ Route::post('/time-out-ajax', function () {
     }
 
     $validated = request()->validate($rules);
+    $regularOnly = (bool) ($validated['regular_only'] ?? false);
 
     // Always use server Manila date to find the record — never trust client date
     $serverTodayManila = \Carbon\Carbon::now('Asia/Manila')->toDateString();
     // Find the open session (no time_out yet) so we never accidentally overwrite
     // the already-completed session when two sessions exist on the same day.
-    $record = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
+    $record = \App\Models\TimeInRecord::where('student_id', $student->id)
         ->whereDate('date', $serverTodayManila)
         ->whereNull('time_out')
         ->orderBy('session') // morning before afternoon — pick the earliest open one
@@ -505,68 +481,28 @@ Route::post('/time-out-ajax', function () {
     if ($timeOutPhotoPath && \Illuminate\Support\Facades\Schema::hasColumn('time_in_records', 'time_out_photo_path')) $updateData['time_out_photo_path'] = $timeOutPhotoPath;
     $record->update($updateData);
 
-    // ── Same OT-cutoff logic as /time-out ─────────────────────────────────────
-    $timeInParts  = explode(':', $record->time_in);
-    $timeOutParts = explode(':', $serverTimeOut);
-    $inTime  = \Carbon\Carbon::createFromTime($timeInParts[0], $timeInParts[1], 0);
-    $outTime = \Carbon\Carbon::createFromTime($timeOutParts[0], $timeOutParts[1], 0);
-    if ($outTime->lessThan($inTime)) {
-        $outTime->addDay(); // crossed midnight
-    }
-    $sessionMinutes = max(0, $inTime->diffInMinutes($outTime));
-    $sessionHours   = round($sessionMinutes / 60, 2);
+    $calculatedHours = \App\Helpers\AttendanceHelper::calculateRecordHours($record);
+    $regularThisSession = $calculatedHours['regular_hours'];
+    $otThisSession = $regularOnly ? 0.0 : $calculatedHours['ot_hours'];
+    $otStatus = $regularOnly ? 'denied' : $calculatedHours['ot_status'];
 
-    // Total hours already logged today in other completed sessions
-    $prevSessionsToday = \App\Models\TimeInRecord::where('student_id', $validated['student_id'])
-        ->whereDate('date', $serverTodayManila)
-        ->whereNotNull('time_out')
-        ->where('id', '!=', $record->id)
-        ->get();
-    $prevDayMinutes = $prevSessionsToday->sum(fn($r) => (function($ti, $to) {
-        $i = \Carbon\Carbon::parse($ti); $o = \Carbon\Carbon::parse($to);
-        if ($o->lt($i)) $o->addDay();
-        return max(0, $i->diffInMinutes($o));
-    })($r->time_in, $r->time_out));
-    $prevDayHours = round($prevDayMinutes / 60, 2);
-    $totalDayHours = round($prevDayHours + $sessionHours, 2);
-
-    // OT cutoff: only count from OT letter submission time onward
-    $otLetter = \App\Models\StudentRequirement::where('student_id', $validated['student_id'])
-        ->whereDate('created_at', $serverTodayManila)
-        ->where('status', '!=', 'denied')
-        ->where(function($q) {
-            $q->where('title', 'like', '%OT%')
-              ->orWhere('title', 'like', '%overtime%')
-              ->orWhere('title', 'like', '%over time%');
-        })
-        ->orderByDesc('created_at')
-        ->first();
-
-    $regularCap         = 8.0;
-    $regularThisSession = 0.0;
-    $otThisSession      = 0.0;
-    $otStatus           = null;
-
-    if ($otLetter) {
-        $otStartTime = $otLetter->created_at->setTimezone('Asia/Manila');
-        $inTimeMins  = $inTime->hour * 60 + $inTime->minute;
-        $outTimeMins = $outTime->hour * 60 + $outTime->minute;
-        $otStartMins = $otStartTime->hour * 60 + $otStartTime->minute;
-        if ($outTimeMins < $inTimeMins) $outTimeMins += 1440;
-        if ($otStartMins < $inTimeMins) $otStartMins += 1440;
-        $otStartMins = max($inTimeMins, min($otStartMins, $outTimeMins));
-
-        $otMinutesThisSession      = max(0, $outTimeMins - $otStartMins);
-        $regularMinutesThisSession = max(0, $sessionMinutes - $otMinutesThisSession);
-        $regularAvailable          = max(0, $regularCap - $prevDayHours) * 60;
-        $regularMinutesThisSession = min($regularMinutesThisSession, $regularAvailable);
-
-        $regularThisSession = round($regularMinutesThisSession / 60, 2);
-        $otThisSession      = round($otMinutesThisSession / 60, 2);
-        $otStatus           = ($otLetter->status === 'approved') ? 'approved' : 'pending';
-    } else {
-        $regularToday       = min($totalDayHours, $regularCap);
-        $regularThisSession = max(0, round($regularToday - $prevDayHours, 2));
+    if ($regularOnly) {
+        $otLetter = \App\Models\StudentRequirement::where('student_id', $student->id)
+            ->whereDate('created_at', $serverTodayManila)
+            ->where('status', 'pending')
+            ->where(function ($query) {
+                $query->where('title', 'like', '%OT%')
+                    ->orWhere('title', 'like', '%overtime%')
+                    ->orWhere('title', 'like', '%over time%');
+            })
+            ->latest('created_at')
+            ->first();
+        $otLetter?->update([
+            'status' => 'denied',
+            'feedback' => 'OT was not claimed because the student chose regular-hours-only time-out.',
+            'approved_by' => null,
+            'approved_at' => null,
+        ]);
     }
 
     // Persist computed hours onto the record (same as /time-out)
@@ -585,16 +521,23 @@ Route::post('/time-out-ajax', function () {
         'status'       => 'pending',
     ]);
     if ($otThisSession > 0 && $otStatus === 'approved') {
+        $studentHours = \App\Models\StudentHours::where('student_id', $validated['student_id'])
+            ->firstOrCreate(['student_id' => $validated['student_id']], ['total_hours_required' => 600]);
+        $newCompleted = round(max(0, $studentHours->hours_completed + $otThisSession), 2);
+        $studentHours->update([
+            'hours_completed' => $newCompleted,
+            'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
+        ]);
         \App\Models\DailyHourLog::create([
             'student_id'   => $validated['student_id'],
             'log_date'     => $serverTodayManila,
             'hours_logged' => $otThisSession,
             'is_overtime'  => true,
-            'status'       => 'pending',
+            'status'       => 'approved',
         ]);
     }
 
-    // Read current (not yet updated) StudentHours for the response — hours are pending approval
+    // Return the latest progress after any OT already authorized by the approved letter was credited.
     $studentHours = \App\Models\StudentHours::where('student_id', $validated['student_id'])
         ->firstOrCreate(['student_id' => $validated['student_id']], ['total_hours_required' => 600]);
     // ── END OT-cutoff logic ───────────────────────────────────────────────────
@@ -613,7 +556,7 @@ Route::post('/time-out-ajax', function () {
                 : 0,
         ],
         'message' => $otThisSession > 0
-            ? sprintf('Time-out recorded! %.2f reg hrs + %.2f OT hrs — awaiting approval.', $regularThisSession, $otThisSession)
+            ? sprintf('Time-out recorded! %.2f reg hrs + %.2f OT hrs — %s', $regularThisSession, $otThisSession, $otStatus === 'approved' ? 'OT credited by approved letter.' : 'OT awaits OT-letter approval.')
             : sprintf('Time-out recorded! %.2f hrs — awaiting approval.', $regularThisSession),
     ]);
 })->name('time-out-ajax')->middleware(['auth.custom', 'role:student']);
@@ -658,6 +601,10 @@ Route::get('/student-progress/{studentId}', function ($studentId) {
 Route::post('/approve-hours/{logId}', function ($logId) {
     $log = \App\Models\DailyHourLog::findOrFail($logId);
     $coordinator = User::findOrFail(session('user_id'));
+
+    if ($log->is_overtime) {
+        return back()->withErrors(['error' => 'Overtime is credited only when the OT letter is approved.']);
+    }
 
     // If the log is pending, apply its hours to the student's totals
     if ($log->status === 'pending') {
@@ -733,11 +680,12 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
     }
 
     $totalToCredit = 0;
+    $totalOtCorrection = 0;
     $msg           = '';
 
     // ── Wrap everything in a DB transaction to prevent partial updates ──────────
     // ── lockForUpdate() prevents race condition where two approvers hit at once ─
-    \Illuminate\Support\Facades\DB::transaction(function () use ($record, $reviewer, &$totalToCredit, &$msg) {
+    \Illuminate\Support\Facades\DB::transaction(function () use ($record, $reviewer, &$totalToCredit, &$totalOtCorrection, &$msg) {
 
         // Re-fetch with a row lock so concurrent requests queue up instead of double-crediting
         $record = \App\Models\TimeInRecord::where('id', $record->id)
@@ -758,39 +706,52 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
             ->lockForUpdate()
             ->get();
 
-        // Check if OT letter is approved for this date
-        $otLetterApproved = \App\Models\StudentRequirement::where('student_id', $record->student_id)
-            ->whereDate('created_at', $record->date)
-            ->where('status', 'approved')
-            ->where(function($q) {
-                $q->where('title', 'like', '%OT%')
-                  ->orWhere('title', 'like', '%overtime%')
-                  ->orWhere('title', 'like', '%over time%');
-            })->exists();
-
         foreach ($sessionRecords as $session) {
-            $regularHours = floatval($session->regular_hours ?? 0);
-            $otHours      = floatval($session->ot_hours ?? 0);
+            $calculatedHours = \App\Helpers\AttendanceHelper::calculateRecordHours($session);
+            $regularHours = $calculatedHours['regular_hours'];
             $totalToCredit += $regularHours;
-            if ($otHours > 0 && $otLetterApproved) {
-                $totalToCredit += $otHours;
-                $session->update(['ot_status' => 'approved']);
-            } elseif ($otHours > 0 && !$otLetterApproved) {
-                $session->update(['ot_status' => 'pending']);
+            if ($session->ot_status === 'approved') {
+                $totalOtCorrection += (float) ($session->ot_hours ?? 0) - $calculatedHours['ot_hours'];
             }
-            $session->update(['verified' => true, 'status' => 'approved', 'approved_by' => $reviewer->id, 'approved_at' => now(), 'denial_reason' => null]);
+            $session->update([
+                'regular_hours' => $regularHours,
+                'ot_hours' => $calculatedHours['ot_hours'],
+                'ot_status' => $calculatedHours['ot_status'],
+                'verified' => true,
+                'status' => 'approved',
+                'approved_by' => $reviewer->id,
+                'approved_at' => now(),
+                'denial_reason' => null,
+            ]);
         }
 
-        if ($totalToCredit > 0) {
+        if ($totalToCredit > 0 || abs($totalOtCorrection) > 0.001) {
             // Use atomic increment to prevent concurrent approvals losing each other's updates
             $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)
                 ->lockForUpdate()
                 ->firstOrCreate(['student_id' => $record->student_id], ['total_hours_required' => 600]);
-            $newCompleted = round(max(0, $studentHours->hours_completed + $totalToCredit), 2);
+            $newCompleted = round(max(0, $studentHours->hours_completed + $totalToCredit - $totalOtCorrection), 2);
             $studentHours->update([
                 'hours_completed' => $newCompleted,
                 'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
             ]);
+
+            if ($totalOtCorrection > 0) {
+                $otLogs = \App\Models\DailyHourLog::where('student_id', $record->student_id)
+                    ->whereDate('log_date', $record->date)
+                    ->where('is_overtime', true)
+                    ->whereIn('status', ['pending', 'approved'])
+                    ->orderByDesc('id')
+                    ->lockForUpdate()
+                    ->get();
+                $remainingCorrection = $totalOtCorrection;
+                foreach ($otLogs as $otLog) {
+                    if ($remainingCorrection <= 0) break;
+                    $reduction = min((float) $otLog->hours_logged, $remainingCorrection);
+                    $otLog->update(['hours_logged' => round(max(0, $otLog->hours_logged - $reduction), 2)]);
+                    $remainingCorrection -= $reduction;
+                }
+            }
         }
 
         $hasAnyUnfinishedSameDate = \App\Models\TimeInRecord::where('student_id', $record->student_id)
@@ -809,11 +770,14 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
                 ->update(['status' => $hasApprovedSameDate ? 'approved' : 'denied']);
         }
 
-        $msg = ($record->ot_hours > 0 && !\App\Models\StudentRequirement::where('student_id', $record->student_id)
+        $otLetterApproved = \App\Models\StudentRequirement::where('student_id', $record->student_id)
             ->whereDate('created_at', $record->date)->where('status','approved')
-            ->where(function($q){ $q->where('title','like','%OT%')->orWhere('title','like','%overtime%')->orWhere('title','like','%over time%'); })->exists())
-            ? 'All sessions approved! Regular hours credited. OT hours pending — student must get OT letter approved.'
-            : 'All sessions for this day approved and hours credited!';
+                ->where(function($q){ $q->where('title','like','%OT%')->orWhere('title','like','%overtime%')->orWhere('title','like','%over time%'); })->exists();
+            $msg = floatval($record->ot_hours ?? 0) > 0
+                ? ($otLetterApproved
+                    ? 'Regular hours credited. OT hours were credited through the approved OT letter.'
+                    : 'Regular hours credited. OT hours remain pending until the OT letter is approved.')
+                : 'Regular hours approved and credited.';
     });
 
     // Send email notification AFTER transaction commits (outside transaction to avoid holding lock)
@@ -1021,22 +985,11 @@ Route::post('/approve-all-time-in/{studentId}', function ($studentId) {
             return !is_null($r->time_out);
         });
 
-    $otLetterCache = [];
     $totalToCredit = 0;
     foreach ($pendingRecords as $record) {
-        $dateKey = $record->date->toDateString();
-        if (!isset($otLetterCache[$dateKey])) {
-            $otLetterCache[$dateKey] = \App\Models\StudentRequirement::where('student_id', $studentId)
-                ->whereDate('created_at', $dateKey)->where('status', 'approved')
-                ->where(fn($q) => $q->where('title','like','%OT%')->orWhere('title','like','%overtime%')->orWhere('title','like','%over time%'))
-                ->exists();
-        }
         $regular = floatval($record->regular_hours ?? 0);
-        $ot      = floatval($record->ot_hours ?? 0);
         $totalToCredit += $regular;
-        if ($ot > 0 && $otLetterCache[$dateKey]) $totalToCredit += $ot;
-        $record->update(['verified' => true, 'status' => 'approved', 'approved_by' => $reviewer->id, 'approved_at' => now(),
-            'ot_status' => $ot > 0 ? ($otLetterCache[$dateKey] ? 'approved' : 'pending') : $record->ot_status]);
+        $record->update(['verified' => true, 'status' => 'approved', 'approved_by' => $reviewer->id, 'approved_at' => now()]);
     }
     if ($totalToCredit > 0) {
         $sh = \App\Models\StudentHours::where('student_id', $studentId)->firstOrCreate(['student_id' => $studentId], ['total_hours_required' => 600]);
@@ -1104,30 +1057,11 @@ Route::post('/approve-all-pending-time-in', function () {
 
     $approvedCount = 0;
     foreach ($pendingRecords->groupBy('student_id') as $studentId => $studentRecords) {
-        $otLetterCache = [];
         $studentCredited = 0;
 
         foreach ($studentRecords as $record) {
-            $dateKey = $record->date->toDateString();
-            if (!array_key_exists($dateKey, $otLetterCache)) {
-                $otLetterCache[$dateKey] = \App\Models\StudentRequirement::where('student_id', $studentId)
-                    ->whereDate('created_at', $dateKey)
-                    ->where('status', 'approved')
-                    ->where(fn($query) => $query->where('title', 'like', '%OT%')
-                        ->orWhere('title', 'like', '%overtime%')
-                        ->orWhere('title', 'like', '%over time%'))
-                    ->exists();
-            }
-
             $regularHours = floatval($record->regular_hours ?? 0);
-            $otHours = floatval($record->ot_hours ?? 0);
             $studentCredited += $regularHours;
-            if ($otHours > 0 && $otLetterCache[$dateKey]) {
-                $studentCredited += $otHours;
-                $record->update(['ot_status' => 'approved']);
-            } elseif ($otHours > 0) {
-                $record->update(['ot_status' => 'pending']);
-            }
             $record->update([
                 'verified' => true,
                 'status' => 'approved',
@@ -1249,10 +1183,24 @@ Route::post('/approve-all-requirements/{studentId}', function ($studentId) {
         $isOt = stripos($req->title,'OT')!==false || stripos($req->title,'overtime')!==false || stripos($req->title,'over time')!==false;
         if ($isOt) {
             $otDate = $req->created_at->toDateString();
-            $otRecs = \App\Models\TimeInRecord::where('student_id',$studentId)->whereDate('date',$otDate)
-                ->where('status','approved')->where('ot_status','pending')->where('ot_hours','>',0)->get();
+            $otRecs = \App\Models\TimeInRecord::where('student_id', $studentId)
+                ->whereDate('date', $otDate)
+                ->whereNotNull('time_out')
+                ->whereIn('status', ['pending', 'approved', 'verified'])
+                ->get();
             $totalOt = 0;
-            foreach ($otRecs as $or) { $totalOt += floatval($or->ot_hours); $or->update(['ot_status'=>'approved']); }
+            foreach ($otRecs as $or) {
+                if ($or->ot_status === 'approved') {
+                    continue;
+                }
+
+                $otHours = floatval($or->ot_hours ?? 0);
+
+                if ($otHours > 0) {
+                    $totalOt += $otHours;
+                    $or->update(['ot_status' => 'approved', 'ot_hours' => $otHours]);
+                }
+            }
             if ($totalOt > 0) {
                 $sh = \App\Models\StudentHours::where('student_id',$studentId)->firstOrCreate(['student_id'=>$studentId],['total_hours_required'=>600]);
                 $newCompleted = round(max(0, $sh->hours_completed + $totalOt), 2);
@@ -1299,6 +1247,52 @@ Route::post('/upload-requirement', function () {
         'file'        => 'nullable',
         'file.*'      => 'file|mimes:pdf,doc,docx,jpg,jpeg,png,gif,webp|max:15360',
     ]);
+
+    $student = User::findOrFail(session('user_id'));
+    if ((int) $validated['student_id'] !== (int) $student->id) {
+        abort(403, 'Access denied: you can only upload requirements for yourself.');
+    }
+
+    $isOtLetter = preg_match('/\\bot\\b|overtime|over\\s*time/i', $validated['title']) === 1;
+    if ($isOtLetter) {
+        $today = \Carbon\Carbon::now('Asia/Manila');
+        $todayDate = $today->toDateString();
+        $activeRecord = \App\Models\TimeInRecord::where('student_id', $student->id)
+            ->whereDate('date', $todayDate)
+            ->whereNull('time_out')
+            ->latest()
+            ->first();
+
+        if (!$activeRecord) {
+            return back()->withErrors(['title' => 'You need an active time-in record to submit an OT letter.']);
+        }
+
+        $completedMinutes = \App\Models\TimeInRecord::where('student_id', $student->id)
+            ->whereDate('date', $todayDate)
+            ->whereNotNull('time_out')
+            ->get()
+            ->sum(fn ($record) => $record->minutes_worked);
+        $activeStartedAt = \Carbon\Carbon::parse($todayDate . ' ' . $activeRecord->time_in, 'Asia/Manila');
+        $activeMinutes = max(0, $activeStartedAt->diffInMinutes($today));
+
+        if (($completedMinutes + $activeMinutes) < 480) {
+            return back()->withErrors(['title' => 'Complete 8 hours today before submitting an OT letter.']);
+        }
+
+        $existingOtLetter = \App\Models\StudentRequirement::where('student_id', $student->id)
+            ->whereDate('created_at', $todayDate)
+            ->whereIn('status', ['pending', 'approved'])
+            ->where(function ($query) {
+                $query->where('title', 'like', '%OT%')
+                    ->orWhere('title', 'like', '%overtime%')
+                    ->orWhere('title', 'like', '%over time%');
+            })
+            ->exists();
+
+        if ($existingOtLetter) {
+            return back()->withErrors(['title' => 'An OT letter has already been submitted for today.']);
+        }
+    }
 
     $files = request()->file('file');
     if (empty($files)) {
@@ -1358,10 +1352,10 @@ Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
 
     if ($isOtLetter) {
         $otDate = $requirement->created_at->toDateString();
-        // Approve the entire day's relevant sessions when the OT letter is approved,
-        // so regular and OT totals on the DTR are counted together for that date.
+        // Credit completed-session OT only; regular time-log approval remains a separate action.
         $dayRecords = \App\Models\TimeInRecord::where('student_id', $requirement->student_id)
             ->whereDate('date', $otDate)
+            ->whereNotNull('time_out')
             ->where(function ($query) {
                 $query->where('status', 'pending')
                     ->orWhere('status', 'approved')
@@ -1371,21 +1365,13 @@ Route::post('/approve-requirement/{requirementId}', function ($requirementId) {
 
         $totalOtToCredit = 0;
         foreach ($dayRecords as $dayRec) {
-            $dayRec->update([
-                'status'   => 'approved',
-                'verified' => true,
-            ]);
-
-            $otValue = floatval($dayRec->ot_hours ?? 0);
-            if ($otValue <= 0 && $dayRec->time_in && $dayRec->time_out) {
-                $inTime = \Carbon\Carbon::parse($dayRec->time_in);
-                $outTime = \Carbon\Carbon::parse($dayRec->time_out);
-                if ($outTime->lt($inTime)) {
-                    $outTime->addDay();
-                }
-                $workedHours = max(0, $inTime->diffInMinutes($outTime) / 60);
-                $otValue = max(0, round($workedHours - (float) ($dayRec->regular_hours ?? 0), 2));
+            if ($dayRec->ot_status === 'approved') {
+                continue;
             }
+
+                // Only credit the OT explicitly calculated from the letter submission timestamp at time-out.
+                // Only credit OT explicitly measured from the letter submission time at time-out.
+                $otValue = floatval($dayRec->ot_hours ?? 0);
 
             if ($otValue > 0) {
                 $dayRec->update([
@@ -1857,16 +1843,15 @@ Route::get('/api/school-ids', function () {
             ->update(['is_used' => true]);
     }
 
-    // Mark as available where NO active student exists AND the school ID is not archived
-    // (archived school IDs keep is_used=true regardless — they cannot be freed this way)
+    // Keep the ID reserved while any active or archived user still owns it.
+    // Permanent user deletion removes that owner, after which this sync frees it.
     \App\Models\StudentSchoolId::whereNotIn('school_id_number', $activeUsedIds)
         ->where('is_used', true)
         ->whereNull('deleted_at')
         ->whereNotExists(function($q) {
             // Safety: don't free it if any user (even soft-deleted) still holds this ID
             $q->from('users')
-              ->whereColumn('users.school_id_number', 'student_school_ids.school_id_number')
-              ->whereNull('users.deleted_at');
+                            ->whereColumn('users.school_id_number', 'student_school_ids.school_id_number');
         })
         ->update(['is_used' => false]);
 
@@ -1925,24 +1910,18 @@ Route::delete('/api/school-ids/{id}', function ($id) {
 Route::post('/api/school-ids/{id}/restore', function ($id) {
     $sid = \App\Models\StudentSchoolId::withTrashed()->findOrFail($id);
     $sid->restore();
-    $sid->update(['is_used' => false]); // re-enable for registration
-
-    // Also restore the student user who owns this school ID (if archived)
-    $user = \App\Models\User::withTrashed()
+    $hasOwner = \App\Models\User::withoutGlobalScope(\Illuminate\Database\Eloquent\SoftDeletingScope::class)
         ->where('school_id_number', $sid->school_id_number)
-        ->whereNotNull('deleted_at')
-        ->first();
-    if ($user) {
-        $user->restore();
-        $sid->update(['is_used' => true]); // mark as used again since user exists
-    }
+        ->exists();
+    $sid->update(['is_used' => $hasOwner]);
 
     return response()->json(['success' => true]);
 })->middleware('role:ccit_head');
 
 Route::delete('/api/school-ids/{id}/force', function ($id) {
-    \App\Models\StudentSchoolId::withTrashed()->findOrFail($id)->forceDelete();
-    return response()->json(['success' => true]);
+    $sid = \App\Models\StudentSchoolId::onlyTrashed()->findOrFail($id);
+    $sid->forceDelete();
+    return response()->json(['success' => true, 'message' => 'School ID permanently deleted.']);
 })->middleware('role:ccit_head');
 
 Route::get('/api/school-ids/archived', function () {
@@ -1991,17 +1970,6 @@ Route::delete('/api/school-years/{id}', function ($id) {
 
 Route::post('/api/school-years/{id}/restore', function ($id) {
     \App\Models\SchoolYear::withTrashed()->findOrFail($id)->restore();
-    return response()->json(['success' => true]);
-})->middleware(['auth.custom', 'role:ccit_head']);
-
-Route::delete('/api/school-years/{id}/force', function ($id) {
-    \App\Models\SchoolYear::withTrashed()->findOrFail($id)->forceDelete();
-    return response()->json(['success' => true]);
-})->middleware(['auth.custom', 'role:ccit_head']);
-
-Route::post('/api/school-years/{id}/activate', function ($id) {
-    \App\Models\SchoolYear::query()->update(['is_active' => false]);
-    \App\Models\SchoolYear::findOrFail($id)->update(['is_active' => true]);
     return response()->json(['success' => true]);
 })->middleware(['auth.custom', 'role:ccit_head']);
 
@@ -2199,7 +2167,8 @@ Route::get('/api/users', function () {
 
 // return single user for editing
 Route::get('/api/users/archived', function () {
-    $archived = User::onlyTrashed()->orderBy('deleted_at', 'desc')->get();
+    $archived = User::withoutGlobalScope(\Illuminate\Database\Eloquent\SoftDeletingScope::class)
+        ->whereNotNull('deleted_at')->orderBy('deleted_at', 'desc')->get();
     $data = $archived->map(fn($u) => [
         'id'               => $u->id,
         'name'             => $u->name,
@@ -2211,7 +2180,7 @@ Route::get('/api/users/archived', function () {
         'deleted_at'       => $u->deleted_at?->format('M d, Y'),
     ]);
     return response()->json(['users' => $data]);
-});
+})->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::get('/api/users/{id}', function ($id) {
     $user = User::findOrFail($id);
@@ -2388,7 +2357,7 @@ Route::get('/api/analytics', function () {
 });
 
 Route::delete('/api/users/{id}', function ($id) {
-    $user = User::findOrFail($id);
+    $user = User::whereNull('deleted_at')->findOrFail($id);
     // Mark student's school ID as inactive when archiving
     if ($user->role === 'student' && $user->school_id_number) {
         \App\Models\StudentSchoolId::where('school_id_number', $user->school_id_number)
@@ -2399,31 +2368,92 @@ Route::delete('/api/users/{id}', function ($id) {
 })->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::post('/api/users/{id}/restore', function ($id) {
-    $user = User::withTrashed()->findOrFail($id);
-    $user->restore(); // un-soft-delete — records become visible again
-    // Restore student's school ID back to "used" (they still own it)
+    $user = User::withoutGlobalScope(\Illuminate\Database\Eloquent\SoftDeletingScope::class)
+        ->whereNotNull('deleted_at')->findOrFail($id);
     if ($user->role === 'student' && $user->school_id_number) {
-        \App\Models\StudentSchoolId::where('school_id_number', $user->school_id_number)
-            ->update(['is_used' => true]);
+        $conflictingUser = User::withoutGlobalScope(\Illuminate\Database\Eloquent\SoftDeletingScope::class)
+            ->whereNull('deleted_at')
+            ->where('school_id_number', $user->school_id_number)
+            ->where('id', '!=', $user->id)
+            ->exists();
+        if ($conflictingUser) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This School ID is now assigned to another active user. Remove or change that assignment before restoring this account.',
+            ], 409);
+        }
+
+        $schoolId = \App\Models\StudentSchoolId::withTrashed()
+            ->where('school_id_number', $user->school_id_number)
+            ->first();
+        if (!$schoolId) {
+            $schoolId = \App\Models\StudentSchoolId::create([
+                'school_id_number' => $user->school_id_number,
+                'school_year' => $user->school_year,
+                'is_used' => true,
+            ]);
+        } elseif ($schoolId->trashed()) {
+            $schoolId->restore();
+        }
+        $schoolId?->update(['is_used' => true]);
     }
+
+    $user->restore(); // un-soft-delete — records become visible again
     return response()->json(['success' => true, 'message' => 'User restored successfully']);
 })->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::delete('/api/users/{id}/force', function ($id) {
-    $user = User::withTrashed()->findOrFail($id);
-    // Permanently delete all related records
-    \App\Models\TimeInRecord::where('student_id', $id)->delete();
-    \App\Models\DailyHourLog::where('student_id', $id)->delete();
-    \App\Models\StudentHours::where('student_id', $id)->delete();
-    \App\Models\StudentRequirement::where('student_id', $id)->delete();
-    \App\Models\StudentEvaluation::where('student_id', $id)->orWhere('supervisor_id', $id)->delete();
-    // Free the school ID permanently
-    if ($user->role === 'student' && $user->school_id_number) {
-        \App\Models\StudentSchoolId::where('school_id_number', $user->school_id_number)
-            ->update(['is_used' => false]);
+    $user = User::withoutGlobalScope(\Illuminate\Database\Eloquent\SoftDeletingScope::class)
+        ->whereNotNull('deleted_at')->findOrFail($id);
+    $schoolIdNumber = $user->role === 'student' ? $user->school_id_number : null;
+    $requirementFiles = \App\Models\StudentRequirement::where('student_id', $user->id)
+        ->get(['file_path', 'file_paths'])
+        ->flatMap(fn ($requirement) => array_merge(
+            $requirement->file_path ? [$requirement->file_path] : [],
+            is_array($requirement->file_paths) ? $requirement->file_paths : []
+        ))
+        ->filter()
+        ->unique()
+        ->values()
+        ->all();
+
+    \Illuminate\Support\Facades\DB::transaction(function () use ($user, $schoolIdNumber) {
+        \App\Models\TimeInRecord::where('student_id', $user->id)->delete();
+        \App\Models\DailyHourLog::where('student_id', $user->id)->delete();
+        \App\Models\StudentHours::where('student_id', $user->id)->delete();
+        \App\Models\StudentRequirement::where('student_id', $user->id)->delete();
+        \App\Models\StudentEvaluation::where('student_id', $user->id)
+            ->orWhere('supervisor_id', $user->id)
+            ->delete();
+
+        if ($schoolIdNumber) {
+            $schoolId = \App\Models\StudentSchoolId::withTrashed()
+                ->where('school_id_number', $schoolIdNumber)
+                ->lockForUpdate()
+                ->first();
+            $otherOwnerExists = User::withoutGlobalScope(\Illuminate\Database\Eloquent\SoftDeletingScope::class)
+                ->where('school_id_number', $schoolIdNumber)
+                ->where('id', '!=', $user->id)
+                ->exists();
+
+            if ($schoolId && !$otherOwnerExists) {
+                if ($schoolId->trashed()) {
+                    $schoolId->restore();
+                }
+                $schoolId->update(['is_used' => false]);
+            } elseif ($schoolId) {
+                $schoolId->update(['is_used' => true]);
+            }
+        }
+
+        $user->forceDelete();
+    });
+
+    foreach ($requirementFiles as $file) {
+        \Illuminate\Support\Facades\Storage::disk('public')->delete($file);
     }
-    $user->forceDelete();
-    return response()->json(['success' => true, 'message' => 'User permanently deleted']);
+
+    return response()->json(['success' => true, 'message' => 'User and related records permanently deleted. School ID is available if no other archived account owns it.']);
 })->middleware(['auth.custom', 'role:ccit_head']);
 
 Route::post('/api/users/{id}/approve', function ($id) {

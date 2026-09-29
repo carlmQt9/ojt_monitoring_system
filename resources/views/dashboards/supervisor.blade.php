@@ -796,7 +796,7 @@
                                             <td class="py-2 px-2 text-xs whitespace-nowrap">
                                                 @php
                                                     $regH = floatval($record->regular_hours ?? 0);
-                                                    $otH  = floatval($record->ot_hours ?? 0);
+                                                    $otH  = $record->ot_status === 'approved' ? floatval($record->ot_hours ?? 0) : 0;
                                                 @endphp
                                                 @if($regH > 0 || $otH > 0)
                                                     <span class="text-green-400 font-semibold">{{ number_format($regH, 2) }}h</span>
@@ -1271,6 +1271,7 @@
                             <div class="p-6 text-center text-gray-400 border border-slate-700 rounded-lg">No eligible pending timed-out records found.</div>
                         @endif
                         @foreach($_supPendingTimeRecords as $record)
+                            @php $calculatedHours = \App\Helpers\AttendanceHelper::calculateRecordHours($record); @endphp
                             <div class="rounded-lg border border-slate-700 bg-slate-800/60 p-3 text-sm text-gray-200">
                                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                     <div><p class="font-semibold">{{ $record->student->name }}</p><p class="text-xs text-gray-500">{{ $record->student->email }}</p></div>
@@ -1280,7 +1281,7 @@
                                     <div><span class="block text-gray-500">Date</span>{{ $record->date->format('M d, Y') }}</div>
                                     <div><span class="block text-gray-500">Session</span>{{ ucfirst($record->session ?? '-') }}</div>
                                     <div><span class="block text-gray-500">Time</span>{{ \Carbon\Carbon::parse($record->time_in)->format('h:i A') }} - {{ \Carbon\Carbon::parse($record->time_out)->format('h:i A') }}</div>
-                                    <div><span class="block text-gray-500">Hours</span>{{ number_format($record->regular_hours ?? 0, 2) }}h @if(floatval($record->ot_hours ?? 0) > 0)<span class="text-yellow-400">+{{ number_format($record->ot_hours, 2) }} OT</span>@endif</div>
+                                    <div><span class="block text-gray-500">Hours</span>{{ number_format($calculatedHours['regular_hours'], 2) }}h @if($calculatedHours['ot_status'] === 'approved' && $calculatedHours['ot_hours'] > 0)<span class="text-yellow-400">+{{ number_format($calculatedHours['ot_hours'], 2) }} OT</span>@endif</div>
                                 </div>
                             </div>
                         @endforeach

@@ -15,8 +15,7 @@ class User extends Authenticatable
     use HasFactory, Notifiable, SoftDeletes;
 
     /**
-     * Override SoftDeletes boot to only apply when the column actually exists.
-     * This prevents crashes on environments where the migration hasn't run yet.
+     * Apply soft deletes only when the migration has added deleted_at.
      */
     public static function bootSoftDeletes(): void
     {
@@ -25,7 +24,7 @@ class User extends Authenticatable
                 static::addGlobalScope(new \Illuminate\Database\Eloquent\SoftDeletingScope());
             }
         } catch (\Throwable) {
-            // DB unavailable during boot — skip soft deletes
+            // Database may not be available during model boot.
         }
     }
 

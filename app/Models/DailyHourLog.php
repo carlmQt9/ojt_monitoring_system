@@ -17,6 +17,10 @@ class DailyHourLog extends Model
         'hours_logged',
         'is_overtime',
         'notes',
+        'status',
+        'denial_reason',
+        'approved_by',
+        'approved_at',
     ];
 
     protected $casts = [

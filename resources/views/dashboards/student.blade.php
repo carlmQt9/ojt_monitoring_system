@@ -193,7 +193,7 @@
         // Pending hours = timed out but not yet approved (awaiting supervisor)
         $_pendingHours = round(\App\Models\TimeInRecord::where('student_id', $user->id)
             ->whereNotNull('time_out')->where('status', 'pending')->get()
-            ->sum(fn($r) => max(0, floatval($r->regular_hours ?? 0))), 2);
+            ->sum(fn($r) => \App\Helpers\AttendanceHelper::calculateRecordHours($r)['regular_hours']), 2);
         $_progress = $_required > 0 ? min(100, round(($_completed / $_required) * 100, 1)) : 0;
 
         // ── Nav badge counts ──────────────────────────────────────────────
@@ -684,13 +684,14 @@
                     $activeRecord = $todayRecords->whereNull('time_out')->first();
 
                     // Total hours today (completed sessions)
-                    $totalDayMinutes = $todayRecords->whereNotNull('time_out')->sum(function($r){
-                        $i=\Carbon\Carbon::parse($r->time_in);$o=\Carbon\Carbon::parse($r->time_out);
-                        if($o->lt($i))$o->addDay();return max(0,$i->diffInMinutes($o));
+                    $calculatedToday = $todayRecords->mapWithKeys(function ($record) {
+                        return [$record->id => $record->time_out
+                            ? \App\Helpers\AttendanceHelper::calculateRecordHours($record)
+                            : ['regular_hours' => (float) ($record->regular_hours ?? 0), 'ot_hours' => (float) ($record->ot_hours ?? 0), 'ot_status' => $record->ot_status]];
                     });
-                    $totalDayHours = round($totalDayMinutes / 60, 2);
-                    $regularHours  = min($totalDayHours, 8);
-                    $otHours       = max(0, round($totalDayHours - 8, 2));
+                    $regularHours = round($calculatedToday->sum(fn($hours) => $hours['regular_hours']), 2);
+                    $otHours = round($calculatedToday->sum(fn($hours) => $hours['ot_status'] === 'approved' ? $hours['ot_hours'] : 0), 2);
+                    $totalDayHours = round($regularHours + $otHours, 2);
 
                     // Can time in afternoon? Morning must be timed out and now >= 12:50
                     $nowMin = (int) $nowManila->format('i');
@@ -725,7 +726,7 @@
                                 <p class="text-gray-400 text-sm">Time In: <span class="text-green-400 font-semibold">{{ \Carbon\Carbon::parse($morningRecord->time_in)->format('h:i A') }}</span></p>
                                 @if($morningRecord->time_out)
                                     <p class="text-gray-400 text-sm">Time Out: <span class="text-orange-400 font-semibold">{{ \Carbon\Carbon::parse($morningRecord->time_out)->format('h:i A') }}</span></p>
-                                    <p class="text-gray-400 text-sm">Hours: <span class="text-blue-400 font-semibold">{{ number_format((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lt($i))$o->addDay();return $i->diffInMinutes($o)/60;})($morningRecord->time_in,$morningRecord->time_out), 2) }} hrs</span></p>
+                                    <p class="text-gray-400 text-sm">Hours: <span class="text-blue-400 font-semibold">{{ number_format($morningRecord->minutes_worked / 60, 2) }} hrs</span></p>
                                 @else
                                     <p class="text-yellow-400 text-xs mt-1">⏳ Currently active</p>
                                 @endif
@@ -739,7 +740,7 @@
                                 <p class="text-gray-400 text-sm">Time In: <span class="text-green-400 font-semibold">{{ \Carbon\Carbon::parse($afternoonRecord->time_in)->format('h:i A') }}</span></p>
                                 @if($afternoonRecord->time_out)
                                     <p class="text-gray-400 text-sm">Time Out: <span class="text-orange-400 font-semibold">{{ \Carbon\Carbon::parse($afternoonRecord->time_out)->format('h:i A') }}</span></p>
-                                    <p class="text-gray-400 text-sm">Hours: <span class="text-blue-400 font-semibold">{{ number_format((function($ti,$to){$i=\Carbon\Carbon::parse($ti);$o=\Carbon\Carbon::parse($to);if($o->lt($i))$o->addDay();return $i->diffInMinutes($o)/60;})($afternoonRecord->time_in,$afternoonRecord->time_out), 2) }} hrs</span></p>
+                                    <p class="text-gray-400 text-sm">Hours: <span class="text-blue-400 font-semibold">{{ number_format($afternoonRecord->minutes_worked / 60, 2) }} hrs</span></p>
                                 @else
                                     <p class="text-yellow-400 text-xs mt-1">⏳ Currently active</p>
                                 @endif
@@ -798,12 +799,20 @@
                                 // Has student already submitted a non-denied OT letter today?
                                 $_otLetterToday = \App\Models\StudentRequirement::where('student_id', $user->id)
                                     ->whereDate('created_at', $today)
+                                    ->where('status', '!=', 'denied')
                                     ->where(function($q){ $q->where('title','like','%OT%')->orWhere('title','like','%overtime%')->orWhere('title','like','%over time%'); })
                                     ->orderByDesc('created_at')->first();
                                 // OT letter submission time as HH:MM in Manila — passed to JS for live OT preview
                                 $_otLetterSubmittedAt = ($_otLetterToday && $_otLetterToday->status !== 'denied')
                                     ? $_otLetterToday->created_at->setTimezone('Asia/Manila')->format('H:i')
                                     : '';
+                                $_otLetterSubmittedAtTimestamp = ($_otLetterToday && $_otLetterToday->status !== 'denied')
+                                    ? $_otLetterToday->created_at->timestamp * 1000
+                                    : 0;
+                                $_activeStartedAtTimestamp = \Carbon\Carbon::parse(
+                                    $activeRecord->date->toDateString() . ' ' . $activeRecord->time_in,
+                                    'Asia/Manila'
+                                )->timestamp * 1000;
                             @endphp
                             <form method="POST" action="{{ route('time-out') }}" id="timeOutForm">
                                 @csrf
@@ -812,6 +821,7 @@
                                 <input type="hidden" name="session" value="{{ $activeRecord->session }}">
                                 <input type="hidden" name="photo_base64" id="timeOutPhotoBase64">
                                 <input type="hidden" name="time_out" id="timeOut" required>
+                                <input type="hidden" name="regular_only" id="regularOnlyTimeout" value="0">
                             </form>
 
                             {{-- OT Gate wrapper: JS will swap between timeout btn and OT prompt --}}
@@ -931,29 +941,22 @@
                             // the student hit 8 hours so no OT is computed server-side.
                             function timeOutEightHrsOnly() {
                                 if (!confirm('Time out now with 8 regular hours only? No OT will be recorded.')) return;
-                                openTimeoutOptionsModal();
+                                openTimeoutOptionsModal(true);
                             }
 
                             (function() {
                                 // prevMins = total minutes already logged in completed sessions today
                                 var prevMins         = {{ $_prevMins }};
-                                var timeInStr        = '{{ $activeRecord->time_in }}';
+                                var activeStartedAt  = {{ $_activeStartedAtTimestamp }};
                                 // otLetterSubmittedAt: 'HH:MM' in Manila time, or '' if no active OT letter
                                 var otLetterSubmittedAt = '{{ $_otLetterSubmittedAt }}';
+                                var otLetterSubmittedAtTimestamp = {{ $_otLetterSubmittedAtTimestamp }};
                                 var otLetterStatus   = '{{ $_otLetterToday ? $_otLetterToday->status : "none" }}';
 
-                                function parseHHMM(str) {
-                                    var p = str.split(':');
-                                    return parseInt(p[0]) * 60 + parseInt(p[1]);
-                                }
-
                                 function checkOtGate() {
-                                    var now          = new Date();
-                                    var nowMins      = now.getHours() * 60 + now.getMinutes();
-                                    var timeInMins   = parseHHMM(timeInStr);
-                                    // elapsed minutes in this active session (handle midnight wrap)
-                                    var elapsed = nowMins - timeInMins;
-                                    if (elapsed < 0) elapsed += 1440;
+                                    var nowMs = Date.now();
+                                    // Absolute timestamps avoid relying on the browser's local timezone.
+                                    var elapsed = Math.max(0, Math.floor((nowMs - activeStartedAt) / 60000));
                                     // total day minutes = previous completed sessions + current elapsed
                                     var totalDayMins = prevMins + elapsed;
 
@@ -975,9 +978,7 @@
                                         otPrompt.classList.remove('hidden');
                                         // Show live OT preview: minutes from letter submission to now
                                         if (otLetterSubmittedAt) {
-                                            var letterMins = parseHHMM(otLetterSubmittedAt);
-                                            var otElapsed  = nowMins - letterMins;
-                                            if (otElapsed < 0) otElapsed += 1440; // midnight wrap
+                                            var otElapsed = Math.max(0, Math.floor((nowMs - otLetterSubmittedAtTimestamp) / 60000));
                                             var otH = Math.floor(otElapsed / 60);
                                             var otM = otElapsed % 60;
                                             var preview = document.getElementById('otLivePreview');
@@ -1143,7 +1144,7 @@
                     // Pending hours = timed out but awaiting approval
                     $pendingHoursDisplay = round(\App\Models\TimeInRecord::where('student_id', $user->id)
                         ->whereNotNull('time_out')->where('status', 'pending')->get()
-                        ->sum(fn($r) => max(0, floatval($r->regular_hours ?? 0))), 2);
+                        ->sum(fn($r) => \App\Helpers\AttendanceHelper::calculateRecordHours($r)['regular_hours']), 2);
                     ?>
 
                     <div class="space-y-4">
@@ -1216,8 +1217,11 @@
                     $anyDenied   = $sessions->contains(fn($r) => $r->status === 'denied');
                     $anyPending  = $sessions->contains(fn($r) => $r->status === 'pending');
                     // Day-level hours from stored columns (correct even for auto-timed-out records)
-                    $dayRegular  = round($sessions->sum(fn($r) => floatval($r->regular_hours ?? 0)), 2);
-                    $dayOt       = round($sessions->sum(fn($r) => floatval($r->ot_hours ?? 0)), 2);
+                    $dayCalculated = $sessions->map(fn($r) => $r->time_out
+                        ? \App\Helpers\AttendanceHelper::calculateRecordHours($r)
+                        : ['regular_hours' => (float) ($r->regular_hours ?? 0), 'ot_hours' => (float) ($r->ot_hours ?? 0), 'ot_status' => $r->ot_status]);
+                    $dayRegular  = round($dayCalculated->sum(fn($hours) => $hours['regular_hours']), 2);
+                    $dayOt       = round($dayCalculated->sum(fn($hours) => $hours['ot_status'] === 'approved' ? $hours['ot_hours'] : 0), 2);
                 @endphp
                 <div class="bg-slate-700/30 rounded-xl p-4 hover:bg-slate-700/50 transition-colors">
                     {{-- Date header + status + day total --}}
@@ -1260,8 +1264,9 @@
                                         ? '12:00 PM (auto)'
                                         : \Carbon\Carbon::parse($morning->time_out)->format('h:i A');
                                 }
-                                $mHours = floatval($morning->regular_hours ?? 0);
-                                $mOt    = floatval($morning->ot_hours ?? 0);
+                                $mCalculated = $morning->time_out ? \App\Helpers\AttendanceHelper::calculateRecordHours($morning) : null;
+                                $mHours = $mCalculated['regular_hours'] ?? floatval($morning->regular_hours ?? 0);
+                                $mOt    = ($mCalculated['ot_status'] ?? $morning->ot_status) === 'approved' ? ($mCalculated['ot_hours'] ?? floatval($morning->ot_hours ?? 0)) : 0;
                             @endphp
                             <p class="text-gray-400 text-xs">
                                 {{ \Carbon\Carbon::parse($morning->time_in)->format('h:i A') }}
@@ -1333,8 +1338,9 @@
                                 if ($afternoon->time_out && !$aIsAutoDenied) {
                                     $aOutDisplay = \Carbon\Carbon::parse($afternoon->time_out)->format('h:i A');
                                 }
-                                $aHours = floatval($afternoon->regular_hours ?? 0);
-                                $aOt    = floatval($afternoon->ot_hours ?? 0);
+                                $aCalculated = $afternoon->time_out ? \App\Helpers\AttendanceHelper::calculateRecordHours($afternoon) : null;
+                                $aHours = $aCalculated['regular_hours'] ?? floatval($afternoon->regular_hours ?? 0);
+                                $aOt    = ($aCalculated['ot_status'] ?? $afternoon->ot_status) === 'approved' ? ($aCalculated['ot_hours'] ?? floatval($afternoon->ot_hours ?? 0)) : 0;
                             @endphp
                             <p class="text-gray-400 text-xs">
                                 {{ \Carbon\Carbon::parse($afternoon->time_in)->format('h:i A') }}
@@ -1639,14 +1645,7 @@
                 ->whereDate('date', \Carbon\Carbon::now('Asia/Manila')->toDateString())
                 ->whereNotNull('time_out')
                 ->get()
-                ->sum(function ($record) {
-                    $timeIn = \Carbon\Carbon::parse($record->time_in);
-                    $timeOut = \Carbon\Carbon::parse($record->time_out);
-                    if ($timeOut->lte($timeIn)) {
-                        $timeOut->addDay();
-                    }
-                    return max(0, $timeIn->diffInMinutes($timeOut));
-                });
+                ->sum(fn ($record) => $record->minutes_worked);
         @endphp
         <div class="bg-slate-800/50 border border-slate-700 rounded-xl p-3 sm:p-5 mb-5">
             <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
@@ -2850,7 +2849,9 @@
         }
 
         // ============ TIMEOUT OPTIONS (alternate flow) ============
-        function openTimeoutOptionsModal() {
+        function openTimeoutOptionsModal(regularOnly = false) {
+            const regularOnlyInput = document.getElementById('regularOnlyTimeout');
+            if (regularOnlyInput) regularOnlyInput.value = regularOnly ? '1' : '0';
             const m = document.getElementById('timeoutOptionsModal');
             if (m) m.classList.remove('hidden');
         }

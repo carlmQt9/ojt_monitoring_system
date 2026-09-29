@@ -10,6 +10,84 @@ use Illuminate\Support\Facades\Log;
 class AttendanceHelper
 {
     /**
+     * Calculate a completed session's actual duration. Equal clock times mean zero
+     * minutes; only a strictly earlier time-out indicates a midnight crossing.
+     */
+    public static function calculateSessionMinutes(string $date, string $timeIn, string $timeOut): int
+    {
+        $start = Carbon::parse($date . ' ' . $timeIn, 'Asia/Manila');
+        $end = Carbon::parse($date . ' ' . $timeOut, 'Asia/Manila');
+
+        if ($end->lt($start)) {
+            $end->addDay();
+        }
+
+        return max(0, (int) floor(($end->getTimestamp() - $start->getTimestamp()) / 60));
+    }
+
+    /**
+     * Recalculate regular and OT hours from the recorded timestamps and OT-letter
+     * submission time instead of trusting potentially stale stored hour columns.
+     *
+     * @return array{regular_hours: float, ot_hours: float, ot_status: ?string}
+     */
+    public static function calculateRecordHours(TimeInRecord $record): array
+    {
+        if (!$record->date || !$record->time_in || !$record->time_out) {
+            return ['regular_hours' => 0.0, 'ot_hours' => 0.0, 'ot_status' => null];
+        }
+
+        $date = $record->date?->toDateString() ?? Carbon::now('Asia/Manila')->toDateString();
+        $start = Carbon::parse($date . ' ' . $record->time_in, 'Asia/Manila');
+        $end = Carbon::parse($date . ' ' . $record->time_out, 'Asia/Manila');
+        if ($end->lt($start)) {
+            $end->addDay();
+        }
+        $sessionMinutes = max(0, (int) floor(($end->getTimestamp() - $start->getTimestamp()) / 60));
+
+        $previousMinutes = TimeInRecord::where('student_id', $record->student_id)
+            ->whereDate('date', $date)
+            ->whereNotNull('time_out')
+            ->where('id', '!=', $record->id)
+            ->where('time_in', '<', $record->time_in)
+            ->get()
+            ->sum(fn (TimeInRecord $previous) => self::calculateSessionMinutes(
+                $previous->date->toDateString(),
+                $previous->time_in,
+                $previous->time_out
+            ));
+
+        $otLetter = \App\Models\StudentRequirement::where('student_id', $record->student_id)
+            ->whereDate('created_at', $date)
+            ->where('status', '!=', 'denied')
+            ->where(function ($query) {
+                $query->where('title', 'like', '%OT%')
+                    ->orWhere('title', 'like', '%overtime%')
+                    ->orWhere('title', 'like', '%over time%');
+            })
+            ->orderByDesc('created_at')
+            ->first();
+
+        $otMinutes = 0;
+        if ($otLetter && $record->ot_status !== 'denied' && $sessionMinutes > 0) {
+            $letterTimestamp = $otLetter->created_at->setTimezone('Asia/Manila')->getTimestamp();
+            $otStartTimestamp = max($start->getTimestamp(), min($letterTimestamp, $end->getTimestamp()));
+            $otMinutes = max(0, (int) floor(($end->getTimestamp() - $otStartTimestamp) / 60));
+        }
+
+        $regularMinutes = min(
+            max(0, $sessionMinutes - $otMinutes),
+            max(0, 480 - $previousMinutes)
+        );
+
+        return [
+            'regular_hours' => round($regularMinutes / 60, 2),
+            'ot_hours' => round($otMinutes / 60, 2),
+            'ot_status' => $otLetter ? ($otLetter->status === 'approved' ? 'approved' : 'pending') : null,
+        ];
+    }
+
+    /**
      * Calculates approved hours for a student on a given date.
      *
      * @param int $studentId
@@ -24,13 +102,14 @@ class AttendanceHelper
             ->whereDate('date', $targetDate)
             ->where(function ($query) {
                 $query->where('status', 'approved')
-                    ->orWhere('status', 'verified');
+                    ->orWhere('status', 'verified')
+                    ->orWhere('ot_status', 'approved');
             })
             ->get();
 
-        $otLetterExists = \App\Models\StudentRequirement::where('student_id', $studentId)
-                ->whereDate('created_at', $targetDate)
-                ->whereIn('status', ['pending', 'approved'])
+        $otLetterApproved = \App\Models\StudentRequirement::where('student_id', $studentId)
+            ->whereDate('created_at', $targetDate)
+            ->where('status', 'approved')
                 ->where(function ($query) {
                     $query->where('title', 'like', '%OT%')
                         ->orWhere('title', 'like', '%overtime%')
@@ -42,29 +121,16 @@ class AttendanceHelper
         $otHours = 0.0;
 
         foreach ($records as $record) {
-            $regularHours += (float) ($record->regular_hours ?? 0);
+            $calculatedHours = self::calculateRecordHours($record);
+            if (in_array($record->status, ['approved', 'verified'], true)) {
+                $regularHours += $calculatedHours['regular_hours'];
+            }
 
-            $recordOtHours = (float) ($record->ot_hours ?? 0);
-            if ($recordOtHours > 0) {
-                $otHours += $recordOtHours;
+            if (!$otLetterApproved || $record->ot_status !== 'approved') {
                 continue;
             }
 
-            if (!$otLetterExists || !$record->time_in || !$record->time_out) {
-                continue;
-            }
-
-            $inTime = Carbon::parse($record->time_in);
-            $outTime = Carbon::parse($record->time_out);
-            if ($outTime->lt($inTime)) {
-                $outTime->addDay();
-            }
-
-            $workedHours = max(0, $inTime->diffInMinutes($outTime) / 60);
-            $inferredOtHours = max(0, round($workedHours - (float) ($record->regular_hours ?? 0), 2));
-            if ($inferredOtHours > 0) {
-                $otHours += $inferredOtHours;
-            }
+            $otHours += $calculatedHours['ot_hours'];
         }
 
         $regularHours = min($regularHours, 8.0);
@@ -111,14 +177,37 @@ class AttendanceHelper
                 $pastAfternoonQuery->where('student_id', $studentId);
             }
 
-            $deniedCount = $pastAfternoonQuery->update([
+            $unclosedAfternoons = $pastAfternoonQuery->get();
+            $deniedCount = $unclosedAfternoons->count();
+
+            foreach ($unclosedAfternoons as $unclosedAfternoon) {
+                $recordDate = $unclosedAfternoon->date->toDateString();
+                \App\Models\StudentRequirement::where('student_id', $unclosedAfternoon->student_id)
+                    ->whereDate('created_at', $recordDate)
+                    ->where('status', '!=', 'denied')
+                    ->where(function ($query) {
+                        $query->where('title', 'like', '%OT%')
+                            ->orWhere('title', 'like', '%overtime%')
+                            ->orWhere('title', 'like', '%over time%');
+                    })
+                    ->update([
+                        'status' => 'denied',
+                        'feedback' => 'Auto-denied: overtime session was not timed out before the end of the day.',
+                        'approved_by' => null,
+                        'approved_at' => null,
+                    ]);
+            }
+
+            if ($unclosedAfternoons->isNotEmpty()) {
+                TimeInRecord::whereIn('id', $unclosedAfternoons->pluck('id'))->update([
                 'time_out'      => '23:59',   // use end-of-day sentinel; '00:00' would display as 12:00 AM (confusing)
                 'regular_hours' => 0,
                 'ot_hours'      => 0,
                 'ot_status'     => null,
                 'status'        => 'denied',
                 'denial_reason' => 'Auto-denied: student did not time out before end of day. Only morning hours are recorded.',
-            ]);
+                ]);
+            }
 
             // ─────────────────────────────────────────────────────────────
             // 2. MORNING AUTO-TIMEOUT AT 12:00 NOON (NEVER DENIED)

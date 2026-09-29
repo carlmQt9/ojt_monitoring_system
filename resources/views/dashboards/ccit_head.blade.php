@@ -1786,8 +1786,17 @@
             return action().then(() => {
                 hidePixelLoader();
                 showPixelSuccess(successMsg);
-            }).catch(() => {
+            }).catch(error => {
                 hidePixelLoader();
+                alert(error.message || 'The action could not be completed.');
+            });
+        }
+        function requireSuccessfulApiResponse(response) {
+            return response.json().then(data => {
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || 'The action could not be completed.');
+                }
+                return data;
             });
         }
 
@@ -2912,8 +2921,9 @@
             _genericConfirmCallback = null;
         }
         document.getElementById('genericConfirmOkBtn').addEventListener('click', function () {
+            const callback = _genericConfirmCallback;
             closeGenericConfirm();
-            if (typeof _genericConfirmCallback === 'function') _genericConfirmCallback();
+            if (typeof callback === 'function') callback();
         });
         document.getElementById('genericConfirmModal').addEventListener('click', function (e) {
             if (e.target === this) closeGenericConfirm();
@@ -3068,7 +3078,7 @@
         function restoreSchoolId(id) {
             pixelAction('RESTORING', () =>
                 fetch(`/api/school-ids/${id}/restore`, { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
-                    .then(r => r.json()).then(d => { if (d.success) { loadArchivedSchoolIds(); loadSchoolIdList(); } })
+                    .then(requireSuccessfulApiResponse).then(() => { loadArchivedSchoolIds(); loadSchoolIdList(); loadArchivedUsers(); })
             , 'SCHOOL ID RESTORED!');
         }
 
@@ -3084,6 +3094,11 @@
             modal.classList.add('hidden');
             modal.style.display = 'none';
         }
+        function escapeArchivedUserText(value) {
+            return String(value ?? '').replace(/[&<>"']/g, character => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[character]);
+        }
         function loadArchivedUsers() {
             fetch('/api/users/archived')
                 .then(r => r.json())
@@ -3095,12 +3110,12 @@
                     }
                     const rows = data.users.map(u => ({
                         id: u.id,
-                        name: u.name,
-                        email: u.email,
-                        role: u.role,
-                        sid: u.school_id_number || '—',
-                        date: u.deleted_at,
-                        safeName: u.name.replace(/'/g,"\\'")
+                        name: escapeArchivedUserText(u.name),
+                        email: escapeArchivedUserText(u.email),
+                        role: escapeArchivedUserText(u.role),
+                        sid: escapeArchivedUserText(u.school_id_number || '—'),
+                        date: escapeArchivedUserText(u.deleted_at || ''),
+                        search: escapeArchivedUserText([u.name, u.email, u.role, u.school_id_number || ''].join(' ').toLowerCase())
                     }));
                     el.innerHTML = `
                         <!-- Desktop table -->
@@ -3113,7 +3128,7 @@
                                 <th class="text-center py-2 px-3 text-gray-300">Archived On</th>
                                 <th class="text-center py-2 px-3 text-gray-300">Actions</th>
                             </tr></thead><tbody>${rows.map(r => `
-                                <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80" data-search="${r.name.toLowerCase()} ${r.email.toLowerCase()} ${r.role.toLowerCase()} ${r.sid.toLowerCase()}">
+                                <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 opacity-80" data-search="${r.search}">
                                     <td class="py-2 px-3 text-gray-400 line-through">${r.name}</td>
                                     <td class="py-2 px-3 text-gray-500">${r.email}</td>
                                     <td class="py-2 px-3 text-gray-500 capitalize">${r.role}</td>
@@ -3122,14 +3137,14 @@
                                     <td class="py-2 px-3 text-center">
                                         <div class="flex items-center justify-center gap-2">
                                             <button onclick="restoreUser(${r.id})" class="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs">Restore</button>
-                                            <button onclick="forceDeleteUser(${r.id},'${r.safeName}')" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-xs">Delete</button>
+                                            <button onclick="forceDeleteUser(${r.id})" class="px-3 py-1 bg-red-800 hover:bg-red-900 text-white rounded text-xs">Delete</button>
                                         </div>
                                     </td>
                                 </tr>`).join('')}</tbody></table>
                         </div>
                         <!-- Mobile cards -->
                         <div class="sm:hidden space-y-3">${rows.map(r => `
-                            <div style="background:rgba(51,65,85,0.5);border:1px solid rgba(71,85,105,0.5)" class="rounded-xl p-4" data-search="${r.name.toLowerCase()} ${r.email.toLowerCase()} ${r.role.toLowerCase()} ${r.sid.toLowerCase()}">
+                            <div style="background:rgba(51,65,85,0.5);border:1px solid rgba(71,85,105,0.5)" class="rounded-xl p-4" data-search="${r.search}">
                                 <div class="flex items-start justify-between gap-2 mb-1">
                                     <p class="text-gray-400 line-through font-semibold text-sm">${r.name}</p>
                                     <span class="text-gray-500 text-xs capitalize shrink-0">${r.role}</span>
@@ -3139,7 +3154,7 @@
                                 <p class="text-gray-500 text-xs mb-3">Archived: ${r.date}</p>
                                 <div class="flex gap-2">
                                     <button onclick="restoreUser(${r.id})" class="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-semibold">♻️ Restore</button>
-                                    <button onclick="forceDeleteUser(${r.id},'${r.safeName}')" class="flex-1 py-1.5 bg-red-800 hover:bg-red-900 text-white rounded-lg text-xs font-semibold">🗑 Delete</button>
+                                    <button onclick="forceDeleteUser(${r.id})" class="flex-1 py-1.5 bg-red-800 hover:bg-red-900 text-white rounded-lg text-xs font-semibold">🗑 Delete</button>
                                 </div>
                             </div>`).join('')}
                         </div>`;
@@ -3148,18 +3163,18 @@
         function restoreUser(id) {
             pixelAction('RESTORING', () =>
                 fetch(`/api/users/${id}/restore`, { method: 'POST', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
-                    .then(r => r.json()).then(d => { if (d.success) { loadArchivedUsers(); loadUsers(); } })
+                    .then(requireSuccessfulApiResponse).then(() => { loadArchivedUsers(); loadUsers(); loadSchoolIdList(); })
             , 'USER RESTORED!');
         }
-        function forceDeleteUser(id, name) {
+        function forceDeleteUser(id) {
             showGenericConfirm({
                 icon: '🗑️',
                 title: 'Delete User?',
-                message: `Permanently delete "${name}"? This cannot be undone.`,
+            message: 'Permanently delete this user and all related records? The School ID will be released if no other archived account owns it. This cannot be undone.',
                 confirmText: 'Delete Forever',
                 onConfirm: () => pixelAction('DELETING', () =>
                     fetch(`/api/users/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
-                        .then(r => r.json()).then(d => { if (d.success) loadArchivedUsers(); })
+                        .then(requireSuccessfulApiResponse).then(() => { loadArchivedUsers(); loadSchoolIdList(); loadUsers(); })
                 , 'USER DELETED!')
             });
         }
@@ -3169,8 +3184,10 @@
                 title: 'Delete School ID?',
                 message: 'This will permanently delete this school ID. This cannot be undone.',
                 confirmText: 'Delete Forever',
-                onConfirm: () => fetch(`/api/school-ids/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
-                    .then(r => r.json()).then(d => { if (d.success) loadArchivedSchoolIds(); })
+                onConfirm: () => pixelAction('DELETING', () =>
+                    fetch(`/api/school-ids/${id}/force`, { method: 'DELETE', headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content } })
+                        .then(requireSuccessfulApiResponse).then(() => { loadArchivedSchoolIds(); loadSchoolIdList(); })
+                , 'SCHOOL ID DELETED!')
             });
         }
 

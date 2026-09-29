@@ -34,10 +34,8 @@ class TimeInRecord extends Model
     public function getMinutesWorkedAttribute(): float
     {
         if (!$this->time_in || !$this->time_out) return 0;
-        $i = \Carbon\Carbon::parse($this->time_in);
-        $o = \Carbon\Carbon::parse($this->time_out);
-        if ($o->lt($i)) $o->addDay(); // handles midnight crossing without treating equal times as a full day
-        return max(0, $i->diffInMinutes($o));
+        $date = $this->date?->toDateString() ?? \Carbon\Carbon::now('Asia/Manila')->toDateString();
+        return \App\Helpers\AttendanceHelper::calculateSessionMinutes($date, $this->time_in, $this->time_out);
     }
 
     // Returns hours worked rounded to 2 decimals

@@ -819,6 +819,9 @@
                                             ->limit(12)
                                             ->get()
                                             ->map(function($r) {
+                                                $calculatedHours = $r->time_out
+                                                    ? \App\Helpers\AttendanceHelper::calculateRecordHours($r)
+                                                    : ['regular_hours' => (float) ($r->regular_hours ?? 0), 'ot_hours' => (float) ($r->ot_hours ?? 0), 'ot_status' => $r->ot_status];
                                                 $timeIn  = $r->time_in  ? \Carbon\Carbon::parse($r->time_in)->format('h:i A')  : null;
                                                 // Clean time_out display: sentinel values → readable labels
                                                 $isAutoOut    = $r->time_out && in_array($r->time_out, ['12:00','12:00:00']);
@@ -832,10 +835,10 @@
                                                 } else {
                                                     $timeOut = null;
                                                 }
-                                                $regH = floatval($r->regular_hours ?? 0);
-                                                $otH  = floatval($r->ot_hours ?? 0);
-                                                $hrsLabel = $regH > 0
-                                                    ? number_format($regH, 2) . 'h' . ($otH > 0 ? ' +' . number_format($otH, 2) . ' OT' : '')
+                                                $regH = $calculatedHours['regular_hours'];
+                                                $otH  = $calculatedHours['ot_status'] === 'approved' ? $calculatedHours['ot_hours'] : 0;
+                                                $hrsLabel = ($regH > 0 || $otH > 0)
+                                                    ? ($regH > 0 ? number_format($regH, 2) . 'h' : '') . ($otH > 0 ? ' +' . number_format($otH, 2) . ' OT' : '')
                                                     : null;
 
                                                 return [
@@ -982,6 +985,43 @@
                 $allReports = collect([]);
             }
             $reportsByStudent = $allReports->groupBy(function($r){ return $r->student->id ?? 'no-student'; });
+            $otSessionDetailsByReport = [];
+            foreach ($allReports as $report) {
+                $isOtLetter = stripos($report->title, 'OT') !== false
+                    || stripos($report->title, 'overtime') !== false
+                    || stripos($report->title, 'over time') !== false;
+                if (!$isOtLetter || !$report->student_id) {
+                    continue;
+                }
+
+                $otSessionDetailsByReport[$report->id] = \App\Models\TimeInRecord::where('student_id', $report->student_id)
+                    ->whereDate('date', $report->created_at->toDateString())
+                    ->whereNotNull('time_out')
+                    ->orderBy('session')
+                    ->get()
+                    ->map(function ($record) {
+                        $inTime = $record->time_in ? \Carbon\Carbon::parse($record->time_in) : null;
+                        $outTime = \Carbon\Carbon::parse($record->time_out);
+                        if ($inTime && $outTime->lt($inTime)) $outTime->addDay();
+                        $workedHours = $inTime ? round($inTime->diffInMinutes($outTime) / 60, 2) : 0;
+                        $otHours = floatval($record->ot_hours ?? 0);
+                        if ($otHours <= 0) {
+                            $otHours = max(0, round($workedHours - floatval($record->regular_hours ?? 0), 2));
+                        }
+
+                        return [
+                            'session' => ucfirst($record->session ?? 'Session'),
+                            'time_in' => $inTime?->format('h:i A') ?? '—',
+                            'time_out' => $outTime->format('h:i A'),
+                            'worked' => number_format($workedHours, 2) . ' hrs',
+                            'ot_hours' => number_format($otHours, 2) . ' hrs',
+                            'time_status' => ucfirst($record->status ?? 'pending'),
+                            'ot_status' => ucfirst($record->ot_status ?? ($otHours > 0 ? 'pending' : 'none')),
+                        ];
+                    })
+                    ->values()
+                    ->all();
+            }
             ?>
 
             @if($reportsByStudent->isNotEmpty())
@@ -1035,6 +1075,12 @@
                                         </thead>
                                         <tbody>
                                             @foreach($reports as $report)
+                                            @php
+                                                $_reportIsOtLetter = stripos($report->title, 'OT') !== false
+                                                    || stripos($report->title, 'overtime') !== false
+                                                    || stripos($report->title, 'over time') !== false;
+                                                $_otSessionDetails = $_reportIsOtLetter ? ($otSessionDetailsByReport[$report->id] ?? []) : null;
+                                            @endphp
                                             <tr class="border-b border-slate-700/30 last:border-0 hover:bg-slate-800/30 transition-colors">
                                                 <td class="py-2 px-4 text-gray-300 text-sm">{{ $report->title }}</td>
                                                 <td class="py-2 px-2 text-gray-400 text-xs whitespace-nowrap">{{ $report->created_at->format('M d, Y') }}</td>
@@ -1044,7 +1090,12 @@
                                                     </span>
                                                 </td>
                                                 <td class="py-2 px-3 text-right">
-                                                    <button onclick="openFileViewer({{ $report->id }}, '{{ addslashes($report->title) }}', '{{ $report->file_path ? asset('storage/' . $report->file_path) : '' }}', '{{ $report->status }}')" 
+                                                    <button onclick="openFileViewer({{ $report->id }}, this.dataset.title, this.dataset.fileUrl, this.dataset.status, this.dataset.otDetails, this.dataset.otDate)"
+                                                        data-title="{{ $report->title }}"
+                                                        data-file-url="{{ $report->file_path ? asset('storage/' . $report->file_path) : '' }}"
+                                                        data-status="{{ $report->status }}"
+                                                        data-ot-date="{{ $report->created_at->format('M d, Y') }}"
+                                                        data-ot-details="{{ json_encode($_reportIsOtLetter ? $_otSessionDetails : null) }}"
                                                         class="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold whitespace-nowrap transition-colors">
                                                         📄 View
                                                     </button>
@@ -1056,6 +1107,12 @@
                                     <!-- Mobile cards - Simplified & Compact -->
                                     <div class="md:hidden divide-y divide-slate-700/40">
                                         @foreach($reports as $report)
+                                        @php
+                                            $_reportIsOtLetter = stripos($report->title, 'OT') !== false
+                                                || stripos($report->title, 'overtime') !== false
+                                                || stripos($report->title, 'over time') !== false;
+                                            $_otSessionDetails = $_reportIsOtLetter ? ($otSessionDetailsByReport[$report->id] ?? []) : null;
+                                        @endphp
                                         <div class="px-3 py-2.5">
                                             <div class="flex items-start justify-between gap-2 mb-2">
                                                 <div class="min-w-0 flex-1">
@@ -1066,7 +1123,12 @@
                                                     {{ ucfirst($report->status) }}
                                                 </span>
                                             </div>
-                                            <button onclick="openFileViewer({{ $report->id }}, '{{ addslashes($report->title) }}', '{{ $report->file_path ? asset('storage/' . $report->file_path) : '' }}', '{{ $report->status }}')" 
+                                            <button onclick="openFileViewer({{ $report->id }}, this.dataset.title, this.dataset.fileUrl, this.dataset.status, this.dataset.otDetails, this.dataset.otDate)"
+                                                data-title="{{ $report->title }}"
+                                                data-file-url="{{ $report->file_path ? asset('storage/' . $report->file_path) : '' }}"
+                                                data-status="{{ $report->status }}"
+                                                data-ot-date="{{ $report->created_at->format('M d, Y') }}"
+                                                data-ot-details="{{ json_encode($_reportIsOtLetter ? $_otSessionDetails : null) }}"
                                                 class="w-full py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded font-semibold transition-colors">
                                                 📄 View &amp; Review
                                             </button>
@@ -1446,6 +1508,32 @@
             </div>
         </div>
 
+        <section id="fvOtDetails" class="hidden shrink-0 bg-slate-900/95 border-b border-slate-700 px-4 py-3 max-h-[35vh] overflow-y-auto">
+            <div class="max-w-5xl mx-auto">
+                <div class="flex items-center justify-between gap-3 mb-2">
+                    <h3 class="text-sm font-semibold text-yellow-300">OT session details</h3>
+                    <span id="fvOtDate" class="text-xs text-gray-400"></span>
+                </div>
+                <div class="overflow-x-auto rounded-lg border border-slate-700">
+                    <table class="w-full text-xs min-w-[650px]">
+                        <thead class="bg-slate-800 text-gray-400">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Session</th>
+                                <th class="px-3 py-2 text-left">Time in</th>
+                                <th class="px-3 py-2 text-left">Finished</th>
+                                <th class="px-3 py-2 text-left">Worked</th>
+                                <th class="px-3 py-2 text-left">OT time</th>
+                                <th class="px-3 py-2 text-left">Time log</th>
+                                <th class="px-3 py-2 text-left">OT letter</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fvOtDetailsBody" class="divide-y divide-slate-700/60"></tbody>
+                    </table>
+                </div>
+                <p id="fvOtEmpty" class="hidden text-gray-400 text-xs py-3">No completed time-out records were found for the OT letter date.</p>
+            </div>
+        </section>
+
         <!-- File preview area -->
         <div class="flex-1 overflow-hidden bg-slate-950 relative">
             <iframe id="fvFrame" src="" class="w-full h-full border-0"></iframe>
@@ -1532,6 +1620,7 @@
                             <div class="p-6 text-center text-gray-400 border border-slate-700 rounded-lg">No eligible pending timed-out records found.</div>
                         @endif
                         @foreach($_coordPendingTimeRecords as $record)
+                            @php $calculatedHours = \App\Helpers\AttendanceHelper::calculateRecordHours($record); @endphp
                             <div class="rounded-lg border border-slate-700 bg-slate-800/60 p-3 text-sm text-gray-200">
                                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                     <div><p class="font-semibold">{{ $record->student->name }}</p><p class="text-xs text-gray-500">{{ $record->student->email }}</p></div>
@@ -1541,7 +1630,7 @@
                                     <div><span class="block text-gray-500">Date</span>{{ $record->date->format('M d, Y') }}</div>
                                     <div><span class="block text-gray-500">Session</span>{{ ucfirst($record->session ?? '-') }}</div>
                                     <div><span class="block text-gray-500">Time</span>{{ \Carbon\Carbon::parse($record->time_in)->format('h:i A') }} - {{ \Carbon\Carbon::parse($record->time_out)->format('h:i A') }}</div>
-                                    <div><span class="block text-gray-500">Hours</span>{{ number_format($record->regular_hours ?? 0, 2) }}h @if(floatval($record->ot_hours ?? 0) > 0)<span class="text-yellow-400">+{{ number_format($record->ot_hours, 2) }} OT</span>@endif</div>
+                                    <div><span class="block text-gray-500">Hours</span>{{ number_format($calculatedHours['regular_hours'], 2) }}h @if($calculatedHours['ot_status'] === 'approved' && $calculatedHours['ot_hours'] > 0)<span class="text-yellow-400">+{{ number_format($calculatedHours['ot_hours'], 2) }} OT</span>@endif</div>
                                 </div>
                             </div>
                         @endforeach
@@ -2303,9 +2392,33 @@
         // ============ FILE VIEWER MODAL ============
         let fvReportId = null;
 
-        function openFileViewer(reportId, title, fileUrl, status) {
+        function openFileViewer(reportId, title, fileUrl, status, otDetailsJson = 'null', otDate = '') {
             fvReportId = reportId;
             document.getElementById('fvTitle').textContent = title;
+
+            const otPanel = document.getElementById('fvOtDetails');
+            const otBody = document.getElementById('fvOtDetailsBody');
+            const otEmpty = document.getElementById('fvOtEmpty');
+            let otDetails = null;
+            try { otDetails = JSON.parse(otDetailsJson || 'null'); } catch (_) {}
+            otBody.replaceChildren();
+            otEmpty.classList.toggle('hidden', Array.isArray(otDetails) && otDetails.length > 0);
+            otPanel.classList.toggle('hidden', !Array.isArray(otDetails));
+            document.getElementById('fvOtDate').textContent = otDate ? `Letter date: ${otDate}` : '';
+            if (Array.isArray(otDetails)) {
+                otDetails.forEach(detail => {
+                    const row = document.createElement('tr');
+                    row.className = 'text-gray-200';
+                    [detail.session, detail.time_in, detail.time_out, detail.worked, detail.ot_hours, detail.time_status, detail.ot_status]
+                        .forEach(value => {
+                            const cell = document.createElement('td');
+                            cell.className = 'px-3 py-2 whitespace-nowrap';
+                            cell.textContent = value || '—';
+                            row.appendChild(cell);
+                        });
+                    otBody.appendChild(row);
+                });
+            }
 
             // Status badge
             const badge = document.getElementById('fvStatus');

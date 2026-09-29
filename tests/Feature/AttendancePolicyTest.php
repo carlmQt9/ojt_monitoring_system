@@ -35,9 +35,16 @@ class AttendancePolicyTest extends TestCase
         $this->assertSame(0.0, round((float) $record->ot_hours, 2));
     }
 
-    public function test_ot_hours_only_count_after_ot_letter_submission(): void
+    public function test_ot_hours_are_not_counted_until_ot_letter_is_approved(): void
     {
         $student = User::factory()->create(['role' => 'student']);
+        $coordinator = User::factory()->create(['role' => 'coordinator']);
+        StudentHours::create([
+            'student_id' => $student->id,
+            'total_hours_required' => 600,
+            'hours_completed' => 0,
+            'hours_remaining' => 600,
+        ]);
 
         TimeInRecord::create([
             'student_id' => $student->id,
@@ -45,18 +52,20 @@ class AttendancePolicyTest extends TestCase
             'session' => 'morning',
             'time_in' => '07:00',
             'time_out' => '12:00',
-            'status' => 'approved',
+            'status' => 'pending',
             'regular_hours' => 5,
         ]);
 
-        TimeInRecord::create([
+        $afternoon = TimeInRecord::create([
             'student_id' => $student->id,
             'date' => '2026-09-27',
             'session' => 'afternoon',
             'time_in' => '13:00',
             'time_out' => '19:30',
-            'status' => 'approved',
+            'status' => 'pending',
             'regular_hours' => 5,
+            'ot_hours' => 1.5,
+            'ot_status' => 'pending',
         ]);
 
         StudentRequirement::forceCreate([
@@ -71,8 +80,23 @@ class AttendancePolicyTest extends TestCase
 
         $summary = AttendanceHelper::computeDailyTotalsForStudent($student->id, '2026-09-27');
 
-        $this->assertSame(8.0, round((float) $summary['regular_hours'], 2));
-        $this->assertSame(1.5, round((float) $summary['ot_hours'], 2));
+        $this->assertSame(0.0, round((float) $summary['regular_hours'], 2));
+        $this->assertSame(0.0, round((float) $summary['ot_hours'], 2));
+
+        $this->withSession(['user_id' => $coordinator->id, 'user' => $coordinator])
+            ->post('/approve-time-in/' . $afternoon->id)
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('student_hours', [
+            'student_id' => $student->id,
+            'hours_completed' => 3.0,
+        ]);
+        $this->assertDatabaseHas('time_in_records', [
+            'id' => $afternoon->id,
+            'status' => 'approved',
+            'regular_hours' => 3.0,
+            'ot_status' => 'pending',
+        ]);
     }
 
     public function test_ot_hours_are_not_counted_when_ot_letter_is_denied(): void
@@ -198,7 +222,7 @@ class AttendancePolicyTest extends TestCase
         $response->assertDontSeeText('September 26, 2026');
     }
 
-    public function test_ot_letter_approval_updates_time_record_status_and_dtr_totals(): void
+    public function test_ot_letter_approval_credits_ot_without_approving_regular_time_logs(): void
     {
         $student = User::factory()->create(['role' => 'student']);
         $coordinator = User::factory()->create(['role' => 'coordinator']);
@@ -226,7 +250,7 @@ class AttendancePolicyTest extends TestCase
             'ot_status' => null,
         ]);
 
-        TimeInRecord::create([
+        $afternoon = TimeInRecord::create([
             'student_id' => $student->id,
             'date' => '2026-09-27',
             'session' => 'afternoon',
@@ -247,13 +271,30 @@ class AttendancePolicyTest extends TestCase
             'student_id' => $student->id,
             'date' => '2026-09-27 00:00:00',
             'session' => 'afternoon',
-            'status' => 'approved',
+            'status' => 'pending',
             'ot_status' => 'approved',
-            'verified' => 1,
+            'verified' => 0,
         ]);
 
         $summary = AttendanceHelper::computeDailyTotalsForStudent($student->id, '2026-09-27');
-        $this->assertSame(8.0, round((float) $summary['regular_hours'], 2));
+        $this->assertSame(0.0, round((float) $summary['regular_hours'], 2));
+        $this->assertSame(1.5, round((float) $summary['ot_hours'], 2));
+        $this->assertDatabaseHas('student_hours', [
+            'student_id' => $student->id,
+            'hours_completed' => 1.5,
+        ]);
+
+        $this->withSession(['user_id' => $coordinator->id, 'user' => $coordinator])
+            ->post('/approve-time-in/' . $afternoon->id)
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('student_hours', [
+            'student_id' => $student->id,
+            'hours_completed' => 4.5,
+        ]);
+
+        $summary = AttendanceHelper::computeDailyTotalsForStudent($student->id, '2026-09-27');
+        $this->assertSame(3.0, round((float) $summary['regular_hours'], 2));
         $this->assertSame(1.5, round((float) $summary['ot_hours'], 2));
     }
 
