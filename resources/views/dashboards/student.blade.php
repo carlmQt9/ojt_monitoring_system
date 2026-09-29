@@ -8,7 +8,7 @@
     <title>Student Dashboard - OJT Monitoring System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="/face-api/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     @include('partials.pagination')
     <style>
@@ -2119,15 +2119,15 @@
             </div>
 
             <!-- Face guide status bar -->
-            <div id="faceGuideStatus" class="flex items-center gap-2 px-3 py-2.5 rounded-lg mb-3 text-sm font-semibold transition-all duration-300 shrink-0" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4)">
+            <div id="faceGuideStatus" class="flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2.5 rounded-lg mb-3 text-xs sm:text-sm font-semibold leading-tight transition-all duration-300 shrink-0" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4)">
                 <span id="faceGuideIcon">🔴</span>
-                <span id="faceGuideText" class="text-red-300">Position your face inside the oval frame</span>
+                <span id="faceGuideText" class="text-[11px] sm:text-sm text-red-300 min-w-0">Center face • steady phone</span>
             </div>
 
             <!-- Video container — fills available space, no stretch -->
             <div class="relative rounded-xl overflow-hidden mb-3 transition-all duration-300 flex-1 min-h-0" id="cameraVideoContainer"
                 style="border:4px solid #ef4444;background:#000;aspect-ratio:4/3;max-height:72vh">
-                <video id="cameraModalVideo" class="w-full h-full camera-video" style="object-fit:cover;display:block" playsinline webkit-playsinline autoplay muted></video>
+                <video id="cameraModalVideo" class="w-full h-full camera-video" style="object-fit:contain;display:block" playsinline webkit-playsinline autoplay muted></video>
                 <img id="cameraModalImage" src="" alt="Preview" class="hidden absolute inset-0 w-full h-full" style="object-fit:contain">
 
                 <!-- Oval face guide frame — guide only, full photo is captured -->
@@ -2137,7 +2137,7 @@
                         <ellipse id="faceOvalBorder" cx="50" cy="46" rx="22" ry="28" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4 2"/>
                     </svg>
                     <div class="absolute bottom-3 left-0 right-0 text-center">
-                        <span id="faceGuideLabel" class="text-xs font-bold px-2 py-1 rounded-full" style="background:rgba(0,0,0,0.6);color:#fca5a5">👤 Align face here</span>
+                        <span id="faceGuideLabel" class="text-[10px] sm:text-xs font-bold px-2 py-1 rounded-full" style="background:rgba(0,0,0,0.6);color:#fca5a5">👤 Align face here</span>
                     </div>
                 </div>
             </div>
@@ -2332,7 +2332,11 @@
                 if (container) container.style.borderColor = '#22c55e';
                 if (statusBar) { statusBar.style.background = 'rgba(34,197,94,0.15)'; statusBar.style.borderColor = 'rgba(34,197,94,0.4)'; }
                 if (icon) icon.textContent = '🟢';
-                if (text) { text.textContent = 'Face verified — ready to capture!'; text.className = 'text-green-300'; }
+                if (text) {
+                    text.textContent = 'Face verified — ready to capture!';
+                    text.classList.remove('text-red-300', 'text-yellow-300');
+                    text.classList.add('text-green-300');
+                }
                 if (oval) { oval.setAttribute('stroke', '#22c55e'); oval.setAttribute('stroke-dasharray', '0'); }
                 if (label) { label.style.color = '#86efac'; label.textContent = '✓ Face verified'; }
                 if (captureBtn) {
@@ -2342,11 +2346,15 @@
                 }
             } else {
                 // Red — blocked, show specific reason
-                const msg = reason || 'Position your face inside the oval — no covers or masks';
+                const msg = reason || 'Center face • steady phone';
                 if (container) container.style.borderColor = '#ef4444';
                 if (statusBar) { statusBar.style.background = 'rgba(239,68,68,0.15)'; statusBar.style.borderColor = 'rgba(239,68,68,0.4)'; }
                 if (icon) icon.textContent = '🔴';
-                if (text) { text.textContent = msg; text.className = 'text-red-300'; }
+                if (text) {
+                    text.textContent = msg;
+                    text.classList.remove('text-green-300', 'text-yellow-300');
+                    text.classList.add('text-red-300');
+                }
                 if (oval) { oval.setAttribute('stroke', '#ef4444'); oval.setAttribute('stroke-dasharray', '4 2'); }
                 if (label) { label.style.color = '#fca5a5'; label.textContent = '👤 Align face here'; }
                 if (captureBtn) {
@@ -2434,7 +2442,7 @@
                 // Smooth the score over time (EMA) so one noisy frame doesn't fake it
                 _livenessMotionScore = _livenessMotionScore * 0.6 + meanDiff * 0.4;
                 return _livenessMotionScore >= LIVENESS_MOTION_THRESHOLD;
-            } catch(e) { return true; } // fail open on canvas error
+            } catch(e) { return false; } // fail closed if liveness cannot be verified
         }
 
         // face-api.js model loaded flag
@@ -2473,13 +2481,12 @@
                 }
 
                 if (faceApiReady) {
-                    // inputSize 320 — good balance of speed and accuracy
-                    // scoreThreshold 0.40 — works for real faces in all lighting conditions
-                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.40 });
+                    // Higher input resolution improves detection of smaller faces; use a stronger confidence floor.
+                    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.50 });
                     let detecting = false;
-                    // 3 consecutive confirmed frames — fast enough to feel responsive
+                    // Require several consecutive high-confidence live detections before enabling capture.
                     let confirmedFrames = 0;
-                    const CONFIRM_FRAMES = 3;
+                    const CONFIRM_FRAMES = 5;
                     // Reset liveness state each time detection restarts
                     _livenessLastFrame  = null;
                     _livenessMotionScore = 0;
@@ -2495,7 +2502,7 @@
                             if (!result) {
                                 confirmedFrames = 0;
                                 _livenessMotionScore = Math.max(0, _livenessMotionScore - 1);
-                                setFaceGuide(false, 'No face detected — remove any cover or mask');
+                                setFaceGuide(false, 'Center face • steady phone');
                                 detecting = false;
                                 return;
                             }
@@ -2504,33 +2511,33 @@
                             const vh = videoEl.videoHeight || videoEl.offsetHeight || 480;
                             const box = result.box;
 
-                            // ── 1. Score floor: 0.45 — filters near-zero detections (paper/blank covers)
-                            if (result.score < 0.45) {
+                            // ── 1. Strong score floor filters weak or ambiguous detections.
+                            if (result.score < 0.55) {
                                 confirmedFrames = 0;
-                                setFaceGuide(false, 'Face not clear enough — look directly at camera');
+                                setFaceGuide(false, 'Face unclear — face the camera in good light');
                                 detecting = false; return;
                             }
 
-                            // ── 2. Oval alignment — 15% tolerance so normal head positioning works ─
+                            // ── 2. Keep the face centered inside the guide oval.
                             const fcx = (box.x + box.width  / 2) / vw;
                             const fcy = (box.y + box.height / 2) / vh;
                             const oCX = 0.50, oCY = 0.46;
-                            const oRX = 0.22 * 1.15, oRY = 0.28 * 1.15;
+                            const oRX = 0.22 * 0.95, oRY = 0.28 * 0.95;
                             const dx = (fcx - oCX) / oRX;
                             const dy = (fcy - oCY) / oRY;
                             if (dx * dx + dy * dy > 1.0) {
                                 confirmedFrames = 0;
-                                setFaceGuide(false, 'Center your face inside the oval frame');
+                                setFaceGuide(false, 'Center your face in the oval');
                                 detecting = false; return;
                             }
 
-                            // ── 3. Face size — reasonable range, not overly strict ────────────────
+                            // ── 3. Face size — reject faces too small or too close to frame-filling.
                             const faceW = box.width / vw;
-                            if (faceW < 0.12 || faceW > 0.92) {
+                            if (faceW < 0.14 || faceW > 0.78) {
                                 confirmedFrames = 0;
-                                setFaceGuide(false, faceW < 0.12
-                                    ? 'Move closer to the camera'
-                                    : 'Move a little further from the camera');
+                                setFaceGuide(false, faceW < 0.14
+                                    ? 'Move your phone a little closer'
+                                    : 'Move your phone a little farther away');
                                 detecting = false; return;
                             }
 
@@ -2539,7 +2546,7 @@
                             const aspectRatio = box.width / (box.height || 1);
                             if (aspectRatio < 0.40 || aspectRatio > 1.20) {
                                 confirmedFrames = 0;
-                                setFaceGuide(false, 'Face not recognized — do not cover your face');
+                                setFaceGuide(false, 'Keep your full face visible');
                                 detecting = false; return;
                             }
 
@@ -2547,10 +2554,11 @@
                             //       complexions and low-light webcams. The neural-net score (check 1)
                             //       already handles the "is this a real face" question reliably. ──────
 
-                            // ── 6. Liveness — very relaxed; just needs any non-zero motion ──────────
+                            // ── 6. Require motion evidence for every accepted frame.
                             const isLive = checkLiveness(videoEl, box);
-                            if (!isLive && confirmedFrames < 4) {
-                                setFaceGuide(false, 'Hold still briefly… verifying live face');
+                            if (!isLive) {
+                                confirmedFrames = 0;
+                                setFaceGuide(false, 'Blink naturally and keep your phone steady');
                                 detecting = false; return;
                             }
 
@@ -2569,7 +2577,11 @@
                                 if (container) container.style.borderColor = '#f59e0b';
                                 if (statusBar) { statusBar.style.background = 'rgba(245,158,11,0.15)'; statusBar.style.borderColor = 'rgba(245,158,11,0.4)'; }
                                 if (icon) icon.textContent = '🟡';
-                                if (text) { text.textContent = `Verifying… hold still (${pct}%)`; text.className = 'text-yellow-300'; }
+                                if (text) {
+                                    text.textContent = `Checking… hold still (${pct}%)`;
+                                    text.classList.remove('text-red-300', 'text-green-300');
+                                    text.classList.add('text-yellow-300');
+                                }
                                 if (oval) { oval.setAttribute('stroke', '#f59e0b'); oval.setAttribute('stroke-dasharray', '0'); }
                             }
                         } catch(e) {
@@ -2583,59 +2595,8 @@
                 }
             }
 
-            // ── Fallback: pixel-analysis presence detection (face-api not available) ─────────
-            // Requires decent lighting and skin tones — still blocks white paper / blank screens.
-            const dc = document.createElement('canvas');
-            let lastTs = 0;
-            let fbConfirmed = 0;
-            let fbLastLuma = null;
-            const FB_CONFIRM = 4;
-            function fallbackLoop(ts) {
-                faceDetectLoop = requestAnimationFrame(fallbackLoop);
-                if (ts - lastTs < 100) return; // ~10fps
-                lastTs = ts;
-                if (cameraPhotoCaptured) return;
-                if (!cameraStream || videoEl.readyState < 2) { fbConfirmed = 0; setFaceGuide(false, 'Camera not ready'); return; }
-                try {
-                    dc.width = 160; dc.height = 120;
-                    const ctx = dc.getContext('2d');
-                    ctx.save(); ctx.scale(-1,1);
-                    ctx.drawImage(videoEl, -160, 0, 160, 120);
-                    ctx.restore();
-                    const imgData = ctx.getImageData(40, 15, 80, 90).data;
-                    let sum = 0, sqSum = 0, skinPx = 0, n = 0;
-                    const luma = [];
-                    for (let i = 0; i < imgData.length; i += 4) {
-                        const r = imgData[i], g = imgData[i+1], b = imgData[i+2];
-                        const l = (r*77 + g*150 + b*29) >> 8;
-                        sum += l; sqSum += l*l; luma.push(l); n++;
-                        if (r > 50 && g > 30 && b > 10 && r > g && r > b && (r-g) > 8 && Math.abs(r-b) > 8) skinPx++;
-                    }
-                    const avg = sum / n;
-                    const variance = sqSum / n - avg * avg;
-                    const skinRatio = skinPx / n;
-                    // Motion check
-                    let motion = 5; // default "live" if no prior frame
-                    if (fbLastLuma && fbLastLuma.length === luma.length) {
-                        let d = 0;
-                        for (let j = 0; j < luma.length; j++) d += Math.abs(luma[j] - fbLastLuma[j]);
-                        motion = d / luma.length;
-                    }
-                    fbLastLuma = luma;
-                    // Relaxed: decent brightness + some texture is enough for fallback
-                    const passed = avg > 25 && variance > 300;
-                    if (passed) { fbConfirmed++; } else { fbConfirmed = 0; }
-                    if (fbConfirmed >= FB_CONFIRM) {
-                        setFaceGuide(true);
-                    } else {
-                        const reason = avg <= 25 ? 'Too dark — improve lighting'
-                                     : motion < 2 ? 'Hold still briefly…'
-                                     : 'Position your face inside the oval';
-                        setFaceGuide(false, reason);
-                    }
-                } catch(e) { fbConfirmed = 0; setFaceGuide(false, 'Detection error'); }
-            }
-            faceDetectLoop = requestAnimationFrame(fallbackLoop);
+            // Never allow capture based on pixel heuristics alone: they cannot verify a face.
+            setFaceGuide(false, 'Camera check unavailable — reload and try again');
         }
         // ===== END FACE DETECTION =====
 
