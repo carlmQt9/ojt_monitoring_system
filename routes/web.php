@@ -3164,29 +3164,3 @@ table.sig td  { width:50%; padding:0 6pt; font-size:8pt; vertical-align:bottom; 
 })->name('narrative-report.download')->middleware('auth.custom');
 
 
-// ── TEMP: Force-write deadline directly to DB (bypasses all Eloquent) ──────────
-Route::post('/debug-set-deadline', function () {
-    $id       = request('id');
-    $deadline = request('deadline');
-    if (!$id || !$deadline) return response()->json(['error' => 'id and deadline required'], 400);
-    try {
-        \Illuminate\Support\Facades\DB::statement(
-            "UPDATE requirement_templates SET deadline = ? WHERE id = ?",
-            [$deadline, $id]
-        );
-        $check = \Illuminate\Support\Facades\DB::select("SELECT id, name, deadline FROM requirement_templates WHERE id = ?", [$id]);
-        return response()->json(['success' => true, 'row' => $check[0] ?? null]);
-    } catch (\Throwable $e) {
-        return response()->json(['error' => $e->getMessage()], 500);
-    }
-})->middleware('auth.custom');
-
-// ── TEMP: Dump exactly what the PUT edit form sends ──────────────────────────
-Route::post('/debug-put-payload', function () {
-    return response()->json([
-        'all_input' => request()->all(),
-        'deadline'  => request('deadline'),
-        'method'    => request('_method'),
-    ]);
-})->middleware('auth.custom');
-// ── END TEMP ────────────────────────────────────────────────────────────────────
