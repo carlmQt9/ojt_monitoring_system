@@ -476,6 +476,70 @@
                 $totalCompanies = $allCompanies->count();
                 $totalInterns = $allCompanies->sum('students_count');
                 $activeCompanies = $allCompanies->filter(fn($c) => $c->students_count > 0)->count();
+
+                // Pre-compute company details for the popup modal (no API call needed)
+                $companyDetailsMap = [];
+                foreach ($allCompanies as $_co) {
+                    $_students = \App\Models\User::where('company_id', $_co->id)
+                        ->where('role', 'student')
+                        ->when($activeSYLabel, fn($q) => $q->where('school_year', $activeSYLabel))
+                        ->get();
+
+                    $_ratingMap = ['outstanding'=>5,'exceeds_expectations'=>4,'meets_expectations'=>3,'needs_improvement'=>2,'unsatisfactory'=>1];
+                    $_weights   = ['quality_of_work'=>20,'quantity_of_work'=>20,'job_knowledge'=>20,'working_relationships'=>20,'attendance_dependability'=>10,'specific_achievements'=>10];
+
+                    $_stuData = [];
+                    foreach ($_students as $_s) {
+                        $_sh   = \App\Models\StudentHours::where('student_id', $_s->id)->first();
+                        $_eval = \App\Models\StudentEvaluation::where('student_id', $_s->id)->first();
+                        $_completed = round($_sh->hours_completed ?? 0, 2);
+                        $_required  = $_sh->total_hours_required ?? 600;
+                        $_progress  = $_required > 0 ? round(($_completed / $_required) * 100, 1) : 0;
+
+                        $_weightedScore = null;
+                        $_evalLabel = null;
+                        try {
+                            if ($_eval && !empty($_eval->quality_of_work_rating)) {
+                                $_wt = 0;
+                                foreach ($_weights as $_f => $_w) {
+                                    $_r = $_eval->{$_f.'_rating'} ?? null;
+                                    $_sc = $_r ? ($_ratingMap[$_r] ?? 0) : 0;
+                                    $_wt += ($_sc / 5) * $_w;
+                                }
+                                $_weightedScore = round($_wt, 2);
+                                $_evalLabel = $_weightedScore >= 96 ? 'Outstanding' : ($_weightedScore >= 86 ? 'Very Satisfactory' : ($_weightedScore >= 76 ? 'Satisfactory' : ($_weightedScore >= 66 ? 'Fair' : 'Poor')));
+                            }
+                        } catch (\Throwable $_ignored) {}
+
+                        $_stuData[] = [
+                            'name'       => $_s->name,
+                            'completed'  => $_completed,
+                            'required'   => $_required,
+                            'progress'   => $_progress,
+                            'avg_score'  => $_weightedScore,
+                            'eval_label' => $_evalLabel,
+                        ];
+                    }
+
+                    $_scores = array_filter(array_column($_stuData, 'avg_score'), fn($v) => $v !== null);
+                    $companyDetailsMap[$_co->id] = [
+                        'company' => [
+                            'name'           => $_co->name,
+                            'industry'       => $_co->industry       ?? null,
+                            'location'       => $_co->location       ?? null,
+                            'contact_person' => $_co->contact_person ?? null,
+                            'contact_email'  => $_co->contact_email  ?? null,
+                            'contact_phone'  => $_co->contact_phone  ?? null,
+                        ],
+                        'students' => $_stuData,
+                        'stats' => [
+                            'total'        => count($_stuData),
+                            'completed'    => count(array_filter($_stuData, fn($s) => $s['progress'] >= 100)),
+                            'avg_progress' => count($_stuData) > 0 ? round(array_sum(array_column($_stuData, 'progress')) / count($_stuData), 1) : 0,
+                            'avg_score'    => count($_scores) > 0 ? round(array_sum($_scores) / count($_scores), 2) : null,
+                        ],
+                    ];
+                }
                 ?>
                 <div class="grid grid-cols-3 gap-3 mb-6">
                     <div class="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-lg p-3 sm:p-4">
@@ -2108,8 +2172,11 @@
         }
 
         // ===== COMPANY DETAILS POPUP =====
+        // Data is pre-loaded server-side — no API call needed
+        const _companyData = @json($companyDetailsMap);
+
         function openCompanyDetails(companyId) {
-            // Reset
+            // Reset modal
             document.getElementById('cdmCompanyName').textContent = 'Loading…';
             document.getElementById('cdmIndustry').textContent = '';
             document.getElementById('cdmLocation').textContent = '';
@@ -2120,59 +2187,57 @@
             document.getElementById('cdmStudentList').innerHTML = '<p class="text-gray-500 text-sm">Loading…</p>';
             document.getElementById('companyDetailsModal').classList.remove('hidden');
 
-            fetch(`/api/company/${companyId}/details`, {
-                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(r => r.json())
-            .then(data => {
-                const c = data.company;
-                const s = data.stats;
+            const data = _companyData[companyId];
+            if (!data) {
+                document.getElementById('cdmCompanyName').textContent = 'Company';
+                document.getElementById('cdmStudentList').innerHTML = '<p class="text-red-400 text-sm">No data found for this company.</p>';
+                return;
+            }
 
-                document.getElementById('cdmCompanyName').textContent = c.name;
-                document.getElementById('cdmIndustry').textContent  = c.industry  ? '🏭 ' + c.industry  : '';
-                document.getElementById('cdmLocation').textContent   = c.location  ? '📍 ' + c.location  : '';
-                document.getElementById('cdmTotal').textContent      = s.total;
-                document.getElementById('cdmAvgProgress').textContent = s.avg_progress + '%';
-                document.getElementById('cdmAvgScore').textContent   = s.avg_score !== null ? s.avg_score + ' / 5' : '—';
+            const c = data.company;
+            const s = data.stats;
 
-                // Contact row
-                const contact = [
-                    c.contact_person ? '👤 ' + c.contact_person : null,
-                    c.contact_email  ? '✉️ ' + c.contact_email  : null,
-                    c.contact_phone  ? '📞 ' + c.contact_phone  : null,
-                ].filter(Boolean).join('  ·  ');
-                const cdmContact = document.getElementById('cdmContact');
-                if (contact) { cdmContact.textContent = contact; cdmContact.classList.remove('hidden'); }
+            document.getElementById('cdmCompanyName').textContent  = c.name;
+            document.getElementById('cdmIndustry').textContent     = c.industry  ? '🏭 ' + c.industry  : '';
+            document.getElementById('cdmLocation').textContent     = c.location  ? '📍 ' + c.location  : '';
+            document.getElementById('cdmTotal').textContent        = s.total;
+            document.getElementById('cdmAvgProgress').textContent  = s.avg_progress + '%';
+            document.getElementById('cdmAvgScore').textContent     = s.avg_score !== null ? s.avg_score + '%' : '—';
 
-                // Student rows
-                const list = document.getElementById('cdmStudentList');
-                if (!data.students.length) {
-                    list.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No interns in this company for the active school year.</p>';
-                    return;
-                }
-                list.innerHTML = data.students.map(st => {
-                    const barColor = st.progress >= 100 ? 'bg-green-500' : st.progress >= 50 ? 'bg-blue-500' : 'bg-yellow-500';
-                    const scoreHtml = st.avg_score !== null
-                        ? `<span class="text-xs font-semibold ${st.avg_score >= 4 ? 'text-green-600 dark:text-green-400' : st.avg_score >= 3 ? 'text-blue-600 dark:text-blue-400' : 'text-yellow-600 dark:text-yellow-400'}">${parseFloat(st.avg_score).toFixed(2)}/5</span>`
-                        : `<span class="text-xs text-gray-500 dark:text-gray-500">No eval</span>`;
-                    return `<div class="bg-slate-100 dark:bg-slate-700/40 rounded-xl p-3 border border-slate-200 dark:border-transparent">
-                        <div class="flex items-center justify-between gap-3 mb-1.5">
-                            <span class="text-gray-900 dark:text-gray-200 text-sm font-medium truncate">${st.name}</span>
-                            <div class="flex items-center gap-2 shrink-0">
-                                ${scoreHtml}
-                                <span class="text-xs font-bold ${st.progress >= 100 ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}">${st.progress}%</span>
-                            </div>
+            // Contact row
+            const contact = [
+                c.contact_person ? '👤 ' + c.contact_person : null,
+                c.contact_email  ? '✉️ ' + c.contact_email  : null,
+                c.contact_phone  ? '📞 ' + c.contact_phone  : null,
+            ].filter(Boolean).join('  ·  ');
+            const cdmContact = document.getElementById('cdmContact');
+            if (contact) { cdmContact.textContent = contact; cdmContact.classList.remove('hidden'); }
+
+            // Student list
+            const list = document.getElementById('cdmStudentList');
+            if (!data.students.length) {
+                list.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No interns in this company for the active school year.</p>';
+                return;
+            }
+            list.innerHTML = data.students.map(st => {
+                const barColor = st.progress >= 100 ? 'bg-green-500' : st.progress >= 50 ? 'bg-blue-500' : 'bg-yellow-500';
+                const scoreHtml = st.avg_score !== null
+                    ? `<span class="text-xs font-semibold ${st.avg_score >= 86 ? 'text-green-400' : st.avg_score >= 76 ? 'text-blue-400' : 'text-yellow-400'}">${parseFloat(st.avg_score).toFixed(1)}% <em class="font-normal">${st.eval_label || ''}</em></span>`
+                    : `<span class="text-xs text-gray-500">No eval</span>`;
+                return `<div class="bg-slate-700/40 rounded-xl p-3 border border-slate-600/30">
+                    <div class="flex items-center justify-between gap-3 mb-1.5">
+                        <span class="text-gray-200 text-sm font-medium truncate">${st.name}</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            ${scoreHtml}
+                            <span class="text-xs font-bold ${st.progress >= 100 ? 'text-green-400' : 'text-gray-300'}">${st.progress}%</span>
                         </div>
-                        <div class="w-full bg-slate-300 dark:bg-slate-600 rounded-full h-1.5">
-                            <div class="${barColor} h-1.5 rounded-full transition-all" style="width:${Math.min(st.progress,100)}%"></div>
-                        </div>
-                        <p class="text-gray-600 dark:text-gray-500 text-xs mt-1">${st.completed} / ${st.required} hrs</p>
-                    </div>`;
-                }).join('');
-            })
-            .catch(() => {
-                document.getElementById('cdmStudentList').innerHTML = '<p class="text-red-400 text-sm">Failed to load company data.</p>';
-            });
+                    </div>
+                    <div class="w-full bg-slate-600 rounded-full h-1.5">
+                        <div class="${barColor} h-1.5 rounded-full transition-all" style="width:${Math.min(st.progress,100)}%"></div>
+                    </div>
+                    <p class="text-gray-500 text-xs mt-1">${st.completed} / ${st.required} hrs</p>
+                </div>`;
+            }).join('');
         }
         function closeCompanyDetails() {
             document.getElementById('companyDetailsModal').classList.add('hidden');
