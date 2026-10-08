@@ -475,7 +475,7 @@
                     ->get();
                 $totalCompanies = $allCompanies->count();
                 $totalInterns = $allCompanies->sum('students_count');
-                $avgInternsPerCompany = $totalCompanies > 0 ? round($totalInterns / $totalCompanies, 1) : 0;
+                $activeCompanies = $allCompanies->filter(fn($c) => $c->students_count > 0)->count();
                 ?>
                 <div class="grid grid-cols-3 gap-3 mb-6">
                     <div class="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-lg p-3 sm:p-4">
@@ -487,8 +487,8 @@
                         <p class="text-2xl sm:text-3xl font-bold text-green-400 mt-1 sm:mt-2">{{ $totalInterns }}</p>
                     </div>
                     <div class="bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-lg p-3 sm:p-4">
-                        <p class="text-purple-300 text-xs sm:text-sm">Avg per Company</p>
-                        <p class="text-2xl sm:text-3xl font-bold text-purple-400 mt-1 sm:mt-2">{{ $avgInternsPerCompany }}</p>
+                        <p class="text-purple-300 text-xs sm:text-sm">Active Companies</p>
+                        <p class="text-2xl sm:text-3xl font-bold text-purple-400 mt-1 sm:mt-2">{{ $activeCompanies }}</p>
                     </div>
                 </div>
 
@@ -508,8 +508,10 @@
                         </thead>
                         <tbody data-pagination-list>
                             @foreach($allCompanies as $company)
-                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors">
-                                <td class="py-3 px-3 text-gray-300">{{ $company->name }}</td>
+                            <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors cursor-pointer" onclick="openCompanyDetails({{ $company->id }})">
+                                <td class="py-3 px-3 text-gray-300 font-medium">
+                                    {{ $company->name }}
+                                </td>
                                 <td class="py-3 px-3 text-gray-400 text-sm">{{ $company->industry ?? '-' }}</td>
                                 <td class="py-3 px-3 text-gray-400 text-sm">{{ $company->location ?? '-' }}</td>
                                 <td class="py-3 px-3 text-center">
@@ -519,14 +521,14 @@
                                 </td>
                                 <td class="py-3 px-3 text-gray-400 text-sm">
                                     @if($company->contact_email)
-                                    <a href="mailto:{{ $company->contact_email }}" class="text-blue-400 hover:underline">{{ $company->contact_email }}</a>
+                                    <a href="mailto:{{ $company->contact_email }}" class="text-blue-400 hover:underline" onclick="event.stopPropagation()">{{ $company->contact_email }}</a>
                                     @elseif($company->contact_phone)
-                                    <a href="tel:{{ $company->contact_phone }}" class="text-blue-400 hover:underline">{{ $company->contact_phone }}</a>
+                                    <a href="tel:{{ $company->contact_phone }}" class="text-blue-400 hover:underline" onclick="event.stopPropagation()">{{ $company->contact_phone }}</a>
                                     @else
                                     <span class="text-gray-500">-</span>
                                     @endif
                                 </td>
-                                <td class="py-3 px-3 text-center">
+                                <td class="py-3 px-3 text-center" onclick="event.stopPropagation()">
                                     <div class="flex items-center justify-center gap-2">
                                         <button onclick="showEditCompanyModal({{ $company->id }}, '{{ addslashes($company->name) }}', '{{ addslashes($company->industry ?? '') }}', '{{ addslashes($company->location ?? '') }}', '{{ addslashes($company->contact_person ?? '') }}', '{{ addslashes($company->contact_email ?? '') }}', '{{ addslashes($company->contact_phone ?? '') }}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Edit</button>
                                         <button onclick="showDeleteCompanyModal({{ $company->id }}, '{{ addslashes($company->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Archive</button>
@@ -540,9 +542,12 @@
                 {{-- Mobile card list --}}
                 <div class="sm:hidden space-y-3" data-pagination-list>
                     @foreach($allCompanies as $company)
-                    <div class="bg-slate-700/30 border border-slate-600/50 rounded-xl p-4">
+                    <div class="bg-slate-700/30 border border-slate-600/50 rounded-xl p-4 cursor-pointer hover:bg-slate-700/40 transition-colors"
+                         onclick="openCompanyDetails({{ $company->id }})">
                         <div class="flex items-start justify-between gap-2 mb-2">
-                            <p class="text-gray-200 font-semibold text-sm leading-tight">{{ $company->name }}</p>
+                            <p class="text-gray-200 font-semibold text-sm leading-tight">
+                                {{ $company->name }}
+                            </p>
                             <span class="shrink-0 px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded-full text-xs font-semibold">{{ $company->students_count }} intern{{ $company->students_count != 1 ? 's' : '' }}</span>
                         </div>
                         @if($company->industry)
@@ -552,11 +557,11 @@
                         <p class="text-gray-400 text-xs mb-0.5">📍 {{ $company->location }}</p>
                         @endif
                         @if($company->contact_email)
-                        <p class="text-xs mb-2"><a href="mailto:{{ $company->contact_email }}" class="text-blue-400">{{ $company->contact_email }}</a></p>
+                        <p class="text-xs mb-2"><a href="mailto:{{ $company->contact_email }}" class="text-blue-400" onclick="event.stopPropagation()">{{ $company->contact_email }}</a></p>
                         @elseif($company->contact_phone)
-                        <p class="text-xs mb-2"><a href="tel:{{ $company->contact_phone }}" class="text-blue-400">{{ $company->contact_phone }}</a></p>
+                        <p class="text-xs mb-2"><a href="tel:{{ $company->contact_phone }}" class="text-blue-400" onclick="event.stopPropagation()">{{ $company->contact_phone }}</a></p>
                         @endif
-                        <div class="flex gap-2 mt-3">
+                        <div class="flex gap-2 mt-3" onclick="event.stopPropagation()">
                             <button onclick="showEditCompanyModal({{ $company->id }}, '{{ addslashes($company->name) }}', '{{ addslashes($company->industry ?? '') }}', '{{ addslashes($company->location ?? '') }}', '{{ addslashes($company->contact_person ?? '') }}', '{{ addslashes($company->contact_email ?? '') }}', '{{ addslashes($company->contact_phone ?? '') }}')"
                                 class="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors">✏️ Edit</button>
                             <button onclick="showDeleteCompanyModal({{ $company->id }}, '{{ addslashes($company->name) }}')"
@@ -653,6 +658,50 @@
 
         </div><!-- end mb-12 -->
         </section><!-- end companies -->
+
+    <!-- ===== COMPANY DETAILS MODAL ===== -->
+    <div id="companyDetailsModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[80] p-4"
+         onclick="if(event.target===this)closeCompanyDetails()">
+        <div class="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <!-- Header -->
+            <div class="flex justify-between items-start px-6 py-4 border-b shrink-0 bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 border-slate-300 dark:border-slate-700 rounded-t-2xl">
+                <div>
+                    <p class="text-xs font-medium uppercase tracking-wider" style="color: rgba(255,255,255,0.95);">Company Overview</p>
+                    <h3 id="cdmCompanyName" class="text-lg font-bold mt-0.5" style="color: white;">—</h3>
+                    <div class="flex flex-wrap gap-3 mt-1 text-xs">
+                        <span id="cdmIndustry" style="color: rgba(255,255,255,0.9);"></span>
+                        <span id="cdmLocation" style="color: rgba(255,255,255,0.9);"></span>
+                    </div>
+                </div>
+                <button onclick="closeCompanyDetails()" class="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-lg font-bold ml-3 shrink-0" style="color: white;">&times;</button>
+            </div>
+            <!-- Stats row -->
+            <div class="grid grid-cols-3 gap-3 px-6 py-4 border-b shrink-0 bg-slate-100 dark:bg-slate-800/80 border-slate-300 dark:border-slate-700">
+                <div class="text-center">
+                    <p class="text-gray-600 dark:text-gray-400 text-xs mb-0.5">Total Interns</p>
+                    <p id="cdmTotal" class="text-2xl font-bold text-gray-900 dark:text-white">—</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-gray-600 dark:text-gray-400 text-xs mb-0.5">Avg Progress</p>
+                    <p id="cdmAvgProgress" class="text-2xl font-bold text-blue-600 dark:text-blue-400">—</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-gray-600 dark:text-gray-400 text-xs mb-0.5">Avg Eval Score</p>
+                    <p id="cdmAvgScore" class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">—</p>
+                </div>
+            </div>
+            <!-- Contact row -->
+            <div id="cdmContact" class="hidden px-6 py-2 border-b text-xs bg-slate-50 dark:bg-slate-800/50 text-gray-700 dark:text-gray-400 border-slate-300 dark:border-slate-700/50 shrink-0"></div>
+            <!-- Student list -->
+            <div class="flex-1 overflow-y-auto px-6 py-4 bg-white dark:bg-slate-900">
+                <p class="text-xs font-semibold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-3">Interns</p>
+                <div id="cdmStudentList" class="space-y-2.5">
+                    <p class="text-gray-500 text-sm">Loading…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- ===== END COMPANY DETAILS MODAL ===== -->
 
         <!-- Display all students with progress (REPLACED with compact table + search) -->
         <section id="section-students" class="dash-section hidden student-tracking-section">
@@ -2029,7 +2078,7 @@
                         ? `<span class="text-red-400 text-xs">Auto-denied</span>`
                         : (l.time_out || '-');
                     const hrsCell = l.hrs
-                        ? `<span class="text-green-400 font-semibold text-xs">${l.hrs}</span>`
+                        ? `<span class="${l.status === 'denied' ? 'text-red-400' : l.status === 'approved' ? 'text-green-400' : 'text-gray-300'} font-semibold text-xs">${l.hrs}</span>`
                         : (l.time_out ? '<span class="text-gray-500">—</span>' : '<span class="text-blue-300 text-xs">⏳</span>');
                     let actions = '-';
                     if (l.status === 'pending') {
@@ -2057,6 +2106,78 @@
         function closeLogsModal() {
             document.getElementById('logsModal').classList.add('hidden');
         }
+
+        // ===== COMPANY DETAILS POPUP =====
+        function openCompanyDetails(companyId) {
+            // Reset
+            document.getElementById('cdmCompanyName').textContent = 'Loading…';
+            document.getElementById('cdmIndustry').textContent = '';
+            document.getElementById('cdmLocation').textContent = '';
+            document.getElementById('cdmTotal').textContent = '—';
+            document.getElementById('cdmAvgProgress').textContent = '—';
+            document.getElementById('cdmAvgScore').textContent = '—';
+            document.getElementById('cdmContact').classList.add('hidden');
+            document.getElementById('cdmStudentList').innerHTML = '<p class="text-gray-500 text-sm">Loading…</p>';
+            document.getElementById('companyDetailsModal').classList.remove('hidden');
+
+            fetch(`/api/company/${companyId}/details`, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                const c = data.company;
+                const s = data.stats;
+
+                document.getElementById('cdmCompanyName').textContent = c.name;
+                document.getElementById('cdmIndustry').textContent  = c.industry  ? '🏭 ' + c.industry  : '';
+                document.getElementById('cdmLocation').textContent   = c.location  ? '📍 ' + c.location  : '';
+                document.getElementById('cdmTotal').textContent      = s.total;
+                document.getElementById('cdmAvgProgress').textContent = s.avg_progress + '%';
+                document.getElementById('cdmAvgScore').textContent   = s.avg_score !== null ? s.avg_score + ' / 5' : '—';
+
+                // Contact row
+                const contact = [
+                    c.contact_person ? '👤 ' + c.contact_person : null,
+                    c.contact_email  ? '✉️ ' + c.contact_email  : null,
+                    c.contact_phone  ? '📞 ' + c.contact_phone  : null,
+                ].filter(Boolean).join('  ·  ');
+                const cdmContact = document.getElementById('cdmContact');
+                if (contact) { cdmContact.textContent = contact; cdmContact.classList.remove('hidden'); }
+
+                // Student rows
+                const list = document.getElementById('cdmStudentList');
+                if (!data.students.length) {
+                    list.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No interns in this company for the active school year.</p>';
+                    return;
+                }
+                list.innerHTML = data.students.map(st => {
+                    const barColor = st.progress >= 100 ? 'bg-green-500' : st.progress >= 50 ? 'bg-blue-500' : 'bg-yellow-500';
+                    const scoreHtml = st.avg_score !== null
+                        ? `<span class="text-xs font-semibold ${st.avg_score >= 4 ? 'text-green-600 dark:text-green-400' : st.avg_score >= 3 ? 'text-blue-600 dark:text-blue-400' : 'text-yellow-600 dark:text-yellow-400'}">${parseFloat(st.avg_score).toFixed(2)}/5</span>`
+                        : `<span class="text-xs text-gray-500 dark:text-gray-500">No eval</span>`;
+                    return `<div class="bg-slate-100 dark:bg-slate-700/40 rounded-xl p-3 border border-slate-200 dark:border-transparent">
+                        <div class="flex items-center justify-between gap-3 mb-1.5">
+                            <span class="text-gray-900 dark:text-gray-200 text-sm font-medium truncate">${st.name}</span>
+                            <div class="flex items-center gap-2 shrink-0">
+                                ${scoreHtml}
+                                <span class="text-xs font-bold ${st.progress >= 100 ? 'text-green-600 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}">${st.progress}%</span>
+                            </div>
+                        </div>
+                        <div class="w-full bg-slate-300 dark:bg-slate-600 rounded-full h-1.5">
+                            <div class="${barColor} h-1.5 rounded-full transition-all" style="width:${Math.min(st.progress,100)}%"></div>
+                        </div>
+                        <p class="text-gray-600 dark:text-gray-500 text-xs mt-1">${st.completed} / ${st.required} hrs</p>
+                    </div>`;
+                }).join('');
+            })
+            .catch(() => {
+                document.getElementById('cdmStudentList').innerHTML = '<p class="text-red-400 text-sm">Failed to load company data.</p>';
+            });
+        }
+        function closeCompanyDetails() {
+            document.getElementById('companyDetailsModal').classList.add('hidden');
+        }
+        // ===== END COMPANY DETAILS POPUP =====
 
         function showCoordDenyTimeModal(recordId) {
             document.getElementById('coordDenyTimeForm').action = `{{ url('/deny-time-in') }}/${recordId}`;

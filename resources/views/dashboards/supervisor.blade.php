@@ -166,6 +166,10 @@
         body.light p,body.light span,body.light label,body.light div,
         body.light td,body.light th,body.light li,body.light small { color: #2d4a6f; }
         body.light .text-white,body.light .text-gray-100,body.light .text-gray-200 { color: #1e3a5f !important; }
+        /* Exception: keep text white on solid blue headers (e.g. evaluation modal) in light mode */
+        body.light #evaluationModal .bg-blue-700 .text-white,
+        body.light #evaluationModal .bg-blue-700 span#evalStudentName { color: #ffffff !important; }
+        body.light #evaluationModal .bg-blue-700 .text-blue-200 { color: #bfdbfe !important; }
         body.light .text-gray-300 { color: #3d5a7f !important; }
         body.light .text-gray-400 { color: #4a6a8f !important; }
         body.light .text-gray-500 { color: #5a7a9f !important; }
@@ -394,7 +398,9 @@
             } else {
                 // include students either assigned to this supervisor OR registered to the supervisor's company
                 $companyId = $user->company->id ?? null;
-                $supervisorStudents = \App\Models\User::where('role', 'student')
+                
+                // Get all students, then sort in PHP to prioritize recently completed
+                $allStudents = \App\Models\User::where('role', 'student')
                     ->where(function($q) use ($user, $companyId) {
                         $q->where('supervisor_id', $user->id);
                         if ($companyId) {
@@ -405,6 +411,28 @@
                         $inner->where('school_year', $activeSchoolYear)->orWhereNull('school_year');
                     }))
                     ->get();
+                
+                // Attach completion status and most recent time-in date for sorting
+                $allStudents->each(function($s) {
+                    $sh = \App\Models\StudentHours::where('student_id', $s->id)->first();
+                    $s->_hours_completed = $sh->hours_completed ?? 0;
+                    $s->_hours_required = $sh->total_hours_required ?? 600;
+                    $s->_is_complete = $s->_hours_completed >= $s->_hours_required;
+                    
+                    // Get most recent time-in date for completed students
+                    $lastTimeIn = \App\Models\TimeInRecord::where('student_id', $s->id)
+                        ->whereNotNull('time_out')
+                        ->orderByDesc('date')
+                        ->first();
+                    $s->_last_timein_date = $lastTimeIn ? $lastTimeIn->date : null;
+                });
+                
+                // Sort: completed first (by most recent time-in desc), then in-progress (by name)
+                $supervisorStudents = $allStudents->sortBy([
+                    fn($a, $b) => $b->_is_complete <=> $a->_is_complete,  // completed first
+                    fn($a, $b) => ($b->_last_timein_date ?? '') <=> ($a->_last_timein_date ?? ''),  // most recent first
+                    fn($a, $b) => $a->name <=> $b->name,  // then by name
+                ])->values();
 
                 $totalStudents = $supervisorStudents->count();
                 $completedStudents = 0;
@@ -639,13 +667,36 @@
                                 </div>
                                 <div class="bg-slate-700/30 rounded-lg p-2.5 col-span-2 sm:col-span-1">
                                     <p class="text-gray-400 text-xs mb-1">📋 Evaluation</p>
-                                    @php $hasNewEval = $evaluation && !empty($evaluation->quality_of_work_rating); @endphp
-                                    <p class="text-sm font-bold @if($hasNewEval) text-green-400 @elseif($evaluation) text-yellow-400 @else text-gray-500 @endif">
-                                        @if($hasNewEval) ✅ Done
-                                        @elseif($evaluation) ⚠️ Needs Update
-                                        @else Not yet
-                                        @endif
-                                    </p>
+                                    @php
+                                        $hasNewEval = $evaluation && !empty($evaluation->quality_of_work_rating);
+                                        
+                                        // Compute weighted score on-the-fly from stored factor ratings (don't trust old average_score)
+                                        $evalAvg = null;
+                                        $evalAvgLabel = null;
+                                        if ($hasNewEval) {
+                                            $ratingMap = ['outstanding'=>5,'exceeds_expectations'=>4,'meets_expectations'=>3,'needs_improvement'=>2,'unsatisfactory'=>1];
+                                            $weights = ['quality_of_work'=>20,'quantity_of_work'=>20,'job_knowledge'=>20,'working_relationships'=>20,'attendance_dependability'=>10,'specific_achievements'=>10];
+                                            $weightedTotal = 0;
+                                            foreach ($weights as $factor => $weight) {
+                                                $rating = $evaluation->{$factor.'_rating'} ?? null;
+                                                $score = $rating ? ($ratingMap[$rating] ?? 0) : 0;
+                                                $weightedTotal += ($score / 5) * $weight;
+                                            }
+                                            $evalAvg = round($weightedTotal, 2);
+                                            $evalAvgLabel = $evalAvg >= 96 ? 'Outstanding' : (
+                                                $evalAvg >= 86 ? 'Very Satisfactory' : (
+                                                $evalAvg >= 76 ? 'Satisfactory' : (
+                                                $evalAvg >= 66 ? 'Fair' : 'Poor')));
+                                        }
+                                    @endphp
+                                    @if($hasNewEval)
+                                        <p class="text-base font-bold text-green-400">{{ $evalAvg ? number_format($evalAvg, 2) . '%' : '✅' }}</p>
+                                        @if($evalAvgLabel)<p class="text-[10px] text-green-300 leading-tight">{{ $evalAvgLabel }}</p>@endif
+                                    @elseif($evaluation)
+                                        <p class="text-sm font-bold text-yellow-400">⚠️ Incomplete</p>
+                                    @else
+                                        <p class="text-sm font-bold text-gray-500">Not yet</p>
+                                    @endif
                                 </div>
                             </div>
 
@@ -664,9 +715,8 @@
                             <!-- Tabs — single navigation, no redundant buttons -->
                             <div class="border-b border-slate-600 mb-4 mt-4">
                                 <div class="flex flex-wrap gap-1">
-                                    <button class="tab-button px-3 py-2 border-b-2 border-purple-500 text-purple-400 font-semibold text-xs sm:text-sm" data-tab="daily-logs-{{ $student->id }}">📅 Daily Logs</button>
-                                    <button class="tab-button px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-white text-xs sm:text-sm" data-tab="time-records-{{ $student->id }}">
-                                        ⏱️ Time Edits @if($pendingTimeEdits > 0)<span class="ml-1 px-1.5 py-0.5 bg-orange-500 text-white text-[10px] rounded-full">{{ $pendingTimeEdits }}</span>@endif
+                                    <button class="tab-button px-3 py-2 border-b-2 border-purple-500 text-purple-400 font-semibold text-xs sm:text-sm" data-tab="time-records-{{ $student->id }}">
+                                        📅 Daily Logs @if($pendingTimeEdits > 0)<span class="ml-1 px-1.5 py-0.5 bg-orange-500 text-white text-[10px] rounded-full">{{ $pendingTimeEdits }}</span>@endif
                                     </button>
                                     <button class="tab-button px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-white text-xs sm:text-sm" data-tab="task-logs-{{ $student->id }}">📸 Task Logs</button>
                                     <button class="tab-button px-3 py-2 border-b-2 border-transparent text-gray-400 hover:text-white text-xs sm:text-sm" data-tab="requirements-{{ $student->id }}">
@@ -679,54 +729,8 @@
                                 </div>
                             </div>
 
-                            <!-- Daily Logs Tab -->
-                            <div id="daily-logs-{{ $student->id }}" class="tab-content">
-                                @if($dailyLogs->isNotEmpty())
-                                <div class="overflow-y-auto rounded-lg border border-slate-700/50" style="max-height:260px">
-                                    <table class="w-full text-sm">
-                                        <thead class="sticky top-0 bg-slate-800 z-10">
-                                            <tr class="text-xs text-gray-400 border-b border-slate-700/50">
-                                                <th class="py-2 px-3 text-left font-semibold">Date</th>
-                                                <th class="py-2 px-2 text-left font-semibold">Hours</th>
-                                                <th class="py-2 px-2 text-center font-semibold">Type</th>
-                                                <th class="py-2 px-2 text-center font-semibold">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-slate-700/30">
-                                        @foreach($dailyLogs as $log)
-                                        <tr class="hover:bg-slate-700/20 transition-colors">
-                                            <td class="py-2 px-3 text-gray-200 text-xs whitespace-nowrap">{{ $log->log_date->format('M d, Y') }}</td>
-                                            <td class="py-2 px-2 text-purple-400 font-semibold text-xs whitespace-nowrap">
-                                                @php $supHours = number_format($log->hours_logged, 2); @endphp
-                                                {{ $log->hours_logged >= 0 ? '+' : '' }}{{ $supHours }}h
-                                            </td>
-                                            <td class="py-2 px-2 text-center">
-                                                @if($log->is_overtime)
-                                                <span class="px-2 py-0.5 bg-red-500/20 text-red-300 text-xs rounded-full">OT</span>
-                                                @else
-                                                <span class="text-gray-500 text-xs">—</span>
-                                                @endif
-                                            </td>
-                                            <td class="py-2 px-2 text-center">
-                                                <span class="px-2 py-0.5 text-xs rounded-full
-                                                    @if($log->status === 'approved') bg-green-500/20 text-green-300
-                                                    @elseif($log->status === 'denied') bg-red-500/20 text-red-300
-                                                    @else bg-yellow-500/20 text-yellow-300 @endif">
-                                                    {{ ucfirst($log->status) }}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                        @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                                @else
-                                <p class="text-gray-400 text-sm">No daily logs yet</p>
-                                @endif
-                            </div>
-
-                            <!-- Time Edits Tab -->
-                            <div id="time-records-{{ $student->id }}" class="tab-content hidden">
+                            <!-- Daily Logs Tab (Time Records) -->
+                            <div id="time-records-{{ $student->id }}" class="tab-content">
                                 @if($timeInRecords->isNotEmpty())
                                 @php
                                     // Show approve all if there are pending records that have timed out
@@ -797,9 +801,10 @@
                                                 @php
                                                     $regH = floatval($record->regular_hours ?? 0);
                                                     $otH  = $record->ot_status === 'approved' ? floatval($record->ot_hours ?? 0) : 0;
+                                                    $hoursColor = $record->status === 'denied' ? 'text-red-400' : ($record->status === 'approved' ? 'text-green-400' : 'text-gray-300');
                                                 @endphp
                                                 @if($regH > 0 || $otH > 0)
-                                                    <span class="text-green-400 font-semibold">{{ number_format($regH, 2) }}h</span>
+                                                    <span class="{{ $hoursColor }} font-semibold">{{ number_format($regH, 2) }}h</span>
                                                     @if($otH > 0)
                                                         <span class="text-yellow-400 font-semibold"> +{{ number_format($otH, 2) }} OT</span>
                                                     @endif
@@ -839,11 +844,6 @@
                                                         <button onclick="showDenyTimeEditModal({{ $record->id }})" class="inline-flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs rounded-lg font-semibold shadow-lg shadow-red-900/30 transition-colors" title="Deny this time log">✕ Deny</button>
                                                     </div>
                                                     @endif
-                                                @elseif($record->status === 'approved')
-                                                    <button onclick="confirmUndoApproval({{ $record->id }}, '{{ $record->date->format('M d, Y') }}', '{{ ucfirst($record->session ?? '') }}')"
-                                                        class="px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded transition-colors" title="Undo approval">
-                                                        ↩ Undo
-                                                    </button>
                                                 @endif
                                             </td>
                                         </tr>
@@ -1035,13 +1035,21 @@
                                 </div>
                                 @elseif($evaluation)
                                 <div class="bg-slate-700/30 p-4 rounded-lg space-y-3">
-                                    <p class="text-green-400 text-sm font-semibold">✅ Evaluation submitted on {{ $evaluation->created_at->format('M d, Y') }}</p>
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-green-400 text-sm font-semibold">✅ Evaluated on {{ $evaluation->created_at->format('M d, Y') }}</p>
+                                        @if($evaluation->average_score)
+                                        <span class="px-3 py-1 bg-green-500/20 text-green-300 text-sm font-bold rounded-full">
+                                            Avg: {{ number_format($evaluation->average_score, 2) }} / 5
+                                        </span>
+                                        @endif
+                                    </div>
                                     @php
                                     $ratingLabels = [
-                                        'outstanding'=>'Outstanding','exceeds_expectations'=>'Exceeds Expectations',
-                                        'meets_expectations'=>'Meets Expectations','needs_improvement'=>'Needs Improvement',
-                                        'unsatisfactory'=>'Unsatisfactory'
+                                        'outstanding'=>'Outstanding','exceeds_expectations'=>'Very Satisfactory',
+                                        'meets_expectations'=>'Satisfactory','needs_improvement'=>'Fair',
+                                        'unsatisfactory'=>'Poor'
                                     ];
+                                    $ratingScoreMap = ['outstanding'=>5,'exceeds_expectations'=>4,'meets_expectations'=>3,'needs_improvement'=>2,'unsatisfactory'=>1];
                                     $evalFactors = [
                                         'quality_of_work'=>'Quality of Work','quantity_of_work'=>'Quantity of Work',
                                         'job_knowledge'=>'Job Knowledge','working_relationships'=>'Working Relationships',
@@ -1050,19 +1058,35 @@
                                     @endphp
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                                         @foreach($evalFactors as $fKey => $fLabel)
-                                        <div class="bg-slate-800/50 p-2 rounded">
-                                            <p class="text-gray-400">{{ $fLabel }}</p>
-                                            <p class="text-white font-semibold mt-0.5">{{ $ratingLabels[$evaluation->{$fKey.'_rating'}] ?? '—' }}</p>
+                                        @php
+                                            $fRating = $evaluation->{$fKey.'_rating'} ?? null;
+                                            $fScore  = $evaluation->{$fKey.'_score'} ?? ($fRating ? ($ratingScoreMap[$fRating] ?? null) : null);
+                                        @endphp
+                                        <div class="bg-slate-800/50 p-2 rounded flex items-center justify-between gap-2">
+                                            <div>
+                                                <p class="text-gray-400">{{ $fLabel }}</p>
+                                                <p class="text-white font-semibold mt-0.5">{{ $ratingLabels[$fRating] ?? '—' }}</p>
+                                            </div>
+                                            @if($fScore)
+                                            <span class="shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold
+                                                @if($fScore >= 4) bg-green-500/20 text-green-300
+                                                @elseif($fScore == 3) bg-blue-500/20 text-blue-300
+                                                @elseif($fScore == 2) bg-yellow-500/20 text-yellow-300
+                                                @else bg-red-500/20 text-red-300 @endif">
+                                                {{ $fScore }}
+                                            </span>
+                                            @endif
                                         </div>
                                         @endforeach
                                     </div>
                                     <button
                                         data-student-id="{{ $student->id }}"
                                         data-student-name="{{ addslashes($student->name) }}"
-                                        data-is-evaluated="0"
-                                        data-eval='{!! json_encode(['evaluation_date'=>$evaluation->evaluation_date,'period_from'=>$evaluation->period_from,'period_to'=>$evaluation->period_to,'job_title'=>$evaluation->job_title,'quality_of_work_rating'=>$evaluation->quality_of_work_rating,'quality_of_work_comment'=>$evaluation->quality_of_work_comment,'quantity_of_work_rating'=>$evaluation->quantity_of_work_rating,'quantity_of_work_comment'=>$evaluation->quantity_of_work_comment,'job_knowledge_rating'=>$evaluation->job_knowledge_rating,'job_knowledge_comment'=>$evaluation->job_knowledge_comment,'working_relationships_rating'=>$evaluation->working_relationships_rating,'working_relationships_comment'=>$evaluation->working_relationships_comment,'attendance_dependability_rating'=>$evaluation->attendance_dependability_rating,'attendance_dependability_comment'=>$evaluation->attendance_dependability_comment,'specific_achievements_rating'=>$evaluation->specific_achievements_rating,'specific_achievements_comment'=>$evaluation->specific_achievements_comment]) !!}'
+                                        data-is-evaluated="1"
+                                        data-eval='{!! json_encode(['evaluation_date'=>$evaluation->evaluation_date,'period_from'=>$evaluation->period_from,'period_to'=>$evaluation->period_to,'job_title'=>$evaluation->job_title,'quality_of_work_rating'=>$evaluation->quality_of_work_rating,'quality_of_work_comment'=>$evaluation->quality_of_work_comment,'quantity_of_work_rating'=>$evaluation->quantity_of_work_rating,'quantity_of_work_comment'=>$evaluation->quantity_of_work_comment,'job_knowledge_rating'=>$evaluation->job_knowledge_rating,'job_knowledge_comment'=>$evaluation->job_knowledge_comment,'working_relationships_rating'=>$evaluation->working_relationships_rating,'working_relationships_comment'=>$evaluation->working_relationships_comment,'attendance_dependability_rating'=>$evaluation->attendance_dependability_rating,'attendance_dependability_comment'=>$evaluation->attendance_dependability_comment,'specific_achievements_rating'=>$evaluation->specific_achievements_rating,'specific_achievements_comment'=>$evaluation->specific_achievements_comment,'signature_data'=>$evaluation->signature_data]) !!}'
                                         onclick="openEvalFromBtn(this)"
-                                        class="w-full mt-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded text-sm transition-colors">Update Evaluation
+                                        class="w-full mt-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors">
+                                        🔍 View Summary
                                     </button>
                                 </div>
                                 @else
@@ -1105,7 +1129,7 @@
         <section id="section-certificates" class="dash-section hidden">
         <div class="mb-12">
             <h2 class="text-2xl font-bold text-white mb-2">🏅 OJT Completion Certificates</h2>
-            <p class="text-gray-400 text-sm mb-6">Upload each intern's physical certificate image. Students can then view, print, and download it from their dashboard.</p>
+            <p class="text-gray-400 text-sm mb-6">Certificates are generated automatically using each student's name, company, and completed hours. Click "Issue Certificate" to generate and award it.</p>
 
             @php
                 $certStudents = $supervisorStudents->map(function($s) {
@@ -1143,42 +1167,34 @@
                             @endif
                         </div>
 
-                        @if($s->certificate_image_path)
-                        <!-- Thumbnail preview -->
-                        <div class="mb-3 rounded-lg overflow-hidden border border-slate-600 bg-slate-900/50 flex items-center justify-center cursor-pointer"
-                             style="height:130px;"
-                             onclick="openCertImageModal('{{ asset('storage/' . $s->certificate_image_path) }}', '{{ addslashes($s->name) }}')">
-                            <img src="{{ asset('storage/' . $s->certificate_image_path) }}"
-                                 alt="Certificate preview"
-                                 class="max-h-full max-w-full object-contain hover:opacity-80 transition-opacity">
+                        @if($s->certificate_awarded_at)
+                        <!-- Generated certificate preview thumbnail (live iframe render) -->
+                        <div class="mb-3 rounded-lg overflow-hidden border border-slate-600 bg-slate-900/50 cursor-pointer relative"
+                             style="height:150px;"
+                             onclick="openCertViewModal({{ $s->id }}, '{{ addslashes($s->name) }}')">
+                            <div style="width:1050px;height:720px;transform:scale(0.265);transform-origin:top left;position:absolute;top:0;left:50%;margin-left:-139px;">
+                                <iframe src="{{ url('/certificate/'.$s->id) }}" class="border-0 pointer-events-none" style="width:1050px;height:720px;display:block;"></iframe>
+                            </div>
+                            <div class="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/20 transition-colors">
+                                <span class="opacity-0 hover:opacity-100 text-white text-xs font-semibold bg-black/60 px-3 py-1 rounded-full transition-opacity">🔍 View Full Size</span>
+                            </div>
                         </div>
                         <div class="flex gap-2">
-                            <button onclick="openCertImageModal('{{ asset('storage/' . $s->certificate_image_path) }}', '{{ addslashes($s->name) }}')"
+                            <button onclick="openCertViewModal({{ $s->id }}, '{{ addslashes($s->name) }}')"
                                 class="flex-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg font-semibold">👁 View</button>
-                            <label class="flex-1 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs rounded-lg font-semibold text-center cursor-pointer">
-                                🔄 Replace
-                                <input type="file" class="hidden" accept="image/*,application/pdf"
-                                       onchange="uploadCertificate({{ $s->id }}, this)">
-                            </label>
+                            <button onclick="awardCertificate({{ $s->id }}, '{{ addslashes($s->name) }}', true)"
+                                class="flex-1 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs rounded-lg font-semibold">🔄 Re-issue</button>
                         </div>
                         @else
-                        <!-- Drop / upload zone -->
-                        <label class="block w-full border-2 border-dashed border-slate-600 hover:border-yellow-500/70 rounded-xl p-6 text-center cursor-pointer transition-colors"
-                               ondragover="event.preventDefault();this.classList.add('!border-yellow-500')"
-                               ondragleave="this.classList.remove('!border-yellow-500')"
-                               ondrop="handleCertDrop(event,{{ $s->id }})">
-                            <div class="text-3xl mb-2">📄</div>
-                            <p class="text-gray-300 text-sm font-semibold">Click or drag to upload</p>
-                            <p class="text-gray-500 text-xs mt-1">JPG, PNG or PDF · max 10 MB</p>
-                            <input type="file" class="hidden" accept="image/*,application/pdf"
-                                   onchange="uploadCertificate({{ $s->id }}, this)">
-                        </label>
-                        <div id="cert-progress-{{ $s->id }}" class="hidden mt-2 flex items-center gap-2 text-xs text-gray-400">
-                            <svg class="animate-spin w-4 h-4 text-yellow-400 shrink-0" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                            </svg>
-                            Uploading…
+                        <!-- One-click auto-generate action -->
+                        <div class="flex flex-col items-center justify-center border-2 border-dashed border-slate-600 rounded-xl p-6 text-center">
+                            <div class="text-3xl mb-2">🏅</div>
+                            <p class="text-gray-300 text-sm font-semibold mb-1">Ready to generate certificate</p>
+                            <p class="text-gray-500 text-xs mb-4">Name, company, and hours will be filled in automatically.</p>
+                            <button onclick="awardCertificate({{ $s->id }}, '{{ addslashes($s->name) }}', false)"
+                                class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg font-semibold transition-colors">
+                                🏅 Issue Certificate
+                            </button>
                         </div>
                         @endif
                     </div>
@@ -1241,7 +1257,7 @@
     <!-- Deny All Time Edits Modal -->
     <div id="denyAllTimeEditModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 modal-backdrop">
         <div class="bg-slate-800 border border-slate-700 rounded-xl p-8 max-w-md w-full mx-4">
-            <h3 class="text-2xl font-bold text-white mb-6">❌ Deny All Time Edits</h3>
+            <h3 class="text-2xl font-bold text-white mb-6">❌ Deny All Daily Logs</h3>
             <form id="denyAllTimeEditForm" method="POST" class="space-y-4">
                 @csrf
                 <div>
@@ -1390,6 +1406,12 @@
                 </div>
                 <button onclick="closeEvaluationModal()" class="w-8 h-8 shrink-0 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white text-lg font-bold ml-2">&times;</button>
             </div>
+            <!-- Inline warning banner (replaces native alert()) -->
+            <div id="evalWarningBanner" class="hidden mx-4 mt-3 px-3 py-2.5 bg-red-50 border border-red-300 rounded-xl flex items-start gap-2.5">
+                <span class="text-red-500 text-base leading-none shrink-0 mt-0.5">⚠️</span>
+                <p id="evalWarningText" class="text-xs text-red-700 font-medium leading-snug"></p>
+                <button type="button" onclick="hideEvalWarning()" class="ml-auto text-red-400 hover:text-red-600 text-sm leading-none shrink-0">&times;</button>
+            </div>
             <div class="flex-1 overflow-y-auto">
             <form id="evaluationForm" method="POST">
                 @csrf
@@ -1399,8 +1421,9 @@
                 <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 space-y-2 text-sm">
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="block text-xs text-gray-500 font-semibold mb-0.5">Evaluation Date</label>
-                            <input type="date" name="evaluation_date" id="eval_evaluation_date" class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-gray-800 text-xs focus:outline-none focus:border-blue-500">
+                            <label class="block text-xs text-gray-500 font-semibold mb-0.5">Evaluation Date <span class="text-blue-500">(auto)</span></label>
+                            <input type="date" name="evaluation_date" id="eval_evaluation_date" readonly
+                                class="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 text-xs bg-gray-100 cursor-not-allowed">
                         </div>
                         <div>
                             <label class="block text-xs text-gray-500 font-semibold mb-0.5">Job Title</label>
@@ -1430,7 +1453,10 @@
                 </div>
                 <!-- Performance Factors stacked cards -->
                 <div class="px-4 py-3 space-y-3">
-                    <p class="text-xs font-bold text-gray-600 uppercase tracking-wide">Performance Factors</p>
+                    <div class="flex items-center justify-between">
+                        <p class="text-xs font-bold text-gray-600 uppercase tracking-wide">Performance Factors</p>
+                        <span class="text-xs text-gray-400">Score: 1 (Unsatisfactory) — 5 (Outstanding)</span>
+                    </div>
                     @php
                     $perfFactors = [
                         'quality_of_work'          => ['label'=>'1. Quality of Work',          'desc'=>'Competence, accuracy, neatness, thoroughness.'],
@@ -1442,54 +1468,88 @@
                     ];
                     $ratingOptions = [
                         'outstanding'          => 'Outstanding',
-                        'exceeds_expectations' => 'Exceeds Expectations',
-                        'meets_expectations'   => 'Meets Expectations',
-                        'needs_improvement'    => 'Needs Improvement',
-                        'unsatisfactory'       => 'Unsatisfactory',
+                        'exceeds_expectations' => 'Very Satisfactory',
+                        'meets_expectations'   => 'Satisfactory',
+                        'needs_improvement'    => 'Fair',
+                        'unsatisfactory'       => 'Poor',
+                    ];
+                    $ratingScores = [
+                        'outstanding'          => 5,
+                        'exceeds_expectations' => 4,
+                        'meets_expectations'   => 3,
+                        'needs_improvement'    => 2,
+                        'unsatisfactory'       => 1,
                     ];
                     @endphp
                     @foreach($perfFactors as $key => $factor)
                     <div class="bg-gray-50 border border-gray-200 rounded-xl p-3">
-                        <p class="text-sm font-bold text-gray-800">{{ $factor['label'] }}</p>
-                        @if($factor['desc'])<p class="text-xs text-gray-500 mt-0.5 mb-2">{{ $factor['desc'] }}</p>@else<div class="mb-2"></div>@endif
-                        <div class="grid grid-cols-2 gap-1 mb-2">
+                        <div class="flex items-start justify-between gap-3 mb-1">
+                            <div>
+                                <p class="text-sm font-bold text-gray-800">{{ $factor['label'] }}</p>
+                                @if($factor['desc'])<p class="text-xs text-gray-500 mt-0.5">{{ $factor['desc'] }}</p>@endif
+                            </div>
+                            {{-- Score badge shown after radio selection --}}
+                            <div class="shrink-0 flex flex-col items-center">
+                                <label class="text-[10px] text-gray-400 font-semibold uppercase">Score</label>
+                                <input type="number" name="{{ $key }}_score" id="score_{{ $key }}"
+                                    min="1" max="5" readonly
+                                    class="w-12 h-8 text-center text-sm font-bold border-2 border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none prmsu-score"
+                                    placeholder="—">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-1 mb-2 mt-2">
                             @foreach($ratingOptions as $val => $rLabel)
                             <label class="flex items-center gap-2 cursor-pointer bg-white border border-gray-200 rounded-lg px-2 py-1.5 hover:border-blue-400 transition-colors has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50">
-                                <input type="radio" name="{{ $key }}_rating" value="{{ $val }}" class="w-4 h-4 accent-blue-600 prmsu-radio shrink-0">
-                                <span class="text-xs text-gray-700 leading-tight">{{ $rLabel }}</span>
+                                <input type="radio" name="{{ $key }}_rating" value="{{ $val }}"
+                                    data-score="{{ $ratingScores[$val] }}"
+                                    data-target="score_{{ $key }}"
+                                    class="w-4 h-4 accent-blue-600 prmsu-radio shrink-0">
+                                <span class="text-xs text-gray-700 leading-tight">{{ $rLabel }} <span class="text-gray-400">({{ $ratingScores[$val] }})</span></span>
                             </label>
                             @endforeach
                         </div>
-                        <textarea name="{{ $key }}_comment" rows="2" class="w-full text-xs text-gray-800 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400 resize-none" placeholder="Comments (optional)..."></textarea>
+                        <textarea name="{{ $key }}_comment" rows="2" class="w-full text-xs text-gray-800 bg-white border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400 resize-none prmsu-comment" placeholder="Comments (optional)..."></textarea>
                     </div>
                     @endforeach
+
+                    {{-- Weighted Score Summary --}}
+                    <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between">
+                        <p class="text-sm font-bold text-blue-800">Weighted Score</p>
+                        <div class="flex items-center gap-2">
+                            <span id="evalAvgScore" class="text-xl font-bold text-blue-700">—</span>
+                            <span id="evalAvgLabel" class="text-xs font-semibold text-blue-500"></span>
+                        </div>
+                    </div>
                 </div>
                 <!-- Definitions collapsible -->
                 <div class="px-4 pb-3">
                     <details class="bg-gray-50 border border-gray-200 rounded-xl">
-                        <summary class="px-3 py-2 text-xs font-bold text-gray-600 uppercase tracking-wide cursor-pointer select-none">Rating Definitions</summary>
+                        <summary class="px-3 py-2 text-xs font-bold text-gray-600 uppercase tracking-wide cursor-pointer select-none">Rating Definitions &amp; Score Guide</summary>
                         <div class="px-3 pb-3 space-y-1.5 text-xs">
-                            @foreach(['Outstanding'=>'Exceeded all performance expectations and made many significant contributions.','Exceeds Expectations'=>'Regularly works beyond majority of expectations and made significant contributions.','Meets Expectations'=>'Met performance expectations and contributed to the organization.','Needs Improvement'=>'Failed to meet one or more significant performance expectations.','Unsatisfactory'=>'Failed to meet the performance expectations for this factor.'] as $term => $def)
+                            @foreach(['Outstanding (5)'=>'Exceeded all performance expectations and made many significant contributions.','Very Satisfactory (4)'=>'Regularly works beyond majority of expectations and made significant contributions.','Satisfactory (3)'=>'Met performance expectations and contributed to the organization.','Fair (2)'=>'Failed to meet one or more significant performance expectations.','Poor (1)'=>'Failed to meet the performance expectations for this factor.'] as $term => $def)
                             <div class="flex gap-2"><span class="font-bold text-gray-700 whitespace-nowrap">{{ $term }} &mdash;</span><span class="text-gray-600">{{ $def }}</span></div>
                             @endforeach
                         </div>
                     </details>
                 </div>
                 <!-- Signature -->
-                <div class="px-4 pb-4 flex justify-between items-end gap-4 border-t border-gray-100 pt-3">
-                    <div class="flex-1">
-                        <p class="text-xs text-gray-500 mb-1">Supervisor's Signature</p>
-                        <div class="border-b border-gray-400 h-5"></div>
-                        <p class="text-xs text-gray-500 mt-1">{{ $user->name }}</p>
+                <div class="px-4 pb-4 border-t border-gray-100 pt-3">
+                    <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Supervisor's Signature <span class="text-red-500">*</span></p>
+                    <div class="border-2 border-gray-300 rounded-xl bg-gray-50 relative" style="touch-action:none;">
+                        <canvas id="signatureCanvas" class="w-full rounded-xl block" height="110"
+                            style="cursor:crosshair;touch-action:none;"></canvas>
+                        <button type="button" onclick="clearSignature()"
+                            class="absolute top-2 right-2 px-2 py-0.5 bg-gray-200 hover:bg-gray-300 text-gray-600 rounded text-[10px] font-semibold">
+                            Clear
+                        </button>
+                        <p class="absolute bottom-2 left-3 text-[10px] text-gray-400 pointer-events-none" id="sigHint">Draw your signature above</p>
                     </div>
-                    <div class="w-32">
-                        <p class="text-xs text-gray-500 mb-1">Date:</p>
-                        <div class="border-b border-gray-400 h-5"></div>
-                    </div>
+                    <p class="text-xs text-gray-500 mt-1">{{ $user->name }}</p>
+                    <input type="hidden" name="signature_data" id="signatureData">
                 </div>
                 <!-- Buttons -->
                 <div class="flex gap-3 px-4 pb-5">
-                    <button type="button" onclick="closeEvaluationModal()" class="flex-1 px-4 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl transition-colors font-semibold text-sm">Cancel</button>
+                    <button type="button" onclick="closeEvaluationModal()" class="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-colors font-semibold text-sm">Close</button>
                     <button type="submit" id="evalSubmitBtn" class="flex-1 px-4 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl transition-colors font-semibold text-sm">Submit Evaluation</button>
                 </div>
             </form>
@@ -1531,10 +1591,18 @@
     <!-- Loading Modal -->
     <div id="loadingModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[110]">
         <div class="bg-slate-900/95 border border-slate-700/40 rounded-xl p-8 w-44 text-center">
-            <div class="inline-block mb-4">
+            <!-- Spinner state -->
+            <div id="loadingModalSpinner" class="inline-block mb-4">
                 <svg class="animate-spin h-12 w-12 text-blue-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-15" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
                     <path class="opacity-100" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+            <!-- Success state (hidden by default) -->
+            <div id="loadingModalSuccess" class="hidden mb-4">
+                <svg class="h-12 w-12 text-green-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.5" class="opacity-30"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 13l3 3 7-7"/>
                 </svg>
             </div>
             <p id="loadingModalText" class="text-white text-xs font-bold tracking-wider">APPROVING</p>
@@ -1850,53 +1918,6 @@
             });
         }
 
-        function confirmUndoApproval(recordId, date, session) {
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4';
-            modal.innerHTML = `
-                <div class="bg-slate-800 border border-orange-500/50 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-                    <div class="text-center mb-4">
-                        <div class="text-4xl mb-3">↩️</div>
-                        <h3 class="text-lg font-bold text-white mb-2">Undo Approval?</h3>
-                        <p class="text-gray-300 text-sm">This will <strong class="text-orange-400">revert the approval</strong> for:</p>
-                        <p class="text-white font-semibold mt-1">${date} ${session ? '— ' + session : ''}</p>
-                        <div class="mt-3 bg-orange-500/10 border border-orange-500/30 rounded-lg px-4 py-3 text-left">
-                            <p class="text-orange-300 text-xs font-semibold">⚠️ Hours will be deducted</p>
-                            <p class="text-gray-400 text-xs mt-1">The credited hours for this session will be removed from the student's progress and the record will return to Pending status.</p>
-                        </div>
-                    </div>
-                    <div class="flex gap-3 mt-5">
-                        <button onclick="this.closest('.fixed').remove()" class="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-semibold transition-all">Cancel</button>
-                        <button onclick="submitUndoApproval(${recordId}, this)" class="flex-1 px-4 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-semibold transition-all">Yes, Undo</button>
-                    </div>
-                </div>`;
-            document.body.appendChild(modal);
-        }
-
-        async function submitUndoApproval(recordId, btn) {
-            btn.disabled = true;
-            btn.textContent = 'Undoing…';
-            try {
-                const res = await fetch(`/api/time-records/${recordId}/undo-approval`, {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
-                });
-                const data = await res.json();
-                btn.closest('.fixed').remove();
-                if (data.success) {
-                    if (!setQueuedToastNotification('Approval Undone', 'Hours deducted and record set back to Pending.', 'orange')) {
-                        showToast('Approval Undone', 'Hours deducted and record set back to Pending.', 'orange');
-                    }
-                    setTimeout(() => location.reload(), 1200);
-                } else {
-                    showToast('Error', data.message || 'Failed to undo approval.', 'red');
-                }
-            } catch(e) {
-                btn.closest('.fixed').remove();
-                showToast('Error', 'Network error. Please try again.', 'red');
-            }
-        }
-
         function toggleStudentExpand(element) {
             const card = element.closest('.student-card');
             const isExpanded = card.classList.contains('expanded');
@@ -2004,9 +2025,10 @@
                 refreshSupervisorStudent(data.dashboard);
                 refreshInlineTimeEditRow(logId, 'approved');
                 showSupervisorLogsModalFromCurrentTitle();
-                hideLoadingModal();
-                if (typeof showSuccess === 'function') showSuccess(data.message || 'The time log was approved.');
-                else showToast('Time log approved', data.message || 'The time log was updated.', 'green');
+                showLoadingSuccess('APPROVED!', () => {
+                    if (typeof showSuccess === 'function') showSuccess(data.message || 'The time log was approved.');
+                    else showToast('Time log approved', data.message || 'The time log was updated.', 'green');
+                });
             })
             .catch((err) => {
                 hideLoadingModal();
@@ -2043,9 +2065,7 @@
             statusCell.innerHTML = `<span class="px-2 py-0.5 text-xs rounded-full whitespace-nowrap bg-${color}-500/20 text-${color}-300">${status}</span>`;
 
             if (status === 'approved') {
-                const date = row.querySelector('td:first-child p')?.textContent.trim() || '';
-                const session = row.querySelector('td:first-child p:nth-child(2)')?.textContent.trim() || '';
-                actionCell.innerHTML = `<button onclick="confirmUndoApproval(${recordId}, '${date}', '${session}')" class="px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white text-xs rounded transition-colors" title="Undo approval">↩ Undo</button>`;
+                actionCell.innerHTML = '<span class="text-gray-500 text-xs">—</span>';
             } else {
                 actionCell.innerHTML = '<span class="text-gray-500 text-xs">—</span>';
             }
@@ -2082,15 +2102,39 @@
         }
 
         function showLoadingModal(text) {
+            // Reset to spinner state
+            document.getElementById('loadingModalSpinner').classList.remove('hidden');
+            document.getElementById('loadingModalSuccess').classList.add('hidden');
             document.getElementById('loadingModalText').textContent = text;
+            document.getElementById('loadingModalText').classList.remove('text-green-400');
+            document.getElementById('loadingModalText').classList.add('text-white');
             document.getElementById('loadingModal').classList.remove('hidden');
+        }
+
+        function showLoadingSuccess(text, callback) {
+            // Switch to checkmark state
+            document.getElementById('loadingModalSpinner').classList.add('hidden');
+            document.getElementById('loadingModalSuccess').classList.remove('hidden');
+            document.getElementById('loadingModalText').textContent = text;
+            document.getElementById('loadingModalText').classList.remove('text-white');
+            document.getElementById('loadingModalText').classList.add('text-green-400');
+            // Hide after a short delay then run callback
+            setTimeout(() => {
+                hideLoadingModal();
+                if (typeof callback === 'function') callback();
+            }, 900);
         }
 
         function hideLoadingModal() {
             document.getElementById('loadingModal').classList.add('hidden');
+            // Reset to spinner state for next use
+            document.getElementById('loadingModalSpinner').classList.remove('hidden');
+            document.getElementById('loadingModalSuccess').classList.add('hidden');
+            document.getElementById('loadingModalText').classList.remove('text-green-400');
+            document.getElementById('loadingModalText').classList.add('text-white');
         }
 
-        // Keep the filtered intern list in place when an inline Time Edits action is used.
+        // Keep the filtered intern list in place when an inline Daily Logs action is used.
         document.addEventListener('submit', function(e) {
             const form = e.target.closest('form[data-inline-time-approval]');
             if (!form) return;
@@ -2316,6 +2360,124 @@
             }
         }, true); // capture phase — runs before pixel-loader listener
 
+        @php
+            try {
+                $__supEvalData = \App\Models\StudentEvaluation::whereIn('student_id',
+                    $supervisorStudents->pluck('id')
+                )->get()->keyBy('student_id');
+            } catch(\Exception $e) {
+                $__supEvalData = collect([]);
+            }
+        @endphp
+        const _supEvalData = @json($__supEvalData);
+
+        function showSupEvalModal(studentId, studentName) {
+            document.getElementById('supEvalModalName').textContent = studentName;
+            const body = document.getElementById('supEvalModalBody');
+            const ev   = _supEvalData[studentId];
+            if (!ev) {
+                body.innerHTML = '<div class="text-center py-8"><p class="text-gray-400">No evaluation submitted yet for this student.</p></div>';
+                document.getElementById('supEvalModal').classList.remove('hidden');
+                return;
+            }
+
+            const ratingMap   = { outstanding:5, exceeds_expectations:4, meets_expectations:3, needs_improvement:2, unsatisfactory:1 };
+            const ratingLabel = { outstanding:'Outstanding', exceeds_expectations:'Very Satisfactory', meets_expectations:'Satisfactory', needs_improvement:'Fair', unsatisfactory:'Poor' };
+            const ratingColor = { outstanding:'text-green-400', exceeds_expectations:'text-blue-400', meets_expectations:'text-yellow-400', needs_improvement:'text-orange-400', unsatisfactory:'text-red-400' };
+            const factors = [
+                { key:'quality_of_work',          label:'1. Quality of Work',            weight:20 },
+                { key:'quantity_of_work',         label:'2. Quantity of Work',           weight:20 },
+                { key:'job_knowledge',            label:'3. Job Knowledge',              weight:20 },
+                { key:'working_relationships',    label:'4. Working Relationships',      weight:20 },
+                { key:'attendance_dependability', label:'5. Attendance & Dependability', weight:10 },
+                { key:'specific_achievements',    label:'6. Specific Achievements',      weight:10 },
+            ];
+
+            let totalWeighted = 0, allRated = true;
+            const rows = factors.map(f => {
+                const rKey    = ev[f.key + '_rating'];
+                const num     = ratingMap[rKey] || 0;
+                const comment = ev[f.key + '_comment'] || '';
+                if (!num) allRated = false;
+                const weighted = num ? ((num / 5) * f.weight).toFixed(2) : '—';
+                if (num) totalWeighted += (num / 5) * f.weight;
+                const col = ratingColor[rKey] || 'text-gray-500';
+                return `<tr class="border-b border-slate-700/40">
+                    <td class="py-2 px-3 text-gray-300 text-xs leading-tight">
+                        ${f.label}
+                        ${comment ? `<div class="text-gray-500 text-[10px] italic mt-0.5">${comment}</div>` : ''}
+                    </td>
+                    <td class="py-2 px-3 text-center">
+                        <span class="font-bold text-sm ${col}">${num || '—'}</span>
+                        <div class="text-[10px] text-gray-500">${ratingLabel[rKey] || ''}</div>
+                    </td>
+                    <td class="py-2 px-3 text-center text-gray-400 text-xs">${f.weight}%</td>
+                    <td class="py-2 px-3 text-center font-bold text-blue-400 text-sm">${weighted}</td>
+                </tr>`;
+            }).join('');
+
+            let overallNum = 0, overallKey = '', overallPct = '—';
+            if (allRated) {
+                overallPct = totalWeighted.toFixed(2) + '%';
+                if      (totalWeighted >= 96) { overallNum = 5; overallKey = 'outstanding'; }
+                else if (totalWeighted >= 86) { overallNum = 4; overallKey = 'exceeds_expectations'; }
+                else if (totalWeighted >= 76) { overallNum = 3; overallKey = 'meets_expectations'; }
+                else if (totalWeighted >= 66) { overallNum = 2; overallKey = 'needs_improvement'; }
+                else                          { overallNum = 1; overallKey = 'unsatisfactory'; }
+            }
+            const overallCol = ratingColor[overallKey] || 'text-gray-400';
+            const overallLbl = ratingLabel[overallKey] || '—';
+
+            let infoHtml = '';
+            if (ev.job_title || ev.evaluation_date || ev.period_from) {
+                const infoCells = [
+                    ev.job_title       ? `<div><p class="text-gray-500 text-[10px]">Position</p><p class="text-gray-200 font-semibold text-xs">${ev.job_title}</p></div>` : '',
+                    ev.evaluation_date ? `<div><p class="text-gray-500 text-[10px]">Eval. Date</p><p class="text-gray-200 font-semibold text-xs">${ev.evaluation_date}</p></div>` : '',
+                    ev.period_from     ? `<div><p class="text-gray-500 text-[10px]">Period</p><p class="text-gray-200 font-semibold text-xs">${ev.period_from} → ${ev.period_to || '?'}</p></div>` : '',
+                ].filter(Boolean).join('');
+                infoHtml = `<div class="flex gap-4 flex-wrap bg-slate-800/50 rounded-xl px-4 py-3 mb-3">${infoCells}</div>`;
+            }
+
+            body.innerHTML = `
+                ${infoHtml}
+                <div class="rounded-xl overflow-hidden border border-slate-700 mb-3">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-700/80">
+                            <tr>
+                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Factor</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Rating</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Weight</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Weighted</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                        <tfoot class="bg-slate-800/80 border-t-2 border-slate-600">
+                            <tr>
+                                <td colspan="2" class="py-2 px-3 font-bold text-gray-200 text-xs">Total Weighted Score</td>
+                                <td class="py-2 px-3 text-center text-gray-400 text-xs font-bold">100%</td>
+                                <td class="py-2 px-3 text-center font-bold text-blue-400 text-sm">${overallPct}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <div class="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-400 mb-0.5">Overall Rating</p>
+                        <p class="font-bold text-lg ${overallCol}">${overallNum ? overallNum + ' — ' + overallLbl : '—'}</p>
+                        <p class="text-xs text-gray-500">${overallPct}</p>
+                    </div>
+                    <div class="flex gap-1">
+                        ${[1,2,3,4,5].map(i => `<span class="text-2xl ${i <= overallNum ? overallCol : 'text-gray-700'}">★</span>`).join('')}
+                    </div>
+                </div>
+                ${ev.feedback ? `<div class="mt-3 bg-slate-800/50 rounded-xl px-4 py-3"><p class="text-xs text-gray-400 mb-1">Overall Comments</p><p class="text-sm text-gray-300">${ev.feedback}</p></div>` : ''}
+            `;
+            document.getElementById('supEvalModal').classList.remove('hidden');
+        }
+        function closeSupEvalModal() { document.getElementById('supEvalModal').classList.add('hidden'); }
+        document.getElementById('supEvalModal')?.addEventListener('click', e => { if (e.target === document.getElementById('supEvalModal')) closeSupEvalModal(); });
+        // ===== END SUPERVISOR EVALUATION RATING MODAL =====
+
         function openEvalFromBtn(btn) {
             const studentId   = btn.dataset.studentId;
             const studentName = btn.dataset.studentName;
@@ -2325,46 +2487,239 @@
         }
 
         // Evaluation Modal (PRMSU)
+        const _evalFactors = ['quality_of_work','quantity_of_work','job_knowledge','working_relationships','attendance_dependability','specific_achievements'];
+        const _evalRatingMap = {outstanding:5,exceeds_expectations:4,meets_expectations:3,needs_improvement:2,unsatisfactory:1};
+        const _evalRatingLabel = {5:'Outstanding',4:'Very Satisfactory',3:'Satisfactory',2:'Fair',1:'Poor'};
+
+        // Factor weights — must match the Evaluation Rating modal exactly
+        const _evalWeights = {
+            quality_of_work: 20, quantity_of_work: 20, job_knowledge: 20,
+            working_relationships: 20, attendance_dependability: 10, specific_achievements: 10
+        };
+        // Label by weighted % thresholds — same as Evaluation Rating modal
+        function _evalLabelFromPct(pct) {
+            if (pct >= 96) return { label: 'Outstanding',       num: 5 };
+            if (pct >= 86) return { label: 'Very Satisfactory', num: 4 };
+            if (pct >= 76) return { label: 'Satisfactory',      num: 3 };
+            if (pct >= 66) return { label: 'Fair',              num: 2 };
+            return              { label: 'Poor',                num: 1 };
+        }
+
+        function _evalUpdateAverage() {
+            let totalWeighted = 0, count = 0;
+            _evalFactors.forEach(f => {
+                const r = document.querySelector(`input[name="${f}_rating"]:checked`);
+                const score = r ? (_evalRatingMap[r.value] || 0) : 0;
+                if (score > 0) {
+                    totalWeighted += (score / 5) * (_evalWeights[f] || 0);
+                    count++;
+                }
+            });
+            const avgEl = document.getElementById('evalAvgScore');
+            const lblEl = document.getElementById('evalAvgLabel');
+            if (count === 0) { avgEl.textContent = '—'; lblEl.textContent = ''; return; }
+            // Show weighted % if all 6 rated, otherwise show partial weighted score
+            const allRated = count === _evalFactors.length;
+            avgEl.textContent = totalWeighted.toFixed(2) + '%';
+            if (allRated) {
+                const { label } = _evalLabelFromPct(totalWeighted);
+                lblEl.textContent = label;
+            } else {
+                lblEl.textContent = `(${count}/6 rated)`;
+            }
+        }
+
+        // Wire radio clicks → update score badge + live average
+        document.addEventListener('change', function(e) {
+            if (!e.target.matches('.prmsu-radio')) return;
+            const score = parseInt(e.target.dataset.score || '0');
+            const targetId = e.target.dataset.target;
+            if (targetId) {
+                const scoreEl = document.getElementById(targetId);
+                if (scoreEl) {
+                    scoreEl.value = score;
+                    scoreEl.style.borderColor = score >= 4 ? '#22c55e' : score >= 3 ? '#3b82f6' : score >= 2 ? '#f59e0b' : '#ef4444';
+                }
+            }
+            _evalUpdateAverage();
+        });
+
         function showEvaluationModal(studentId, studentName, isEvaluated = false, existingData = null) {
+            if (typeof hideEvalWarning === 'function') hideEvalWarning();
             document.getElementById('evalStudentName').textContent = studentName;
             document.getElementById('eval_student_name_field').value = studentName;
             const form = document.getElementById('evaluationForm');
             form.action = `{{ url('/save-evaluation') }}/${studentId}`;
-            // 1. Reset
-            form.querySelectorAll('.prmsu-radio').forEach(r => { r.checked = false; r.style.pointerEvents = ''; r.disabled = false; });
-            form.querySelectorAll('textarea').forEach(t => { t.value = ''; t.readOnly = false; t.style.pointerEvents = ''; });
-            form.querySelectorAll('input[type="date"],input[type="text"]').forEach(el => { if (!el.hasAttribute('readonly')) { el.value = ''; el.disabled = false; } });
+
+            // 1. Reset all fields
+            form.querySelectorAll('.prmsu-radio').forEach(r => { r.checked = false; r.disabled = false; r.style.pointerEvents = ''; });
+            form.querySelectorAll('.prmsu-score').forEach(el => { el.value = ''; el.style.borderColor = ''; el.disabled = false; });
+            form.querySelectorAll('.prmsu-comment').forEach(t => { t.value = ''; t.readOnly = false; t.style.pointerEvents = ''; });
+            form.querySelectorAll('input[type="date"]:not([id="eval_evaluation_date"]),input[type="text"]:not([readonly])').forEach(el => { el.value = ''; el.disabled = false; });
             document.getElementById('ratingInput').value = 0;
-            // 2. Populate before disabling
+            document.getElementById('evalAvgScore').textContent = '—';
+            document.getElementById('evalAvgLabel').textContent = '';
+
+            // 2. Auto-set today's date (always — readonly field)
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('eval_evaluation_date').value = existingData?.evaluation_date || today;
+
+            // 3. Populate existing data if any
             if (existingData) {
-                if (existingData.evaluation_date) document.getElementById('eval_evaluation_date').value = existingData.evaluation_date;
-                if (existingData.period_from)     document.getElementById('eval_period_from').value    = existingData.period_from;
-                if (existingData.period_to)       document.getElementById('eval_period_to').value      = existingData.period_to;
-                if (existingData.job_title)       document.getElementById('eval_job_title').value      = existingData.job_title;
-                ['quality_of_work','quantity_of_work','job_knowledge','working_relationships','attendance_dependability','specific_achievements'].forEach(f => {
+                if (existingData.period_from) document.getElementById('eval_period_from').value = existingData.period_from;
+                if (existingData.period_to)   document.getElementById('eval_period_to').value   = existingData.period_to;
+                if (existingData.job_title)   document.getElementById('eval_job_title').value   = existingData.job_title;
+                _evalFactors.forEach(f => {
                     const rVal = existingData[f + '_rating'];
-                    if (rVal) { const r = form.querySelector(`input[name="${f}_rating"][value="${rVal}"]`); if (r) r.checked = true; }
-                    const cVal = existingData[f + '_comment'];
+                    if (rVal) {
+                        const radio = form.querySelector(`input[name="${f}_rating"][value="${rVal}"]`);
+                        if (radio) {
+                            radio.checked = true;
+                            const score = _evalRatingMap[rVal] || 0;
+                            const scoreEl = document.getElementById('score_' + f);
+                            if (scoreEl) {
+                                scoreEl.value = score;
+                                scoreEl.style.borderColor = score >= 4 ? '#22c55e' : score >= 3 ? '#3b82f6' : score >= 2 ? '#f59e0b' : '#ef4444';
+                            }
+                        }
+                    }
                     const ta = form.querySelector(`textarea[name="${f}_comment"]`);
-                    if (ta && cVal) ta.value = cVal;
+                    if (ta && existingData[f + '_comment']) ta.value = existingData[f + '_comment'];
                 });
+                _evalUpdateAverage();
             }
-            // 3. Lock if already evaluated
+
+            // 4. Lock everything if already evaluated — view-only
             const submitBtn = document.getElementById('evalSubmitBtn');
             if (isEvaluated) {
-                submitBtn.disabled = true;
-                submitBtn.textContent = '✅ Already Submitted';
-                submitBtn.className = submitBtn.className.replace('bg-blue-700 hover:bg-blue-800','bg-gray-400 cursor-not-allowed');
-                form.querySelectorAll('.prmsu-radio').forEach(r => r.style.pointerEvents = 'none');
-                form.querySelectorAll('textarea').forEach(t => { t.readOnly = true; t.style.pointerEvents = 'none'; });
-                form.querySelectorAll('input[type="date"],input[type="text"]').forEach(el => { if (!el.hasAttribute('readonly')) el.disabled = true; });
+                submitBtn.style.display = 'none';
+                form.querySelectorAll('.prmsu-radio').forEach(r => { r.disabled = true; r.style.pointerEvents = 'none'; });
+                form.querySelectorAll('.prmsu-score').forEach(el => { el.disabled = true; });
+                form.querySelectorAll('.prmsu-comment').forEach(t => { t.readOnly = true; t.style.pointerEvents = 'none'; t.style.background = '#f3f4f6'; });
+                form.querySelectorAll('input[type="date"]:not([id="eval_evaluation_date"]),input[type="text"]:not([readonly])').forEach(el => { el.disabled = true; });
             } else {
+                submitBtn.style.display = '';
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit Evaluation';
-                submitBtn.className = submitBtn.className.replace('bg-gray-400 cursor-not-allowed','bg-blue-700 hover:bg-blue-800');
+                submitBtn.className = 'flex-1 px-4 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl transition-colors font-semibold text-sm';
             }
             document.getElementById('evaluationModal').classList.remove('hidden');
         }
+
+        // ===== SIGNATURE PAD =====
+        (function () {
+            let canvas, ctx, drawing = false;
+            let _attached = false;
+
+            function setupCanvas() {
+                canvas = document.getElementById('signatureCanvas');
+                if (!canvas) return false;
+                if (!_attached) {
+                    // Only set width once — setting canvas.width clears its content
+                    canvas.width = canvas.offsetWidth || 540;
+                    canvas.height = 110;
+                    ctx = canvas.getContext('2d');
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.lineWidth = 2.2;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    canvas.addEventListener('mousedown',  onStart);
+                    canvas.addEventListener('mousemove',  onMove);
+                    canvas.addEventListener('mouseup',    onEnd);
+                    canvas.addEventListener('mouseleave', onEnd);
+                    canvas.addEventListener('touchstart', onStart, {passive: false});
+                    canvas.addEventListener('touchmove',  onMove,  {passive: false});
+                    canvas.addEventListener('touchend',   onEnd);
+                    _attached = true;
+                }
+                return true;
+            }
+
+            function getPos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width  / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const src = e.touches ? e.touches[0] : e;
+                return { x: (src.clientX - rect.left) * scaleX, y: (src.clientY - rect.top) * scaleY };
+            }
+
+            function onStart(e) {
+                if (canvas.dataset.locked === '1') return;
+                e.preventDefault();
+                const p = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(p.x, p.y);
+                drawing = true;
+            }
+            function onMove(e) {
+                if (!drawing) return;
+                e.preventDefault();
+                const p = getPos(e);
+                ctx.lineTo(p.x, p.y);
+                ctx.stroke();
+                const hint = document.getElementById('sigHint');
+                if (hint) hint.style.display = 'none';
+            }
+            function onEnd(e) {
+                if (!drawing) return;
+                drawing = false;
+                // Save after each stroke so the hidden field is always current
+                document.getElementById('signatureData').value = canvas.toDataURL('image/png');
+            }
+
+            // Hook into showEvaluationModal — reset or restore signature
+            const _orig = window.showEvaluationModal;
+            window.showEvaluationModal = function(studentId, studentName, isEvaluated, existingData) {
+                _orig(studentId, studentName, isEvaluated, existingData);
+                requestAnimationFrame(() => {
+                    if (!setupCanvas()) return;
+
+                    // Reset for fresh submission
+                    canvas.width = canvas.offsetWidth || 540; // safe to reset here before drawing
+                    ctx = canvas.getContext('2d');
+                    ctx.strokeStyle = '#1e293b';
+                    ctx.lineWidth = 2.2;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    document.getElementById('signatureData').value = '';
+                    const hint = document.getElementById('sigHint');
+                    if (hint) hint.style.display = '';
+
+                    if (isEvaluated && existingData?.signature_data) {
+                        // Restore saved signature image on view-only
+                        const img = new Image();
+                        img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        img.src = existingData.signature_data;
+                        canvas.dataset.locked = '1';
+                        canvas.style.cursor = 'default';
+                        canvas.style.opacity = '0.85';
+                        if (hint) hint.style.display = 'none';
+                    } else if (isEvaluated) {
+                        canvas.dataset.locked = '1';
+                        canvas.style.cursor = 'default';
+                        canvas.style.opacity = '0.5';
+                    } else {
+                        canvas.dataset.locked = '0';
+                        canvas.style.cursor = 'crosshair';
+                        canvas.style.opacity = '';
+                    }
+                });
+            };
+
+            window.clearSignature = function () {
+                if (!canvas) setupCanvas();
+                if (!canvas || canvas.dataset.locked === '1') return;
+                canvas.width = canvas.width; // clear
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2.2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                document.getElementById('signatureData').value = '';
+                const hint = document.getElementById('sigHint');
+                if (hint) hint.style.display = '';
+            };
+        })();
+        // ===== END SIGNATURE PAD =====
 
         function closeEvaluationModal() {
             document.getElementById('evaluationModal').classList.add('hidden');
@@ -2398,23 +2753,51 @@
             activateCardTab(studentId, 'requirements');
         }
 
+        // Inline warning banner inside the evaluation modal (replaces native alert())
+        let _evalWarningTimer = null;
+        function showEvalWarning(message) {
+            const banner = document.getElementById('evalWarningBanner');
+            const text = document.getElementById('evalWarningText');
+            if (!banner || !text) { alert(message); return; }
+            text.textContent = message;
+            banner.classList.remove('hidden');
+            banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            clearTimeout(_evalWarningTimer);
+            _evalWarningTimer = setTimeout(hideEvalWarning, 5000);
+        }
+        function hideEvalWarning() {
+            document.getElementById('evalWarningBanner')?.classList.add('hidden');
+            clearTimeout(_evalWarningTimer);
+        }
+
         // Evaluation form — submit via AJAX
         document.getElementById('evaluationForm')?.addEventListener('submit', function(e) {
             e.preventDefault();
             e.stopImmediatePropagation();
+            hideEvalWarning();
             const form = this;
-            const factors = ['quality_of_work','quantity_of_work','job_knowledge','working_relationships','attendance_dependability','specific_achievements'];
-            for (const f of factors) {
+            for (const f of _evalFactors) {
                 if (!form.querySelector(`input[name="${f}_rating"]:checked`)) {
-                    alert(`Please select a rating for all performance factors.`);
+                    showEvalWarning('Please select a rating for all performance factors.');
                     return;
                 }
             }
-            // Derive overall rating from radio selections (map to 1-5)
-            const ratingMap = {outstanding:5,exceeds_expectations:4,meets_expectations:3,needs_improvement:2,unsatisfactory:1};
-            const scores = factors.map(f => ratingMap[form.querySelector(`input[name="${f}_rating"]:checked`)?.value] || 0);
-            const avg = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
-            document.getElementById('ratingInput').value = avg;
+            // Require signature
+            const sigData = document.getElementById('signatureData').value;
+            if (!sigData) {
+                showEvalWarning('Please draw your signature before submitting.');
+                document.getElementById('signatureCanvas')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            // Compute weighted score — same formula as Evaluation Rating modal
+            let _submitWeighted = 0;
+            _evalFactors.forEach(f => {
+                const val = form.querySelector(`input[name="${f}_rating"]:checked`)?.value;
+                const num = _evalRatingMap[val] || 0;
+                _submitWeighted += (num / 5) * (_evalWeights[f] || 0);
+            });
+            const { num: _overallNum } = _evalLabelFromPct(_submitWeighted);
+            document.getElementById('ratingInput').value = _overallNum;
 
             const submitBtn = document.getElementById('evalSubmitBtn');
             submitBtn.disabled = true;
@@ -2438,13 +2821,13 @@
                     setQueuedSuccessMessage('Evaluation submitted successfully!');
                     setTimeout(() => { _allowLeave = true; window.location.reload(); }, 500);
                 } else {
-                    alert('Failed to submit. Please try again.');
+                    showEvalWarning(data.message || 'Failed to submit. Please try again.');
                     submitBtn.disabled = false; submitBtn.textContent = 'Submit Evaluation';
                 }
             })
             .catch(err => {
                 if (typeof hidePixelLoader === 'function') hidePixelLoader();
-                alert('Submission failed: ' + err.message);
+                showEvalWarning('Submission failed: ' + err.message);
                 submitBtn.disabled = false; submitBtn.textContent = 'Submit Evaluation';
             });
         }, true);
@@ -2566,6 +2949,20 @@
             document.getElementById('supDtrFrame').src = '';
         }
     </script>
+    <!-- ===== SUPERVISOR EVALUATION RATING MODAL ===== -->
+    <div id="supEvalModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center px-5 py-4 border-b border-slate-700 shrink-0">
+                <h3 class="text-base font-bold text-white">⭐ Evaluation Rating — <span id="supEvalModalName"></span></h3>
+                <button onclick="closeSupEvalModal()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white">✕</button>
+            </div>
+            <div id="supEvalModalBody" class="px-5 py-4 overflow-y-auto">
+                <p class="text-gray-400 text-sm text-center py-6">Loading…</p>
+            </div>
+        </div>
+    </div>
+    <!-- ===== END SUPERVISOR EVALUATION RATING MODAL ===== -->
+
     <!-- DTR Viewer Modal -->
     <div id="supDtrModal" class="hidden fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4" onclick="if(event.target===this)closeSupDtrModal()">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col">
@@ -2583,97 +2980,57 @@
     </div>
     <!-- End DTR Viewer Modal -->
 
-    <!-- ===== CERTIFICATE IMAGE MODAL ===== -->
-    <div id="certImageModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4"
-         onclick="if(event.target===this)closeCertImageModal()">
+    <!-- ===== CERTIFICATE VIEW MODAL (auto-generated, rendered via iframe) ===== -->
+    <div id="certViewModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4"
+         onclick="if(event.target===this)closeCertViewModal()">
         <div class="bg-slate-900 border border-yellow-500/30 rounded-2xl shadow-2xl flex flex-col"
-             style="max-width:960px;width:100%;max-height:92vh;">
+             style="max-width:1100px;width:100%;max-height:92vh;">
             <div class="flex justify-between items-center px-5 py-3 border-b border-slate-700 shrink-0">
-                <span id="certImageModalTitle" class="text-sm font-semibold text-yellow-300">🏅 OJT Certificate of Completion</span>
+                <span id="certViewModalTitle" class="text-sm font-semibold text-yellow-300">🏅 OJT Certificate of Completion</span>
                 <div class="flex items-center gap-2">
-                    <button onclick="printCertImage()"
+                    <button onclick="printCertView()"
                         class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">🖨️ Print</button>
-                    <button onclick="downloadCertImage()"
-                        class="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs font-semibold">⬇️ Download</button>
-                    <button onclick="closeCertImageModal()"
+                    <button onclick="downloadCertView()"
+                        class="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs font-semibold">⬇️ Download PDF</button>
+                    <button onclick="closeCertViewModal()"
                         class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-lg">✕</button>
                 </div>
             </div>
             <div class="flex-1 overflow-auto flex items-center justify-center p-4 bg-slate-950/50 rounded-b-2xl">
-                <img id="certImageEl" src="" alt="Certificate"
-                     class="max-w-full max-h-full object-contain rounded-lg shadow-xl">
+                <iframe id="certViewFrame" src="" class="w-full border-0 rounded-lg shadow-xl bg-white" style="height:72vh;"></iframe>
             </div>
         </div>
     </div>
-    <!-- ===== END CERTIFICATE IMAGE MODAL ===== -->
+    <!-- ===== END CERTIFICATE VIEW MODAL ===== -->
 
     <script>
-    let _certImageUrl = '', _certImageName = '';
+    let _certViewName = '';
 
-    function openCertImageModal(url, name) {
-        _certImageUrl = url;
-        _certImageName = name;
-        document.getElementById('certImageEl').src = url;
-        document.getElementById('certImageModalTitle').textContent = '🏅 ' + name + ' — Certificate';
-        document.getElementById('certImageModal').classList.remove('hidden');
+    function openCertViewModal(studentId, name) {
+        _certViewName = name;
+        document.getElementById('certViewFrame').src = `/certificate/${studentId}`;
+        document.getElementById('certViewModalTitle').textContent = '🏅 ' + name + ' — Certificate';
+        document.getElementById('certViewModal').classList.remove('hidden');
     }
-    function closeCertImageModal() {
-        document.getElementById('certImageModal').classList.add('hidden');
-        document.getElementById('certImageEl').src = '';
+    function closeCertViewModal() {
+        document.getElementById('certViewModal').classList.add('hidden');
+        document.getElementById('certViewFrame').src = '';
     }
-    function printCertImage() {
-        const win = window.open('', '_blank');
-        win.document.write(`<!DOCTYPE html><html><head><style>
-            *{margin:0;padding:0;box-sizing:border-box;}
-            body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff;}
-            img{max-width:100%;max-height:100vh;object-fit:contain;}
-            @page{size:landscape;margin:5mm;}
-        </style></head><body><img src="${_certImageUrl}" onload="window.print();window.close()"></body></html>`);
-        win.document.close();
+    function printCertView() {
+        const frame = document.getElementById('certViewFrame');
+        frame.contentWindow?.print();
     }
-    function downloadCertImage() {
-        const a = document.createElement('a');
-        a.href = _certImageUrl;
-        a.download = 'OJT_Certificate_' + _certImageName.replace(/\s+/g,'_') + '.' + _certImageUrl.split('.').pop();
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+    function downloadCertView() {
+        const frame = document.getElementById('certViewFrame');
+        const filename = 'OJT_Certificate_' + _certViewName.replace(/\s+/g, '_') + '.pdf';
+        if (frame.contentWindow?.downloadAsPdf) {
+            frame.contentWindow.downloadAsPdf(filename);
+        } else {
+            showToast('Please wait', 'Certificate is still loading, try again in a moment.', 'blue');
+        }
     }
 
-    // Upload certificate image via AJAX
-    function uploadCertificate(studentId, input) {
-        const file = input.files[0];
-        if (!file) return;
-        const progress = document.getElementById('cert-progress-' + studentId);
-
-        // Show uploading overlay
-        showUploadingOverlay('Uploading certificate…');
-
-        const fd = new FormData();
-        fd.append('certificate_image', file);
-        fd.append('_token', document.querySelector('meta[name="csrf-token"]').content);
-        fetch('/upload-certificate/' + studentId, { method: 'POST', body: fd })
-            .then(r => r.json())
-            .then(data => {
-                hideUploadingOverlay();
-                if (data.success) {
-                    if (!setQueuedToastNotification('✅ Certificate Uploaded!', 'The certificate is now visible to the student.', 'green')) {
-                        showToast('✅ Certificate Uploaded!', 'The certificate is now visible to the student.', 'green');
-                    }
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    if (progress) progress.classList.add('hidden');
-                    showToast('Upload Failed', data.message || 'Please try again.', 'red');
-                }
-            })
-            .catch(() => {
-                hideUploadingOverlay();
-                if (progress) progress.classList.add('hidden');
-                showToast('Network Error', 'Please try again.', 'red');
-            });
-    }
-
-    // Uploading overlay helpers
+    // Uploading overlay helpers (still used by the certificate-generation progress indicator)
     function showUploadingOverlay(msg) {
         let el = document.getElementById('_uploadOverlay');
         if (!el) {
@@ -2696,14 +3053,6 @@
         const el = document.getElementById('_uploadOverlay');
         if (el) el.style.display = 'none';
     }
-    function handleCertDrop(event, studentId) {
-        event.preventDefault();
-        const file = event.dataTransfer.files[0];
-        if (!file) return;
-        const fakeInput = { files: [file] };
-        uploadCertificate(studentId, fakeInput);
-    }
-
     function showToast(title, message, color) {
         const colors = {
             green: 'linear-gradient(135deg,#16a34a,#15803d)',

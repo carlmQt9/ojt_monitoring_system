@@ -815,48 +815,9 @@ Route::post('/approve-time-in/{recordId}', function ($recordId) {
     return back()->with('success', $message);
 })->name('approve-time-in')->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
-// Undo approval — revert approved record back to pending and deduct hours
+// Undo approval — permanently disabled. Approvals are final and cannot be reversed.
 Route::post('/api/time-records/{recordId}/undo-approval', function ($recordId) {
-    $record = \App\Models\TimeInRecord::findOrFail($recordId);
-
-    if ($record->status !== 'approved') {
-        return response()->json(['success' => false, 'message' => 'Record is not approved.'], 422);
-    }
-
-    // Calculate hours to deduct
-    $regularToDeduct = floatval($record->regular_hours ?? 0);
-    $otToDeduct = ($record->ot_status === 'approved') ? floatval($record->ot_hours ?? 0) : 0;
-    $totalToDeduct = $regularToDeduct + $otToDeduct;
-
-    // Revert record to pending with undone marker
-    $record->update([
-        'status'       => 'pending',
-        'verified'     => false,
-        'approved_by'  => null,
-        'approved_at'  => null,
-        'ot_status'    => $record->ot_hours > 0 ? 'pending' : null,
-        'denial_reason'=> 'undone',
-    ]);
-
-    // Deduct hours from student progress
-    if ($totalToDeduct > 0) {
-        $studentHours = \App\Models\StudentHours::where('student_id', $record->student_id)->first();
-        if ($studentHours) {
-            $newCompleted = round(max(0, $studentHours->hours_completed - $totalToDeduct), 2);
-            $studentHours->update([
-                'hours_completed' => $newCompleted,
-                'hours_remaining' => round(max(0, $studentHours->total_hours_required - $newCompleted), 2),
-            ]);
-        }
-    }
-
-    // Revert daily log entries for this date back to pending
-    \App\Models\DailyHourLog::where('student_id', $record->student_id)
-        ->whereDate('log_date', $record->date)
-        ->where('status', 'approved')
-        ->update(['status' => 'pending']);
-
-    return response()->json(['success' => true, 'deducted' => $totalToDeduct]);
+    return response()->json(['success' => false, 'message' => 'Approvals are final and cannot be undone.'], 403);
 })->middleware(['auth.custom', 'role:coordinator,supervisor']);
 
 Route::post('/deny-time-in/{recordId}', function ($recordId) {
@@ -1418,30 +1379,26 @@ Route::post('/save-evaluation/{studentId}', function ($studentId) {
     $reviewer = User::findOrFail(session('user_id'));
 
     if ($reviewer->role !== 'supervisor') {
-        return response()->json([
-            'success' => false,
-            'message' => 'Access Denied: only supervisors can evaluate students.',
-        ], 403);
+        return response()->json(['success' => false, 'message' => 'Access Denied: only supervisors can evaluate students.'], 403);
     }
 
     $targetStudent = User::find($studentId);
-
-    // Company ownership: supervisor may only evaluate students in their own company
     if (!$targetStudent || $targetStudent->company_id !== $reviewer->company_id) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Access Denied: You can only evaluate students in your company.',
-        ], 403);
+        return response()->json(['success' => false, 'message' => 'Access Denied: You can only evaluate students in your company.'], 403);
     }
 
-    $completedHours = \App\Models\StudentHours::where('student_id', $studentId)
-        ->value('hours_completed') ?? 0;
-
+    $completedHours = \App\Models\StudentHours::where('student_id', $studentId)->value('hours_completed') ?? 0;
     if ((float) $completedHours < 600) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Access Denied: Evaluation is not allowed until the student completes 600 hours.',
-        ], 403);
+        return response()->json(['success' => false, 'message' => 'Access Denied: Evaluation is not allowed until the student completes 600 hours.'], 403);
+    }
+
+    // Block re-submission — evaluation is permanent once submitted
+    $existing = \App\Models\StudentEvaluation::where('student_id', $studentId)
+        ->where('supervisor_id', $reviewer->id)
+        ->whereNotNull('quality_of_work_rating')
+        ->first();
+    if ($existing) {
+        return response()->json(['success' => false, 'message' => 'Evaluation has already been submitted and cannot be changed.'], 403);
     }
 
     try {
@@ -1454,17 +1411,24 @@ Route::post('/save-evaluation/{studentId}', function ($studentId) {
             'job_title'                        => 'nullable|string|max:255',
             'quality_of_work_rating'           => 'required|string',
             'quality_of_work_comment'          => 'nullable|string|max:1000',
+            'quality_of_work_score'            => 'nullable|integer|min:1|max:5',
             'quantity_of_work_rating'          => 'required|string',
             'quantity_of_work_comment'         => 'nullable|string|max:1000',
+            'quantity_of_work_score'           => 'nullable|integer|min:1|max:5',
             'job_knowledge_rating'             => 'required|string',
             'job_knowledge_comment'            => 'nullable|string|max:1000',
+            'job_knowledge_score'              => 'nullable|integer|min:1|max:5',
             'working_relationships_rating'     => 'required|string',
             'working_relationships_comment'    => 'nullable|string|max:1000',
+            'working_relationships_score'      => 'nullable|integer|min:1|max:5',
             'attendance_dependability_rating'  => 'required|string',
             'attendance_dependability_comment' => 'nullable|string|max:1000',
+            'attendance_dependability_score'   => 'nullable|integer|min:1|max:5',
             'specific_achievements_rating'     => 'required|string',
             'specific_achievements_comment'    => 'nullable|string|max:1000',
+            'specific_achievements_score'      => 'nullable|integer|min:1|max:5',
             'feedback'                         => 'nullable|string|max:2000',
+            'signature_data'                   => 'nullable|string',
             'attendance'      => 'nullable|integer|min:0|max:5',
             'communication'   => 'nullable|integer|min:0|max:5',
             'collaboration'   => 'nullable|integer|min:0|max:5',
@@ -1474,24 +1438,61 @@ Route::post('/save-evaluation/{studentId}', function ($studentId) {
             'job_skills'      => 'nullable|integer|min:0|max:5',
             'employability'   => 'nullable|integer|min:0|max:5',
         ]);
+
         $supervisorId = $data['supervisor_id'];
         unset($data['supervisor_id']);
-        // Auto-derive overall rating from PRMSU factor ratings
+
+        // Compute score per factor from rating if score not sent by client
         $ratingMap = ['outstanding'=>5,'exceeds_expectations'=>4,'meets_expectations'=>3,'needs_improvement'=>2,'unsatisfactory'=>1];
-        $factors = ['quality_of_work_rating','quantity_of_work_rating','job_knowledge_rating','working_relationships_rating','attendance_dependability_rating','specific_achievements_rating'];
-        $scores = array_filter(array_map(fn($f) => $ratingMap[$data[$f] ?? ''] ?? 0, $factors));
-        $data['rating'] = count($scores) ? (int) round(array_sum($scores) / count($scores)) : 1;
-        $eval = \App\Models\StudentEvaluation::updateOrCreate(
-            ['student_id' => $studentId, 'supervisor_id' => $supervisorId],
-            $data
+        $factorKeys = ['quality_of_work','quantity_of_work','job_knowledge','working_relationships','attendance_dependability','specific_achievements'];
+
+        // Factor weights — must match the Evaluation Rating modal exactly
+        $factorWeights = [
+            'quality_of_work' => 20, 'quantity_of_work' => 20, 'job_knowledge' => 20,
+            'working_relationships' => 20, 'attendance_dependability' => 10, 'specific_achievements' => 10,
+        ];
+
+        $weightedTotal = 0.0;
+        foreach ($factorKeys as $f) {
+            $score = $data[$f.'_score'] ?? null;
+            if (!$score && isset($data[$f.'_rating'])) {
+                $score = $ratingMap[$data[$f.'_rating']] ?? null;
+            }
+            $data[$f.'_score'] = $score;
+            if ($score) {
+                $weightedTotal += ((int)$score / 5) * ($factorWeights[$f] ?? 0);
+            }
+        }
+
+        // Store weighted % as average_score (e.g. 84.00 means 84%)
+        $averageScore = round($weightedTotal, 2);
+        $data['average_score'] = $averageScore;
+
+        // Derive overall 1-5 rating from weighted % thresholds
+        if      ($averageScore >= 96) $data['rating'] = 5;
+        elseif  ($averageScore >= 86) $data['rating'] = 4;
+        elseif  ($averageScore >= 76) $data['rating'] = 3;
+        elseif  ($averageScore >= 66) $data['rating'] = 2;
+        else                          $data['rating'] = 1;
+
+        // Auto-set evaluation_date to today if not provided
+        if (empty($data['evaluation_date'])) {
+            $data['evaluation_date'] = \Carbon\Carbon::now('Asia/Manila')->toDateString();
+        }
+
+        $eval = \App\Models\StudentEvaluation::create(
+            array_merge(['student_id' => $studentId, 'supervisor_id' => $supervisorId], $data)
         );
-        return response()->json(['success' => true, 'rating' => $eval->rating, 'message' => 'Evaluation submitted successfully!']);
+
+        return response()->json([
+            'success'       => true,
+            'rating'        => $eval->rating,
+            'average_score' => $eval->average_score,
+            'message'       => 'Evaluation submitted successfully!',
+        ]);
     } catch (\Illuminate\Validation\ValidationException $e) {
         $messages = collect($e->errors())->flatten()->all();
-        return response()->json([
-            'success' => false,
-            'message' => 'Validation failed: ' . implode(', ', $messages)
-        ], 422);
+        return response()->json(['success' => false, 'message' => 'Validation failed: ' . implode(', ', $messages)], 422);
     } catch (\Throwable $e) {
         \Illuminate\Support\Facades\Log::error('Evaluation save error: ' . $e->getMessage());
         return response()->json(['success' => false, 'message' => 'An error occurred. Please try again.'], 500);
@@ -1647,21 +1648,88 @@ Route::post('/restore-company/{id}', function ($id) {
 Route::delete('/force-delete-company/{id}', function ($id) {
     $company = \App\Models\Company::withTrashed()->findOrFail($id);
     // Permanently delete all users under this company and their records
-    \App\Models\User::withTrashed()->where('company_id', $id)->each(function ($user) {
-        \App\Models\TimeInRecord::where('student_id', $user->id)->delete();
-        \App\Models\DailyHourLog::where('student_id', $user->id)->delete();
-        \App\Models\StudentHours::where('student_id', $user->id)->delete();
-        \App\Models\StudentRequirement::where('student_id', $user->id)->delete();
-        \App\Models\StudentEvaluation::where('student_id', $user->id)->orWhere('supervisor_id', $user->id)->delete();
-        if ($user->role === 'student' && $user->school_id_number) {
-            \App\Models\StudentSchoolId::where('school_id_number', $user->school_id_number)
-                ->update(['is_used' => false]);
-        }
-        $user->forceDelete();
+    $company->students()->withTrashed()->each(function($s) {
+        \App\Models\StudentRequirement::where('student_id', $s->id)->each(function($r) {
+            if ($r->file_path) \Illuminate\Support\Facades\Storage::disk('public')->delete($r->file_path);
+            $r->forceDelete();
+        });
+        \App\Models\DailyHourLog::where('student_id', $s->id)->delete();
+        \App\Models\TimeInRecord::where('student_id', $s->id)->delete();
+        \App\Models\StudentHours::where('student_id', $s->id)->delete();
+        \App\Models\StudentEvaluation::where('student_id', $s->id)->delete();
+        $s->forceDelete();
     });
     $company->forceDelete();
     return back()->with('success', 'Company permanently deleted!');
 })->name('force-delete-company')->middleware(['auth.custom', 'role:coordinator,ccit_head']);
+
+// Company details popup — returns JSON with students + averages
+Route::get('/api/company/{id}/details', function ($id) {
+    $activeSY = \App\Models\SchoolYear::where('is_active', true)->first();
+    $company  = \App\Models\Company::findOrFail($id);
+
+    $students = \App\Models\User::where('company_id', $id)
+        ->where('role', 'student')
+        ->when($activeSY, fn($q) => $q->where('school_year', $activeSY->label))
+        ->get();
+
+    $studentData = $students->map(function ($s) {
+        $sh   = \App\Models\StudentHours::where('student_id', $s->id)->first();
+        $eval = \App\Models\StudentEvaluation::where('student_id', $s->id)->first();
+        $completed = round($sh->hours_completed ?? 0, 2);
+        $required  = $sh->total_hours_required ?? 600;
+        
+        // Compute weighted score on-the-fly from stored factor ratings
+        $weightedScore = null;
+        $evalLabel = null;
+        if ($eval && !empty($eval->quality_of_work_rating)) {
+            $ratingMap = ['outstanding'=>5,'exceeds_expectations'=>4,'meets_expectations'=>3,'needs_improvement'=>2,'unsatisfactory'=>1];
+            $weights = ['quality_of_work'=>20,'quantity_of_work'=>20,'job_knowledge'=>20,'working_relationships'=>20,'attendance_dependability'=>10,'specific_achievements'=>10];
+            $weightedTotal = 0;
+            foreach ($weights as $factor => $weight) {
+                $rating = $eval->{$factor.'_rating'} ?? null;
+                $score = $rating ? ($ratingMap[$rating] ?? 0) : 0;
+                $weightedTotal += ($score / 5) * $weight;
+            }
+            $weightedScore = round($weightedTotal, 2);
+            $evalLabel = $weightedScore >= 96 ? 'Outstanding' : (
+                $weightedScore >= 86 ? 'Very Satisfactory' : (
+                $weightedScore >= 76 ? 'Satisfactory' : (
+                $weightedScore >= 66 ? 'Fair' : 'Poor')));
+        }
+        
+        return [
+            'name'        => $s->name,
+            'completed'   => $completed,
+            'required'    => $required,
+            'progress'    => $required > 0 ? round(($completed / $required) * 100, 1) : 0,
+            'avg_score'   => $weightedScore,
+            'eval_label'  => $evalLabel,
+        ];
+    })->values();
+
+    $avgProgress  = $studentData->avg('progress') ?? 0;
+    $avgScore     = $studentData->whereNotNull('avg_score')->avg('avg_score');
+    $totalDone    = $studentData->where('progress', '>=', 100)->count();
+
+    return response()->json([
+        'company'      => [
+            'name'            => $company->name,
+            'industry'        => $company->industry,
+            'location'        => $company->location,
+            'contact_person'  => $company->contact_person,
+            'contact_email'   => $company->contact_email,
+            'contact_phone'   => $company->contact_phone,
+        ],
+        'students'     => $studentData,
+        'stats'        => [
+            'total'        => $studentData->count(),
+            'completed'    => $totalDone,
+            'avg_progress' => round($avgProgress, 1),
+            'avg_score'    => $avgScore ? round($avgScore, 2) : null,
+        ],
+    ]);
+})->middleware(['auth.custom', 'role:coordinator,ccit_head']);
 
 // Requirement Template Routes
 Route::post('/requirement-templates', function () {
@@ -1671,6 +1739,7 @@ Route::post('/requirement-templates', function () {
         'description' => 'nullable|string|max:500',
         'max_files'   => 'required|integer|min:1|max:20',
         'sort_order'  => 'nullable|integer|min:1',
+        'deadline'    => 'required|date',
     ]);
 
     $requestedOrder = $validated['sort_order'] ?? null;
@@ -1705,6 +1774,7 @@ Route::put('/requirement-templates/{id}', function ($id) {
         'description' => 'nullable|string|max:500',
         'max_files'   => 'required|integer|min:1|max:20',
         'sort_order'  => 'required|integer|min:1|max:' . $totalInCategory,
+        'deadline'    => 'nullable|date',
     ]);
 
     $newOrder = (int) $validated['sort_order'];
@@ -2579,29 +2649,13 @@ Route::post('/award-certificate/{studentId}', function ($studentId) {
     return response()->json(['success' => true, 'message' => 'Certificate awarded to ' . $student->name . '!']);
 })->name('award-certificate')->middleware(['auth.custom', 'role:supervisor']);
 
-// Upload certificate image (supervisor action)
+// Deprecated: certificates are now auto-generated via /certificate/{studentId}.
+// Route kept (disabled) in case any stale client cache still references it.
 Route::post('/upload-certificate/{studentId}', function ($studentId) {
-    $supervisor = User::findOrFail(session('user_id'));
-    $student    = User::findOrFail($studentId);
-
-    request()->validate([
-        'certificate_image' => 'required|file|mimes:jpg,jpeg,png,pdf|max:10240',
-    ]);
-
-    // Delete old file if exists
-    if ($student->certificate_image_path) {
-        \Illuminate\Support\Facades\Storage::disk('public')->delete($student->certificate_image_path);
-    }
-
-    $path = request()->file('certificate_image')->store('certificates', 'public');
-
-    $student->update([
-        'certificate_image_path' => $path,
-        'certificate_awarded_at' => now(),
-        'certificate_awarded_by' => $supervisor->name,
-    ]);
-
-    return response()->json(['success' => true, 'url' => asset('storage/' . $path)]);
+    return response()->json([
+        'success' => false,
+        'message' => 'Manual certificate upload has been replaced by automatic certificate generation. Use "Issue Certificate" instead.',
+    ], 410);
 })->name('upload-certificate')->middleware(['auth.custom', 'role:supervisor']);
 
 // View certificate page (student or supervisor)

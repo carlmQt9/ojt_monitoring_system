@@ -210,6 +210,9 @@
         $_today = \Carbon\Carbon::now('Asia/Manila')->toDateString();
         $_navBadgeReports = \App\Models\DailyNarrative::where('student_id', $user->id)
             ->whereDate('report_date', $_today)->doesntExist() ? 1 : 0;
+
+        // Initialize afternoon countdown timer variable (used in JS later)
+        $afternoonOpensIn = 0;
     ?>
 
     @include('partials.success-popup')
@@ -511,15 +514,15 @@
             @if($user->certificate_awarded_at)
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                {{-- Left: certificate image or placeholder --}}
+                {{-- Left: auto-generated certificate preview --}}
                 <div class="bg-slate-800/60 border border-yellow-500/30 rounded-2xl overflow-hidden flex flex-col">
-                    @if($user->certificate_image_path)
-                    {{-- Clickable certificate preview --}}
-                    <div class="relative group cursor-pointer flex-1 flex items-center justify-center bg-slate-900/50 min-h-[220px]"
-                         onclick="openCertImageModal('{{ asset('storage/' . $user->certificate_image_path) }}', '{{ addslashes($user->name) }}')">
-                        <img src="{{ asset('storage/' . $user->certificate_image_path) }}"
-                             alt="Certificate of Completion"
-                             class="w-full h-full object-contain max-h-72 transition-transform duration-300 group-hover:scale-[1.02]">
+                    {{-- Clickable live certificate preview (rendered from /certificate/{id}) --}}
+                    <div class="relative group cursor-pointer flex items-center justify-center bg-slate-900/50 overflow-hidden"
+                         style="height:360px;"
+                         onclick="openCertViewModal({{ $user->id }}, '{{ addslashes($user->name) }}')">
+                        <div style="width:1050px;height:720px;transform:scale(0.46);transform-origin:top left;position:absolute;top:50%;left:50%;margin-top:-165px;margin-left:-241px;">
+                            <iframe src="{{ url('/certificate/'.$user->id) }}" class="border-0 pointer-events-none" style="width:1050px;height:720px;display:block;"></iframe>
+                        </div>
                         <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                             <span class="opacity-0 group-hover:opacity-100 transition-opacity bg-black/70 text-white text-sm font-semibold px-4 py-2 rounded-xl">
                                 🔍 Click to view full size
@@ -528,71 +531,61 @@
                     </div>
                     {{-- Action buttons --}}
                     <div class="flex gap-3 p-4 border-t border-slate-700/60">
-                        <button onclick="openCertImageModal('{{ asset('storage/' . $user->certificate_image_path) }}', '{{ addslashes($user->name) }}')"
+                        <button onclick="openCertViewModal({{ $user->id }}, '{{ addslashes($user->name) }}')"
                             class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-colors">
                             👁 View
                         </button>
-                        <button onclick="_certImageUrl='{{ asset('storage/' . $user->certificate_image_path) }}';_certImageName='{{ addslashes($user->name) }}';printCertImage()"
+                        <button onclick="openCertViewModal({{ $user->id }}, '{{ addslashes($user->name) }}');setTimeout(printCertView,600)"
                             class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors">
                             🖨️ Print
                         </button>
-                        <button onclick="_certImageUrl='{{ asset('storage/' . $user->certificate_image_path) }}';_certImageName='{{ addslashes($user->name) }}';downloadCertImage()"
+                        <button onclick="openCertViewModal({{ $user->id }}, '{{ addslashes($user->name) }}');setTimeout(downloadCertView,600)"
                             class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-semibold rounded-xl transition-colors">
                             ⬇️ Download
                         </button>
                     </div>
-                    @else
-                    {{-- Not yet uploaded --}}
-                    <div class="flex-1 flex flex-col items-center justify-center p-10 text-center min-h-[220px]">
-                        <div class="text-5xl mb-4 opacity-40">📄</div>
-                        <p class="text-gray-400 font-semibold">Certificate not yet uploaded</p>
-                        <p class="text-gray-500 text-xs mt-2">Your supervisor will upload it soon. Check back later.</p>
-                    </div>
-                    @endif
                 </div>
 
                 {{-- Right: award details --}}
-                <div class="bg-slate-800/60 border border-yellow-500/30 rounded-2xl p-6 flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center gap-3 mb-5">
-                            <div class="w-12 h-12 bg-yellow-500/20 border border-yellow-500/40 rounded-xl flex items-center justify-center text-2xl shrink-0">🏅</div>
-                            <div>
-                                <p class="text-yellow-300 font-bold text-lg leading-tight">Certificate of Completion</p>
-                                <p class="text-gray-400 text-xs">OJT Monitoring System</p>
-                            </div>
-                        </div>
-
-                        <div class="space-y-3">
-                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
-                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Recipient</span>
-                                <span class="text-white font-semibold text-sm">{{ $user->name }}</span>
-                            </div>
-                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
-                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Company</span>
-                                <span class="text-white text-sm">{{ $user->company->name ?? '—' }}</span>
-                            </div>
-                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
-                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Hours Rendered</span>
-                                <span class="text-green-400 font-bold text-sm">{{ number_format($_timeinCompleted, 2) }} hrs</span>
-                            </div>
-                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
-                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Awarded by</span>
-                                <span class="text-white text-sm">{{ $user->certificate_awarded_by }}</span>
-                            </div>
-                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
-                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Date Awarded</span>
-                                <span class="text-white text-sm">{{ $user->certificate_awarded_at->format('F d, Y') }}</span>
-                            </div>
-                            @if($user->school_year)
-                            <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-xl">
-                                <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">School Year</span>
-                                <span class="text-white text-sm">{{ $user->school_year }}</span>
-                            </div>
-                            @endif
+                <div class="bg-slate-800/60 border border-yellow-500/30 rounded-2xl p-6 flex flex-col">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-12 h-12 bg-yellow-500/20 border border-yellow-500/40 rounded-xl flex items-center justify-center text-2xl shrink-0">🏅</div>
+                        <div>
+                            <p class="text-yellow-300 font-bold text-lg leading-tight">Certificate of Completion</p>
+                            <p class="text-gray-400 text-xs">OJT Monitoring System</p>
                         </div>
                     </div>
 
-                    <div class="mt-5 pt-4 border-t border-slate-700/60">
+                    <div class="space-y-2.5">
+                        <div class="flex items-start gap-3 p-2.5 bg-slate-700/40 rounded-xl">
+                            <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Recipient</span>
+                            <span class="text-white font-semibold text-sm">{{ $user->name }}</span>
+                        </div>
+                        <div class="flex items-start gap-3 p-2.5 bg-slate-700/40 rounded-xl">
+                            <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Company</span>
+                            <span class="text-white text-sm">{{ $user->company->name ?? '—' }}</span>
+                        </div>
+                        <div class="flex items-start gap-3 p-2.5 bg-slate-700/40 rounded-xl">
+                            <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Hours Rendered</span>
+                            <span class="text-green-400 font-bold text-sm">{{ number_format($_timeinCompleted, 2) }} hrs</span>
+                        </div>
+                        <div class="flex items-start gap-3 p-2.5 bg-slate-700/40 rounded-xl">
+                            <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Awarded by</span>
+                            <span class="text-white text-sm">{{ $user->certificate_awarded_by }}</span>
+                        </div>
+                        <div class="flex items-start gap-3 p-2.5 bg-slate-700/40 rounded-xl">
+                            <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">Date Awarded</span>
+                            <span class="text-white text-sm">{{ $user->certificate_awarded_at->format('F d, Y') }}</span>
+                        </div>
+                        @if($user->school_year)
+                        <div class="flex items-start gap-3 p-2.5 bg-slate-700/40 rounded-xl">
+                            <span class="text-gray-400 text-xs w-24 shrink-0 pt-0.5">School Year</span>
+                            <span class="text-white text-sm">{{ $user->school_year }}</span>
+                        </div>
+                        @endif
+                    </div>
+
+                    <div class="mt-4 pt-4 border-t border-slate-700/60">
                         <div class="flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
                             <span class="text-green-400 text-xs font-semibold">OJT Successfully Completed</span>
@@ -1421,6 +1414,16 @@
             $tplOnboarding = \App\Models\RequirementTemplate::where('category','onboarding')->orderBy('sort_order')->orderBy('name')->get();
             $tplDaily      = \App\Models\RequirementTemplate::where('category','daily')->orderBy('sort_order')->orderBy('name')->get();
             $onboarding = $tplOnboarding->pluck('max_files','name')->toArray();
+            
+            // Create a map of requirement names to their deadlines
+            $deadlineMap = [];
+            foreach($tplOnboarding as $tpl) {
+                $deadlineMap[$tpl->name] = $tpl->deadline;
+            }
+            foreach($tplDaily as $tpl) {
+                $deadlineMap[$tpl->name] = $tpl->deadline;
+            }
+            $nowManila = \Carbon\Carbon::now('Asia/Manila');
         ?>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
@@ -1433,21 +1436,39 @@
                 @else
                 <ul class="space-y-3" data-pagination-list>
                     @foreach($onboarding as $item => $maxFiles)
-                        <?php $found = $requirements->first(fn($r)=> stripos($r->title, $item) !== false); $exists = (bool)$found; ?>
-                        <li class="flex justify-between items-center p-3 bg-slate-700/40 rounded-lg">
-                            <div>
+                        <?php 
+                            $found = $requirements->first(fn($r)=> stripos($r->title, $item) !== false); 
+                            $exists = (bool)$found;
+                            $deadline = $deadlineMap[$item] ?? null;
+                            $isPastDeadline = $deadline && \Carbon\Carbon::parse($deadline)->lt($nowManila->startOfDay());
+                        ?>
+                        <li class="flex justify-between items-center p-3 bg-slate-700/40 rounded-lg {{ $isPastDeadline && !$exists ? 'opacity-60' : '' }}">
+                            <div class="flex-1">
                                 <div class="text-gray-200 font-semibold text-sm">{{ $item }}</div>
                                 <div class="text-xs mt-0.5 {{ $exists ? ($found->status==='approved' ? 'text-green-400' : ($found->status==='denied' ? 'text-red-400' : 'text-yellow-400')) : 'text-gray-500' }}">
                                     {{ $exists ? ucfirst($found->status) : 'Not submitted' }}
                                     @if($maxFiles > 1)<span class="text-gray-500 ml-1">(up to {{ $maxFiles }} photos)</span>@endif
                                 </div>
+                                @if($deadline && !$exists)
+                                    @php
+                                        $deadlineDate = \Carbon\Carbon::parse($deadline, 'Asia/Manila');
+                                        $dayName = $deadlineDate->format('D');
+                                    @endphp
+                                    <div class="text-xs mt-1 {{ $isPastDeadline ? 'text-red-400' : 'text-yellow-400' }}">
+                                        {{ $isPastDeadline ? '⏰ Deadline passed:' : '📅 Deadline:' }} {{ $dayName }} - {{ $deadlineDate->format('M d, Y') }}
+                                    </div>
+                                @endif
                             </div>
                             <div class="flex items-center gap-2">
                                 @if($found && $found->file_path)
                                     <button type="button" onclick="openFileViewer('{{ asset('storage/' . $found->file_path) }}','{{ addslashes($item) }}')" class="px-2 py-1 bg-blue-600/80 hover:bg-blue-600 text-white rounded text-xs">View</button>
                                 @endif
                                 @if(!$exists || $found->status === 'denied')
-                                    <button type="button" onclick="openUploadModal('{{ addslashes($item) }}', {{ $maxFiles }})" class="px-2 py-1 {{ $exists && $found->status === 'denied' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700' }} text-white rounded text-xs">{{ $exists && $found->status === 'denied' ? 'Resubmit' : 'Upload' }}</button>
+                                    @if($isPastDeadline)
+                                        <button type="button" disabled class="px-2 py-1 bg-gray-600 text-gray-400 rounded text-xs cursor-not-allowed" title="Deadline has passed">Closed</button>
+                                    @else
+                                        <button type="button" onclick="openUploadModal('{{ addslashes($item) }}', {{ $maxFiles }})" class="px-2 py-1 {{ $exists && $found->status === 'denied' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700' }} text-white rounded text-xs">{{ $exists && $found->status === 'denied' ? 'Resubmit' : 'Upload' }}</button>
+                                    @endif
                                 @endif
                             </div>
                         </li>
@@ -1484,7 +1505,7 @@
                 </div>
 
                 @if($narratives->isNotEmpty())
-                <div class="space-y-2 max-h-72 overflow-y-auto pr-1" data-pagination-list data-page-size="10">
+                <div class="space-y-2 pr-1" data-pagination-list data-page-size="10">
                     @foreach($narratives as $n)
                     <div class="flex items-start gap-3 p-3 bg-slate-700/40 rounded-lg cursor-pointer hover:bg-slate-700/60 transition-colors"
                          onclick="openNarrativeViewModal({{ $n->id }}, '{{ addslashes($n->description) }}', '{{ $n->photo_url }}', {{ $n->day_number }}, '{{ \Carbon\Carbon::parse($n->report_date)->format('M d, Y') }}')">
@@ -1781,10 +1802,10 @@
         @php
             $narrativeReports = \App\Models\DailyNarrative::where('student_id', $user->id)
                 ->orderBy('day_number', 'desc')->get();
-            $narrativePdfEntries = $narrativeReports->map(function ($entry) {
+            $narrativePdfEntries = $narrativeReports->sortBy('day_number')->map(function ($entry) {
                 return [
                     'day' => $entry->day_number,
-                    'date' => \Carbon\Carbon::parse($entry->report_date)->format('F d, Y'),
+                    'date' => \Carbon\Carbon::parse($entry->report_date)->format('l, F d, Y'),
                     'description' => $entry->description,
                     'photo' => $entry->photo_url,
                 ];
@@ -1869,7 +1890,6 @@
             <div class="flex justify-between items-center px-5 py-3 border-b border-slate-700 shrink-0">
                 <span id="fileViewerTitle" class="text-sm font-semibold text-white truncate">File Preview</span>
                 <div class="flex items-center gap-2">
-                    <a id="fileViewerDownload" href="#" target="_blank" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">⬇ Open / Download</a>
                     <button onclick="closeFileViewer()" class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-lg leading-none">✕</button>
                 </div>
             </div>
@@ -3364,10 +3384,8 @@
         function openFileViewer(url, title) {
             const modal = document.getElementById('fileViewerModal');
             const body  = document.getElementById('fileViewerBody');
-            const dl    = document.getElementById('fileViewerDownload');
             const ttl   = document.getElementById('fileViewerTitle');
             ttl.textContent = title || 'File Preview';
-            dl.href = url;
             body.innerHTML = '';
             const ext = url.split('?')[0].split('.').pop().toLowerCase();
             if (['jpg','jpeg','png','gif','webp','bmp'].includes(ext)) {
@@ -4142,56 +4160,49 @@
     </div>
     <!-- ===== END UPLOAD LOADER OVERLAY ===== -->
 
-    <!-- ===== CERTIFICATE IMAGE MODAL ===== -->
-    <div id="certImageModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4"
-         onclick="if(event.target===this)closeCertImageModal()">
+    <!-- ===== CERTIFICATE VIEW MODAL (auto-generated, rendered via iframe) ===== -->
+    <div id="certViewModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4"
+         onclick="if(event.target===this)closeCertViewModal()">
         <div class="bg-slate-900 border border-yellow-500/30 rounded-2xl shadow-2xl flex flex-col"
-             style="max-width:960px;width:100%;max-height:92vh;">
+             style="max-width:1100px;width:100%;max-height:92vh;">
             <div class="flex justify-between items-center px-5 py-3 border-b border-slate-700 shrink-0">
                 <span class="text-sm font-semibold text-yellow-300">🏅 OJT Certificate of Completion</span>
                 <div class="flex items-center gap-2">
-                    <button onclick="printCertImage()"
+                    <button onclick="printCertView()"
                         class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">🖨️ Print</button>
-                    <button onclick="downloadCertImage()"
-                        class="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs font-semibold">⬇️ Download</button>
-                    <button onclick="closeCertImageModal()"
+                    <button onclick="downloadCertView()"
+                        class="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs font-semibold">⬇️ Download PDF</button>
+                    <button onclick="closeCertViewModal()"
                         class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-lg">✕</button>
                 </div>
             </div>
             <div class="flex-1 overflow-auto flex items-center justify-center p-4 bg-slate-950/50 rounded-b-2xl">
-                <img id="certImageEl" src="" alt="Certificate"
-                     class="max-w-full max-h-full object-contain rounded-lg shadow-xl">
+                <iframe id="certViewFrame" src="" class="w-full border-0 rounded-lg shadow-xl bg-white" style="height:72vh;"></iframe>
             </div>
         </div>
     </div>
-    <!-- ===== END CERTIFICATE IMAGE MODAL ===== -->
+    <!-- ===== END CERTIFICATE VIEW MODAL ===== -->
 
     <script>
-    let _certImageUrl = '', _certImageName = '';
-    function openCertImageModal(url, name) {
-        _certImageUrl = url; _certImageName = name;
-        document.getElementById('certImageEl').src = url;
-        document.getElementById('certImageModal').classList.remove('hidden');
+    let _certViewName = '';
+    function openCertViewModal(studentId, name) {
+        _certViewName = name;
+        document.getElementById('certViewFrame').src = `/certificate/${studentId}`;
+        document.getElementById('certViewModal').classList.remove('hidden');
     }
-    function closeCertImageModal() {
-        document.getElementById('certImageModal').classList.add('hidden');
-        document.getElementById('certImageEl').src = '';
+    function closeCertViewModal() {
+        document.getElementById('certViewModal').classList.add('hidden');
+        document.getElementById('certViewFrame').src = '';
     }
-    function printCertImage() {
-        const win = window.open('', '_blank');
-        win.document.write(`<!DOCTYPE html><html><head><style>
-            *{margin:0;padding:0;box-sizing:border-box;}
-            body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff;}
-            img{max-width:100%;max-height:100vh;object-fit:contain;}
-            @page{size:landscape;margin:5mm;}
-        </style></head><body><img src="${_certImageUrl}" onload="window.print();window.close()"></body></html>`);
-        win.document.close();
+    function printCertView() {
+        document.getElementById('certViewFrame').contentWindow?.print();
     }
-    function downloadCertImage() {
-        const a = document.createElement('a');
-        a.href = _certImageUrl;
-        a.download = 'OJT_Certificate_' + _certImageName.replace(/\s+/g,'_') + '.' + _certImageUrl.split('.').pop();
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    function downloadCertView() {
+        const frame = document.getElementById('certViewFrame');
+        const filename = 'OJT_Certificate_' + _certViewName.replace(/\s+/g, '_') + '.pdf';
+        if (frame.contentWindow?.downloadAsPdf) {
+            frame.contentWindow.downloadAsPdf(filename);
+        }
     }
     </script>
 
