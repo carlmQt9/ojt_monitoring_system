@@ -691,8 +691,8 @@
                         <thead>
                             <tr class="border-b border-slate-700">
                                 <th class="text-left py-2 px-3 text-gray-300 font-semibold">Name</th>
-                                <th class="text-left py-2 px-3 text-gray-300 font-semibold">Description</th>
                                 <th class="text-center py-2 px-3 text-gray-300 font-semibold">Max Files</th>
+                                <th class="text-center py-2 px-3 text-gray-300 font-semibold">Deadline</th>
                                 <th class="text-center py-2 px-3 text-gray-300 font-semibold">Order</th>
                                 <th class="text-center py-2 px-3 text-gray-300 font-semibold">Actions</th>
                             </tr>
@@ -701,12 +701,26 @@
                             @foreach($onboardingTpls as $tpl)
                             <tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors">
                                 <td class="py-3 px-3 text-gray-200 font-medium">{{ $tpl->name }}</td>
-                                <td class="py-3 px-3 text-gray-400 text-sm">{{ $tpl->description ?? '-' }}</td>
                                 <td class="py-3 px-3 text-center"><span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-sm">{{ $tpl->max_files }}</span></td>
+                                <td class="py-3 px-3 text-center text-sm">
+                                    @if($tpl->deadline)
+                                        @php
+                                            $deadline = \Carbon\Carbon::parse($tpl->deadline, 'Asia/Manila');
+                                            $now = \Carbon\Carbon::now('Asia/Manila')->startOfDay();
+                                            $isPast = $deadline->lt($now);
+                                            $dayName = $deadline->format('D');
+                                        @endphp
+                                        <span class="px-2 py-1 rounded {{ $isPast ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400' }}">
+                                            {{ $dayName }} - {{ $deadline->format('M d, Y') }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-500">-</span>
+                                    @endif
+                                </td>
                                 <td class="py-3 px-3 text-center text-gray-400 text-sm">{{ $tpl->sort_order }}</td>
                                 <td class="py-3 px-3 text-center">
                                     <div class="flex items-center justify-center gap-2">
-                                        <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }},{{ $tpl->category === 'onboarding' ? $onboardingCount : $dailyCount }})" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Edit</button>
+                                        <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }},{{ $tpl->category === 'onboarding' ? $onboardingCount : $dailyCount }},'{{ $tpl->deadline?->format('Y-m-d') ?? '' }}')" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm">Edit</button>
                                         <button onclick="showArchiveTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')" class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm">Archive</button>
                                     </div>
                                 </td>
@@ -723,12 +737,22 @@
                             <p class="text-gray-200 font-semibold text-sm leading-tight">{{ $tpl->name }}</p>
                             <span class="shrink-0 px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold">{{ $tpl->max_files }} file{{ $tpl->max_files != 1 ? 's' : '' }}</span>
                         </div>
-                        @if($tpl->description)
-                        <p class="text-gray-400 text-xs mb-2">{{ $tpl->description }}</p>
+                        @if($tpl->deadline)
+                            @php
+                                $deadline = \Carbon\Carbon::parse($tpl->deadline, 'Asia/Manila');
+                                $now = \Carbon\Carbon::now('Asia/Manila')->startOfDay();
+                                $isPast = $deadline->lt($now);
+                                $dayName = $deadline->format('D');
+                            @endphp
+                            <p class="text-xs mb-2">
+                                <span class="px-2 py-0.5 rounded {{ $isPast ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400' }}">
+                                    {{ $dayName }} - {{ $deadline->format('M d, Y') }}
+                                </span>
+                            </p>
                         @endif
                         <p class="text-gray-500 text-xs mb-3">Order: {{ $tpl->sort_order }}</p>
                         <div class="flex gap-2">
-                            <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }},{{ $tpl->category === 'onboarding' ? $onboardingCount : $dailyCount }})"
+                            <button onclick="showEditTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}','{{ $tpl->category }}','{{ addslashes($tpl->description ?? '') }}',{{ $tpl->max_files }},{{ $tpl->sort_order }},{{ $tpl->category === 'onboarding' ? $onboardingCount : $dailyCount }},'{{ $tpl->deadline?->format('Y-m-d') ?? '' }}')
                                 class="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors">✏️ Edit</button>
                             <button onclick="showArchiveTemplateModal({{ $tpl->id }},'{{ addslashes($tpl->name) }}')"
                                 class="flex-1 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition-colors">🗑 Archive</button>
@@ -883,8 +907,8 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-2">Description</label>
-                    <textarea name="description" rows="2" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none" placeholder="Optional description"></textarea>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Deadline <span class="text-red-400">*</span></label>
+                    <input type="date" name="deadline" required class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -922,11 +946,10 @@
                     <select name="category" id="edit_tpl_category" required class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
                         <option value="onboarding">Onboarding</option>
                     </select>
-                    </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-2">Description</label>
-                    <textarea name="description" id="edit_tpl_description" rows="2" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none"></textarea>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Deadline <span class="text-gray-500 font-normal">(optional)</span></label>
+                    <input type="date" name="deadline" id="edit_tpl_deadline" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 text-white rounded-lg focus:border-indigo-500 focus:outline-none">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
@@ -2856,11 +2879,11 @@
         function closeAddTemplateModal() {
             document.getElementById('addTemplateModal').classList.add('hidden');
         }
-        function showEditTemplateModal(id, name, category, description, maxFiles, sortOrder, categoryCount) {
+        function showEditTemplateModal(id, name, category, description, maxFiles, sortOrder, categoryCount, deadline) {
             document.getElementById('edit_tpl_name').value = name;
             document.getElementById('edit_tpl_category').value = category;
-            document.getElementById('edit_tpl_description').value = description;
             document.getElementById('edit_tpl_max_files').value = maxFiles;
+            document.getElementById('edit_tpl_deadline').value = deadline || '';
             const orderInput = document.getElementById('edit_tpl_sort_order');
             orderInput.value = sortOrder;
             orderInput.min = 1;

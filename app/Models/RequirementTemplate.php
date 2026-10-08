@@ -16,6 +16,11 @@ class RequirementTemplate extends Model
         'description',
         'max_files',
         'sort_order',
+        'deadline',
+    ];
+
+    protected $casts = [
+        'deadline' => 'date',
     ];
 
     protected static function booted(): void
