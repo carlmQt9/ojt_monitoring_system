@@ -1739,25 +1739,36 @@ Route::post('/requirement-templates', function () {
         'description' => 'nullable|string|max:500',
         'max_files'   => 'required|integer|min:1|max:20',
         'sort_order'  => 'nullable|integer|min:1',
-        'deadline'    => 'required|date',
+        'deadline'    => 'nullable|date',
     ]);
 
+    $deadline     = !empty($validated['deadline']) ? $validated['deadline'] : null;
+    $category     = $validated['category'];
     $requestedOrder = $validated['sort_order'] ?? null;
-    $category = $validated['category'];
 
     if ($requestedOrder) {
-        // Shift existing templates in the same category up to make room
         \App\Models\RequirementTemplate::where('category', $category)
-            ->where('sort_order', '>=', $requestedOrder)
-            ->increment('sort_order');
-        $validated['sort_order'] = $requestedOrder;
+            ->where('sort_order', '>=', $requestedOrder)->increment('sort_order');
+        $sortOrder = $requestedOrder;
     } else {
-        // Auto-assign next available sort_order for this category
         $max = \App\Models\RequirementTemplate::where('category', $category)->max('sort_order') ?? 0;
-        $validated['sort_order'] = $max + 1;
+        $sortOrder = $max + 1;
     }
 
-    \App\Models\RequirementTemplate::create($validated);
+    // Use raw INSERT so deadline is always written regardless of schema cache
+    \Illuminate\Support\Facades\DB::statement(
+        "INSERT INTO requirement_templates (name, category, description, max_files, sort_order, deadline, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())",
+        [
+            $validated['name'],
+            $category,
+            $validated['description'] ?? null,
+            $validated['max_files'],
+            $sortOrder,
+            $deadline,
+        ]
+    );
+
     return back()->with('success', 'Requirement added successfully!');
 })->name('requirement-templates.store')->middleware(['auth.custom', 'role:ccit_head']);
 
@@ -1765,7 +1776,6 @@ Route::put('/requirement-templates/{id}', function ($id) {
     $tpl = \App\Models\RequirementTemplate::findOrFail($id);
     $newCategory = request()->input('category', $tpl->category);
 
-    // Max allowed = highest sort_order in the target category (always gapless after reorder)
     $totalInCategory = \App\Models\RequirementTemplate::where('category', $newCategory)->count();
 
     $validated = request()->validate([
@@ -1777,39 +1787,37 @@ Route::put('/requirement-templates/{id}', function ($id) {
         'deadline'    => 'nullable|date',
     ]);
 
-    $newOrder = (int) $validated['sort_order'];
-    $oldOrder = (int) $tpl->sort_order;
-    $newCategory = $validated['category'];
-    $oldCategory = $tpl->category;
+    $deadline  = !empty($validated['deadline']) ? $validated['deadline'] : null;
+    $newOrder  = (int) $validated['sort_order'];
+    $oldOrder  = (int) $tpl->sort_order;
+    $newCat    = $validated['category'];
+    $oldCat    = $tpl->category;
 
-    if ($newCategory !== $oldCategory) {
-        // Moving to a different category: close gap in old, make room in new
-        \App\Models\RequirementTemplate::where('category', $oldCategory)
-            ->where('id', '!=', $id)
-            ->where('sort_order', '>', $oldOrder)
-            ->decrement('sort_order');
-
-        \App\Models\RequirementTemplate::where('category', $newCategory)
-            ->where('id', '!=', $id)
-            ->where('sort_order', '>=', $newOrder)
-            ->increment('sort_order');
+    if ($newCat !== $oldCat) {
+        \App\Models\RequirementTemplate::where('category', $oldCat)->where('id', '!=', $id)->where('sort_order', '>', $oldOrder)->decrement('sort_order');
+        \App\Models\RequirementTemplate::where('category', $newCat)->where('id', '!=', $id)->where('sort_order', '>=', $newOrder)->increment('sort_order');
     } elseif ($newOrder !== $oldOrder) {
         if ($newOrder < $oldOrder) {
-            // Moving up: shift items between new and old position down by 1
-            \App\Models\RequirementTemplate::where('category', $newCategory)
-                ->where('id', '!=', $id)
-                ->whereBetween('sort_order', [$newOrder, $oldOrder - 1])
-                ->increment('sort_order');
+            \App\Models\RequirementTemplate::where('category', $newCat)->where('id', '!=', $id)->whereBetween('sort_order', [$newOrder, $oldOrder - 1])->increment('sort_order');
         } else {
-            // Moving down: shift items between old and new position up by 1
-            \App\Models\RequirementTemplate::where('category', $newCategory)
-                ->where('id', '!=', $id)
-                ->whereBetween('sort_order', [$oldOrder + 1, $newOrder])
-                ->decrement('sort_order');
+            \App\Models\RequirementTemplate::where('category', $newCat)->where('id', '!=', $id)->whereBetween('sort_order', [$oldOrder + 1, $newOrder])->decrement('sort_order');
         }
     }
 
-    $tpl->update($validated);
+    // Use raw UPDATE so deadline is always written regardless of schema cache
+    \Illuminate\Support\Facades\DB::statement(
+        "UPDATE requirement_templates SET name=?, category=?, description=?, max_files=?, sort_order=?, deadline=?, updated_at=NOW() WHERE id=?",
+        [
+            $validated['name'],
+            $newCat,
+            $validated['description'] ?? null,
+            $validated['max_files'],
+            $newOrder,
+            $deadline,
+            $id,
+        ]
+    );
+
     return back()->with('success', 'Requirement updated successfully!');
 })->name('requirement-templates.update')->middleware(['auth.custom', 'role:ccit_head']);
 
@@ -3154,3 +3162,31 @@ table.sig td  { width:50%; padding:0 6pt; font-size:8pt; vertical-align:bottom; 
         ->header('Content-Disposition', 'attachment; filename="NarrativeReport_' . $safeName . '_' . now()->format('Y-m-d') . '.doc"')
         ->header('Cache-Control', 'max-age=0');
 })->name('narrative-report.download')->middleware('auth.custom');
+
+
+// ── TEMP: Force-write deadline directly to DB (bypasses all Eloquent) ──────────
+Route::post('/debug-set-deadline', function () {
+    $id       = request('id');
+    $deadline = request('deadline');
+    if (!$id || !$deadline) return response()->json(['error' => 'id and deadline required'], 400);
+    try {
+        \Illuminate\Support\Facades\DB::statement(
+            "UPDATE requirement_templates SET deadline = ? WHERE id = ?",
+            [$deadline, $id]
+        );
+        $check = \Illuminate\Support\Facades\DB::select("SELECT id, name, deadline FROM requirement_templates WHERE id = ?", [$id]);
+        return response()->json(['success' => true, 'row' => $check[0] ?? null]);
+    } catch (\Throwable $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+})->middleware('auth.custom');
+
+// ── TEMP: Dump exactly what the PUT edit form sends ──────────────────────────
+Route::post('/debug-put-payload', function () {
+    return response()->json([
+        'all_input' => request()->all(),
+        'deadline'  => request('deadline'),
+        'method'    => request('_method'),
+    ]);
+})->middleware('auth.custom');
+// ── END TEMP ────────────────────────────────────────────────────────────────────

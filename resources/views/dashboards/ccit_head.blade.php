@@ -666,10 +666,61 @@
         <!-- SECTION: Manage Requirements -->
         <section id="section-manage-requirements" class="dash-section hidden">
         <?php
-            $reqTemplates = \App\Models\RequirementTemplate::orderBy('category')->orderBy('sort_order')->orderBy('name')->get();
-            $archivedTemplates = \App\Models\RequirementTemplate::onlyTrashed()->orderBy('deleted_at','desc')->get();
-            $onboardingCount = \App\Models\RequirementTemplate::where('category','onboarding')->count();
-            $dailyCount = \App\Models\RequirementTemplate::where('category','daily')->count();
+            // ── DEBUG: show raw DB state (remove after fixing) ──
+            try {
+                $__cols = \Illuminate\Support\Facades\DB::select("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='requirement_templates' ORDER BY ORDINAL_POSITION");
+                $__colNames = array_column($__cols, 'COLUMN_NAME');
+                $__hasDeadline = in_array('deadline', $__colNames);
+                $__rawRows = \Illuminate\Support\Facades\DB::select("SELECT id, name, deadline FROM requirement_templates WHERE deleted_at IS NULL LIMIT 5");
+                // Show what routes/web.php version is running — check for our raw SQL marker
+                $__routeVersion = function_exists('__deadline_raw_sql_v2') ? 'RAW SQL v2' : 'checking...';
+                // Check if raw SQL route marker exists by trying to read a known string
+                $__webphpHash = md5_file(base_path('routes/web.php'));
+            } catch(\Throwable $__e) {
+                $__colNames = ['ERROR: '.$__e->getMessage()];
+                $__hasDeadline = false;
+                $__rawRows = [];
+                $__webphpHash = 'error';
+            }
+        ?>
+        <div class="mb-4 p-4 bg-red-900/60 border border-red-500 rounded-xl text-xs font-mono text-white">
+            <p class="font-bold text-yellow-300 mb-2">⚠️ DEBUG (remove after fixing)</p>
+            <p>deadline column exists: <strong class="{{ $__hasDeadline ? 'text-green-400' : 'text-red-400' }}">{{ $__hasDeadline ? 'YES ✅' : 'NO ❌' }}</strong></p>
+            <p class="mt-1">All columns: {{ implode(', ', $__colNames) }}</p>
+            <p class="mt-1">routes/web.php MD5: <strong class="text-yellow-300">{{ $__webphpHash }}</strong></p>
+            <p class="mt-2 font-bold">Raw deadline values from DB:</p>
+            @foreach($__rawRows as $__r)
+            <p>ID={{ $__r->id }} | {{ $__r->name }} → deadline={{ json_encode($__r->deadline) }}</p>
+            @endforeach
+            <div class="mt-3 pt-3 border-t border-red-600">
+                <p class="font-bold text-yellow-300 mb-1">Direct DB write test — set ID=1 deadline to 2026-12-31:</p>
+                <button onclick="
+                    fetch('/debug-set-deadline',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-CSRF-TOKEN':document.querySelector('meta[name=csrf-token]').content},body:'id=1&deadline=2026-12-31'})
+                    .then(r=>r.json()).then(d=>alert(JSON.stringify(d,null,2))).catch(e=>alert('FETCH ERROR: '+e));
+                " class="px-3 py-1 bg-yellow-500 text-black rounded font-bold mr-2">① Test Direct SQL Write on ID=1</button>
+                <p class="mt-1 text-gray-400">Click ① — share the alert popup here. Then reload page to see if deadline appears above.</p>
+            </div>
+        </div>
+        <?php
+            // Load templates via raw SQL so deadline is always fetched regardless of Eloquent schema cache
+            $rawTpls = \Illuminate\Support\Facades\DB::select(
+                "SELECT id, name, category, description, max_files, sort_order, deadline, deleted_at
+                 FROM requirement_templates WHERE deleted_at IS NULL ORDER BY category, sort_order, name"
+            );
+            // Convert to a collection of objects matching what the blade expects
+            $reqTemplates = collect($rawTpls)->map(function($r) {
+                $r->deadline = !empty($r->deadline) ? \Carbon\Carbon::parse($r->deadline) : null;
+                return $r;
+            });
+            $archivedTemplates = collect(\Illuminate\Support\Facades\DB::select(
+                "SELECT id, name, category, max_files, sort_order, deadline, deleted_at FROM requirement_templates WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+            ))->map(function($r) {
+                $r->deleted_at = !empty($r->deleted_at) ? \Carbon\Carbon::parse($r->deleted_at) : null;
+                $r->deadline   = !empty($r->deadline)   ? \Carbon\Carbon::parse($r->deadline)   : null;
+                return $r;
+            });
+            $onboardingCount = $reqTemplates->where('category','onboarding')->count();
+            $dailyCount      = $reqTemplates->where('category','daily')->count();
         ?>
         <div class="mb-6">
             <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
