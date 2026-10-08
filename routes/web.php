@@ -1484,6 +1484,26 @@ Route::post('/save-evaluation/{studentId}', function ($studentId) {
             array_merge(['student_id' => $studentId, 'supervisor_id' => $supervisorId], $data)
         );
 
+        // Raw SQL patch: write signature_data and average_score directly
+        // bypasses Eloquent schema cache in case columns are missing from cache
+        try {
+            $sigVal   = $data['signature_data'] ?? null;
+            $scoreVal = $data['average_score']   ?? null;
+            if ($eval->id && ($sigVal !== null || $scoreVal !== null)) {
+                $sets = [];
+                $binds = [];
+                if ($sigVal !== null)   { $sets[] = 'signature_data = ?';  $binds[] = $sigVal; }
+                if ($scoreVal !== null) { $sets[] = 'average_score = ?';   $binds[] = $scoreVal; }
+                $binds[] = $eval->id;
+                \Illuminate\Support\Facades\DB::statement(
+                    'UPDATE student_evaluations SET ' . implode(', ', $sets) . ' WHERE id = ?',
+                    $binds
+                );
+            }
+        } catch (\Throwable $_rawErr) {
+            \Illuminate\Support\Facades\Log::error('Raw SQL patch error: ' . $_rawErr->getMessage());
+        }
+
         return response()->json([
             'success'       => true,
             'rating'        => $eval->rating,
