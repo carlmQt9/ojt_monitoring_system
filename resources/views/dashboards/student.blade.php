@@ -4161,23 +4161,28 @@
     <!-- ===== END UPLOAD LOADER OVERLAY ===== -->
 
     <!-- ===== CERTIFICATE VIEW MODAL (auto-generated, rendered via iframe) ===== -->
-    <div id="certViewModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-4"
+    <div id="certViewModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center bg-black/85 p-2 sm:p-4"
          onclick="if(event.target===this)closeCertViewModal()">
-        <div class="bg-slate-900 border border-yellow-500/30 rounded-2xl shadow-2xl flex flex-col"
-             style="max-width:1100px;width:100%;max-height:92vh;">
-            <div class="flex justify-between items-center px-5 py-3 border-b border-slate-700 shrink-0">
-                <span class="text-sm font-semibold text-yellow-300">🏅 OJT Certificate of Completion</span>
-                <div class="flex items-center gap-2">
+        <div class="bg-slate-900 border border-yellow-500/30 rounded-2xl shadow-2xl flex flex-col w-full"
+             style="max-width:1100px;max-height:92vh;">
+            <!-- Header -->
+            <div class="flex justify-between items-center px-4 py-3 border-b border-slate-700 shrink-0">
+                <span class="text-xs sm:text-sm font-semibold text-yellow-300 truncate mr-2">🏅 <span id="certViewModalName">OJT Certificate</span></span>
+                <div class="flex items-center gap-1.5 shrink-0">
                     <button onclick="printCertView()"
-                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">🖨️ Print</button>
+                        class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">🖨️ Print</button>
                     <button onclick="downloadCertView()"
-                        class="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs font-semibold">⬇️ Download PDF</button>
+                        class="px-2.5 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs font-semibold">⬇️ Download PDF</button>
                     <button onclick="closeCertViewModal()"
                         class="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 hover:bg-slate-600 text-gray-300 hover:text-white text-lg">✕</button>
                 </div>
             </div>
-            <div class="flex-1 overflow-auto flex items-center justify-center p-4 bg-slate-950/50 rounded-b-2xl">
-                <iframe id="certViewFrame" src="" class="w-full border-0 rounded-lg shadow-xl bg-white" style="height:72vh;"></iframe>
+            <!-- Certificate — horizontally scrollable on mobile so content isn't squished -->
+            <div class="flex-1 overflow-auto bg-slate-950/50 rounded-b-2xl" style="min-height:0;">
+                <div style="min-width:740px; padding:12px;">
+                    <iframe id="certViewFrame" src="" class="border-0 rounded-lg shadow-xl bg-white block"
+                            style="width:100%;height:calc(92vh - 120px);min-height:500px;"></iframe>
+                </div>
             </div>
         </div>
     </div>
@@ -4188,6 +4193,8 @@
     function openCertViewModal(studentId, name) {
         _certViewName = name;
         document.getElementById('certViewFrame').src = `/certificate/${studentId}`;
+        const nameEl = document.getElementById('certViewModalName');
+        if (nameEl) nameEl.textContent = name ? name + ' — Certificate' : 'OJT Certificate';
         document.getElementById('certViewModal').classList.remove('hidden');
     }
     function closeCertViewModal() {
